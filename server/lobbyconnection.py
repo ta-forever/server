@@ -572,6 +572,10 @@ class LobbyConnection:
         login = message["login"].strip()
         password = message["password"]
 
+        # ';' separated list of adresses that the client believes may be accessible for purpose of hosting games
+        # or None if client expects ICE adaper to work this out
+        local_ip = message.get("local_ip", None)
+
         async with self._db.acquire() as conn:
             player_id, login, steamid = await self.check_user_login(conn, login, password)
             metrics.user_logins.labels("success").inc()
@@ -617,6 +621,7 @@ class LobbyConnection:
         self.player = Player(
             login=str(login),
             session=self.session,
+            ip=local_ip,
             player_id=player_id,
             lobby_connection=self
         )

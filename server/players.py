@@ -35,6 +35,7 @@ class Player:
         self,
         login: str = None,
         session: int = 0,
+        ip = None,
         player_id: int = 0,
         ratings=None,
         clan=None,
@@ -45,6 +46,7 @@ class Player:
 
         self.id = player_id
         self.login = login
+        self.ip = ip
 
         # The player_id of the user in the `login` table of the database.
         self.session = session
@@ -77,6 +79,10 @@ class Player:
     @property
     def faction(self) -> Faction:
         return self._faction
+
+    @property
+    def address(self) -> str:
+        return self.ip
 
     @faction.setter
     def faction(self, value: Union[str, int, Faction]) -> None:

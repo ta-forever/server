@@ -333,7 +333,7 @@ class LadderService(Service):
                 game.set_player_option(player.id, "Army", slot)
                 game.set_player_option(player.id, "Color", slot)
 
-            mapname = re.match("maps/(.+).zip", map_path).group(1)
+            mapname = re.match("maps/(.+)\.[zip|ufo]", map_path).group(1)
             # FIXME: Database filenames contain the maps/ prefix and .zip suffix.
             # Really in the future, just send a better description
             self._logger.debug("Starting ladder game: %s", game)

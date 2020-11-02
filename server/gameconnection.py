@@ -162,13 +162,14 @@ class GameConnection(GpgNetServerProtocol):
             await self.abort("The host left the lobby")
             return
 
-        await self.send_JoinGame(peer.player.login, peer.player.id)
+        await self.send_JoinGame(peer.player.address, peer.player.login, peer.player.id)
 
         if not peer:
             await self.abort("The host left the lobby")
             return
 
         await peer.send_ConnectToPeer(
+            address=self.player.address,
             player_name=self.player.login,
             player_uid=self.player.id,
             offer=True
@@ -181,6 +182,7 @@ class GameConnection(GpgNetServerProtocol):
         """
         if peer is not None:
             await self.send_ConnectToPeer(
+                address=peer.player.address,
                 player_name=peer.player.login,
                 player_uid=peer.player.id,
                 offer=True
@@ -189,6 +191,7 @@ class GameConnection(GpgNetServerProtocol):
         if peer is not None:
             with contextlib.suppress(DisconnectedError):
                 await peer.send_ConnectToPeer(
+                    address=self.address,
                     player_name=self.player.login,
                     player_uid=self.player.id,
                     offer=False
@@ -233,12 +236,19 @@ class GameConnection(GpgNetServerProtocol):
         if key == "Slots":
             self.game.max_players = int(value)
         elif key == "ScenarioFile":
+            # Forged alliance
             raw = repr(value)
             self.game.map_scenario_path = \
                 raw.replace("\\", "/").replace("//", "/").replace("'", "")
             self.game.map_file_path = "maps/{}.zip".format(
                 self.game.map_scenario_path.split("/")[2].lower()
             )
+        elif key == "MapName":
+            # Total annihilatoin
+            mapNameHint = repr(value).replace("'", "").strip(' ')
+            # @todo we only get the 1st 15 characters of the name ....
+            self.game.map_scenario_path = "maps/{}.ufo".format(mapNameHint)
+            self.game.map_file_path = "maps/{}.ufo".format(mapNameHint)
         elif key == "Title":
             self.game.name = self.game.sanitize_name(value)
 
@@ -269,8 +279,10 @@ class GameConnection(GpgNetServerProtocol):
         self._mark_dirty()
 
     async def handle_player_option(self, player_id, command, value):
-        if not self.is_host():
-            return
+        # allow joiner to advertise that they've joined
+        # (gpgnet4ta can't work out for the host who's joined until game actually starts)
+        # if not self.is_host():
+        #     return
 
         self.game.set_player_option(int(player_id), command, value)
         self._mark_dirty()

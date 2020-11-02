@@ -96,6 +96,8 @@ class ConfigurationStore:
         # How many previous queue sizes to consider
         self.QUEUE_POP_TIME_MOVING_AVG_SIZE = 5
 
+        self.CASE_SENSITIVE_MAP_NAMES = False
+
         self._defaults = {
             key: value for key, value in vars(self).items() if key.isupper()
         }

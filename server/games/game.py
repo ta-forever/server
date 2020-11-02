@@ -10,7 +10,7 @@ import pymysql
 from sqlalchemy import and_, bindparam
 from sqlalchemy.sql.functions import now as sql_now
 
-from server.config import FFA_TEAM
+from server.config import FFA_TEAM, config
 from server.db.models import game_player_stats, game_stats
 from server.games.game_results import (
     GameOutcome,
@@ -82,7 +82,7 @@ class Game:
         self.host = host
         self.name = self.sanitize_name(name)
         self.map_id = None
-        self.map_file_path = f"maps/{map_}.zip"
+        self.map_file_path = f"maps/{map_}.ufo"
         self.map_scenario_path = None
         self.password = None
         self._players = []
@@ -245,15 +245,19 @@ class Game:
         :return:
         """
         if army not in self.armies:
-            self._logger.debug(
-                "Ignoring results for unknown army %s: %s %s reported by: %s",
-                army, result_type, score, reporter
-            )
+            self._logger.debug("Game.add_result(reporter=%s,army=%s,result_type=%s,score=%s",
+                repr(reporter), repr(army), repr(result_type), repr(score))
+            self._logger.debug("  Ignoring results for unknown army. Known armies are:%s", repr(self.armies))
             return
 
         try:
             outcome = GameOutcome(result_type.upper())
         except ValueError:
+            self._logger.debug("Game.add_result(reporter=%s,army=%s,result_type=%s,score=%s",
+                repr(reporter), repr(army), repr(result_type), repr(score))
+            self._logger.debug("  Unrecognised result_type %s. Known result_types are:%s",
+                repr(result_type),
+                repr(list(map(str, GameOutcome))))
             outcome = GameOutcome.UNKNOWN
 
         result = GameResultReport(reporter, army, outcome, score)
@@ -856,12 +860,17 @@ class Game:
         :return:
         """
         try:
-            return str(self.map_scenario_path.split("/")[2]).lower()
+            folder_name = str(self.map_scenario_path.split("/")[2])
         except (IndexError, AttributeError):
             if self.map_file_path:
-                return self.map_file_path[5:-4].lower()
+                folder_name = self.map_file_path[5:-4]
             else:
-                return "scmp_009"
+                folder_name = "scmp_007"
+
+        if config.CASE_SENSITIVE_MAP_NAMES:
+            return folder_name
+        else:
+            return folder_name.lower()
 
     def __eq__(self, other):
         if not isinstance(other, Game):
