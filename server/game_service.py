@@ -79,7 +79,7 @@ class GameService(Service):
             # game, and don't end up with 800,000 junk rows in the database.
             result = await conn.execute("SELECT MAX(id) FROM game_stats")
             row = await result.fetchone()
-            self.game_id_counter = row[0]
+            self.game_id_counter = row[0] or 0
 
     async def update_data(self):
         """
@@ -158,6 +158,7 @@ class GameService(Service):
                 FeaturedModType.FAFBETA:      CustomGame,
                 FeaturedModType.EQUILIBRIUM:  CustomGame
             }.get(game_mode, Game)
+
         game = game_class(**game_args)
 
         self._games[game_id] = game
