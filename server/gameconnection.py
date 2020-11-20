@@ -191,7 +191,7 @@ class GameConnection(GpgNetServerProtocol):
         if peer is not None:
             with contextlib.suppress(DisconnectedError):
                 await peer.send_ConnectToPeer(
-                    address=self.address,
+                    address=self.player.address,
                     player_name=self.player.login,
                     player_uid=self.player.id,
                     offer=False

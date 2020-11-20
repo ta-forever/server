@@ -15,7 +15,7 @@ class GpgNetServerProtocol(metaclass=ABCMeta):
         :param player_name: Remote player name
         :param player_uid: Remote player identifier
         """
-        if address:
+        if False:
             player_name_and_address = "{}@{}".format(player_name, address)
             await self.send_gpgnet_message("ConnectToPeer", [player_name_and_address, player_uid, offer])
         else:
@@ -30,7 +30,7 @@ class GpgNetServerProtocol(metaclass=ABCMeta):
         :param remote_player_name:
         :param remote_player_uid:
         """
-        if address:
+        if False:
             remote_player_name_and_address = "{}@{}".format(remote_player_name, address)
             await self.send_gpgnet_message("JoinGame", [remote_player_name_and_address, remote_player_uid])
         else:
