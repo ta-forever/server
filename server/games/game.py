@@ -682,7 +682,9 @@ class Game:
             self.validity is ValidityState.VALID
             and ((row and not row.ranked) or (not row and not is_generated))
         ):
-            await self.mark_invalid(ValidityState.BAD_MAP)
+            #@todo enable this test again when DB is made aware of more maps
+            #await self.mark_invalid(ValidityState.BAD_MAP)
+            pass
 
         modId = self.game_service.featured_mods[self.game_mode].id
 
