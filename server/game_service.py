@@ -189,24 +189,16 @@ class GameService(Service):
     @property
     def live_games(self) -> List[Game]:
         return [game for game in self._games.values()
-                if game.state is GameState.LIVE]
+                if game.state in (GameState.LAUNCHING, GameState.LIVE)]
 
     @property
     def open_games(self) -> List[Game]:
         """
-        Return all games that meet the client's definition of "not closed".
-        Server game states are mapped to client game states as follows:
-
-            GameState.LOBBY: "open",
-            GameState.LIVE: "playing",
-            GameState.ENDED: "closed",
-            GameState.INITIALIZING: "closed",
-
-        The client ignores everything "closed". This property fetches all such not-closed games.
+        Return all games that are STAGING, BATTLEROOM, LAUNCHING or LIVE
         :return:
         """
         return [game for game in self._games.values()
-                if game.state is GameState.LOBBY or game.state is GameState.LIVE]
+                if game.state in (GameState.STAGING, GameState.BATTLEROOM, GameState.LAUNCHING, GameState.LIVE)]
 
     @property
     def all_games(self) -> ValuesView[Game]:
@@ -215,7 +207,7 @@ class GameService(Service):
     @property
     def pending_games(self) -> List[Game]:
         return [game for game in self._games.values()
-                if game.state is GameState.LOBBY or game.state is GameState.INITIALIZING]
+                if game.state in (GameState.INITIALIZING, GameState.STAGING, GameState.BATTLEROOM, GameState.LAUNCHING)]
 
     def remove_game(self, game: Game):
         if game.id in self._games:

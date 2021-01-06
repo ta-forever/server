@@ -29,7 +29,7 @@ async def host(proto):
     await proto.send_message({
         "target": "game",
         "command": "GameState",
-        "args": ["Idle"]
+        "args": ["Idle", "Idle"]
     })
     return msg
 
@@ -90,7 +90,7 @@ async def test_game_info_broadcast_on_connection_error(
             await proto.send_message({
                 "target": "game",
                 "command": "GameState",
-                "args": ["Ended"]
+                "args": ["Ended", "Ended"]
             })
 
     tasks = []

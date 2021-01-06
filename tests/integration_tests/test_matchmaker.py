@@ -58,12 +58,12 @@ async def test_game_launch_message(lobby_server):
     await proto1.send_message({
         "command": "GameState",
         "target": "game",
-        "args": ["Idle"]
+        "args": ["Idle", "Idle"]
     })
     await proto1.send_message({
         "command": "GameState",
         "target": "game",
-        "args": ["Lobby"]
+        "args": ["Lobby", "Staging"]
     })
     msg2 = await read_until_command(proto2, "game_launch")
 
@@ -87,12 +87,12 @@ async def test_game_matchmaking_start(lobby_server, database):
     await host.send_message({
         "command": "GameState",
         "target": "game",
-        "args": ["Idle"]
+        "args": ["Idle", "Idle"]
     })
     await host.send_message({
         "command": "GameState",
         "target": "game",
-        "args": ["Lobby"]
+        "args": ["Lobby", "Staging"]
     })
     await read_until_command(host, "game_info")
 
@@ -100,12 +100,12 @@ async def test_game_matchmaking_start(lobby_server, database):
     await guest.send_message({
         "command": "GameState",
         "target": "game",
-        "args": ["Idle"]
+        "args": ["Idle", "Idle"]
     })
     await guest.send_message({
         "command": "GameState",
         "target": "game",
-        "args": ["Lobby"]
+        "args": ["Lobby", "Staging"]
     })
     await read_until_command(host, "game_info")
     await read_until_command(guest, "game_info")

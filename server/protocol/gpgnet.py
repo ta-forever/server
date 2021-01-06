@@ -9,32 +9,20 @@ class GpgNetServerProtocol(metaclass=ABCMeta):
     async def send_ConnectToPeer(self, address: Optional[str], player_name: str, player_uid: int, offer: bool):
         """
         Tells a client that has a listening LobbyComm instance to connect to the given peer
-        :param address: ';' separated list of addresses to try, or None.
-                        Ignored (and dropped) by ICE adapter when forwarding to game.
-                        If present, we'll tac it onto end of player name so it doesn't get lost if theres an ICE adapter in the way.
+        :param address: Ignored
         :param player_name: Remote player name
         :param player_uid: Remote player identifier
         """
-        if False:
-            player_name_and_address = "{}@{}".format(player_name, address)
-            await self.send_gpgnet_message("ConnectToPeer", [player_name_and_address, player_uid, offer])
-        else:
-            await self.send_gpgnet_message("ConnectToPeer", [player_name, player_uid, offer])
+        await self.send_gpgnet_message("ConnectToPeer", [player_name, player_uid, offer])
 
     async def send_JoinGame(self, address: Optional[str], remote_player_name: str, remote_player_uid: int):
         """
         Tells the game to join the given peer by ID
-        :param address: ';' separated list of addresses to try, or None.
-                        Ignored (and dropped) by ICE adapter when forwarding to game.
-                        If present, we'll tac it onto end of player name so it doesn't get lost if theres an ICE adapter in the way.
+        :param address: Ignored
         :param remote_player_name:
         :param remote_player_uid:
         """
-        if False:
-            remote_player_name_and_address = "{}@{}".format(remote_player_name, address)
-            await self.send_gpgnet_message("JoinGame", [remote_player_name_and_address, remote_player_uid])
-        else:
-            await self.send_gpgnet_message("JoinGame", [remote_player_name, remote_player_uid])
+        await self.send_gpgnet_message("JoinGame", [remote_player_name, remote_player_uid])
 
     async def send_HostGame(self, map_path):
         """

@@ -720,7 +720,7 @@ class LobbyConnection:
             return
 
         game = self.game_service[game_id]  # type: Game
-        if game.state is not GameState.LOBBY and game.state is not GameState.LIVE:
+        if game.state not in (GameState.STAGING, GameState.BATTLEROOM, GameState.LAUNCHING, GameState.LIVE):
             await self.send_warning("The game you were connected to is no longer available")
             return
 
@@ -736,7 +736,8 @@ class LobbyConnection:
         )
 
         game.add_game_connection(self.game_connection)
-        self.player.state = PlayerState.PLAYING
+        # or maybe HOSTING/HOSTED/JOINING/JOINED ... but do we have sufficient information to restore state correctly?
+        self.player_service.set_player_state(self.player, PlayerState.PLAYING)
         self.player.game = game
 
     async def command_ask_session(self, message):
@@ -848,12 +849,12 @@ class LobbyConnection:
             })
             return
 
-        if not game or game.state is not GameState.LOBBY:
-            self._logger.debug("Game not in lobby state: %s state %s", game, game.state)
+        if not game or game.state not in (GameState.STAGING, GameState.BATTLEROOM):
+            self._logger.debug("Game not joinable: %s state %s", game, game.state)
             await self.send({
                 "command": "notice",
                 "style": "info",
-                "text": "The game you are trying to join is not ready."
+                "text": "The game you are trying to join is not joinable."
             })
             return
 
@@ -963,7 +964,7 @@ class LobbyConnection:
             games=self.game_service
         )
 
-        self.player.state = PlayerState.HOSTING if is_host else PlayerState.JOINING
+        self.player_service.set_player_state(self.player, PlayerState.HOSTING if is_host else PlayerState.JOINING)
         self.player.game = game
         cmd = {
             "command": "game_launch",

@@ -48,7 +48,7 @@ async def test_games(control_server, lobby_server, game_service):
     await proto.send_message({
         "target": "game",
         "command": "GameState",
-        "args": ["Idle"]
+        "args": ["Idle", "Idle"]
     })
     await proto.send_message({
         "target": "game",

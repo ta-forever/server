@@ -8,10 +8,11 @@ from server.players import Player
 @unique
 class GameState(Enum):
     INITIALIZING = 0
-    LOBBY = 1
-    LIVE = 2
-    ENDED = 3
-
+    STAGING = 1
+    BATTLEROOM = 2
+    LAUNCHING = 3
+    LIVE = 4
+    ENDED = 5
 
 @unique
 class Victory(Enum):

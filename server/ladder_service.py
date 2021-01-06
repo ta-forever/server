@@ -28,6 +28,7 @@ from .db.models import (
 )
 from .decorators import with_logger
 from .game_service import GameService
+from .player_service import PlayerService
 from .games import FeaturedModType, LadderGame
 from .matchmaker import MapPool, MatchmakerQueue, Search
 from .players import Player, PlayerState
@@ -46,10 +47,12 @@ class LadderService(Service):
         self,
         database: FAFDatabase,
         game_service: GameService,
+        player_service: PlayerService
     ):
         self._db = database
         self._informed_players: Set[Player] = set()
         self.game_service = game_service
+        self.player_service = player_service
         self.queues = {}
 
         self._searches: Dict[Player, Dict[str, Search]] = defaultdict(dict)
@@ -171,7 +174,7 @@ class LadderService(Service):
         search = Search(players, rating_type=queue.rating_type)
 
         for player in players:
-            player.state = PlayerState.SEARCHING_LADDER
+            self.player_service.set_player_state(player, PlayerState.SEARCHING_LADDER)
             # FIXME: For now, inform_player is only designed for ladder1v1
             if queue_name == "ladder1v1":
                 self.inform_player(player)
@@ -221,7 +224,7 @@ class LadderService(Service):
                 not self._searches[player]
                 and player.state == PlayerState.SEARCHING_LADDER
             ):
-                player.state = PlayerState.IDLE
+                self.player_service.set_player_state(player, PlayerState.IDLE)
         self._logger.info(
             "%s stopped searching for %s", cancelled_search, queue_name
         )
