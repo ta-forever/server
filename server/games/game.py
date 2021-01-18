@@ -62,7 +62,7 @@ class Game:
         rating_type: Optional[str] = None,
         displayed_rating_range: Optional[InclusiveRange] = None,
         enforce_rating_range: bool = False,
-        max_players: int = 12
+        max_players: int = 10
     ):
         self._db = database
         self._results = GameResultReports(id_)

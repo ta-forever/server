@@ -779,7 +779,7 @@ class LobbyConnection:
             avatar_url = message["avatar"]
 
             async with self._db.acquire() as conn:
-                if avatar_url is not None:
+                if avatar_url is not None and len(avatar_url)>0:
                     result = await conn.execute(
                         select([
                             avatars_list.c.id, avatars_list.c.tooltip
@@ -805,7 +805,7 @@ class LobbyConnection:
                 )
                 self.player.avatar = None
 
-                if avatar_url is not None:
+                if avatar_url is not None and len(avatar_url)>0:
                     await conn.execute(
                         avatars.update().where(
                             and_(
