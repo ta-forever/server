@@ -176,10 +176,9 @@ class Game:
         """
         A set of all teams of this game's players.
         """
-        return frozenset(
-            self.get_player_option(player.id, "Team")
-            for player in self.players
-        )
+        teams = [ self.get_player_option(player.id, "Team")
+                  for player in self.players ]
+        return frozenset(team for team in teams if team is not None and team>=0)
 
     @property
     def is_ffa(self) -> bool:
@@ -231,7 +230,7 @@ class Game:
             team_id = self.get_player_option(player.id, "Team")
             if team_id == FFA_TEAM:
                 ffa_players.append({player})
-            else:
+            elif team_id >= 0:
                 teams[team_id].add(player)
 
         return list(teams.values()) + ffa_players
@@ -883,11 +882,14 @@ class Game:
             "rating_max": self.displayed_rating_range.hi,
             "enforce_rating_range": self.enforce_rating_range,
             "teams": {
-                team: [
-                    player.login for player in self.players
-                    if self.get_player_option(player.id, "Team") == team
-                ]
-                for team in self.teams
+                k:v for k,v in {
+                    team: [
+                        player.login for player in self.players
+                        if self.get_player_option(player.id, "Team") == team
+                    ]
+                    for team in list(self.teams)+[-1]  # playing teams + watchers
+                }.items()
+                if len(v)>0     # only teams with members
             }
         }
 
