@@ -57,7 +57,7 @@ class Game:
         game_stats_service: "GameStatsService",
         host: Optional[Player] = None,
         name: str = "None",
-        map_: str = "SCMP_007",
+        map_: str = "SHERWOOD",
         game_mode: str = FeaturedModType.FAF,
         rating_type: Optional[str] = None,
         displayed_rating_range: Optional[InclusiveRange] = None,
@@ -82,8 +82,8 @@ class Game:
         self.host = host
         self.name = self.sanitize_name(name)
         self.map_id = None
-        self.map_file_path = f"maps/{map_}.ufo"
-        self.map_scenario_path = None
+        self.map_file_path = f"/{map_}/"
+        self.map_ranked = False
         self.password = None
         self._players = []
         self.AIs = {}
@@ -690,6 +690,25 @@ class Game:
                         SET s.times_played = s.times_played + 1 WHERE v.uid in :ids"""),
                     ids=tuple(uids))
 
+    def set_map(self, map_id, map_file_path, ranked):
+        self.map_id = map_id
+        self.map_file_path = map_file_path
+        self.map_ranked = ranked
+
+    async def fetch_map_file_path(self, default_hpi, map_name, crc):
+        sql = "SELECT id, filename, ranked FROM map_version "\
+              "WHERE filename like %s order by version desc limit 1", "%/{}/{}".format(map_name, crc)
+        async with self._db.acquire() as conn:
+            result = await conn.execute(*sql)
+            row = await result.fetchone()
+
+        if row:
+            self.set_map(row.id, row.filename, row.ranked)
+        else:
+            self._logger.debug(f"{map_name}/{crc} not found. defaulting to {default_hpi}/{map_name}/{crc} with id=None and unranked")
+            self._logger.debug(repr(sql))
+            self.set_map(None, f"{default_hpi}/{map_name}/{crc}", False)
+
     async def persist_game_stats(self):
         """
         Runs at game-start to populate the game_stats table (games that start are ones we actually
@@ -697,27 +716,8 @@ class Game:
         """
         assert self.host is not None
 
-        async with self._db.acquire() as conn:
-            # Determine if the map is blacklisted, and invalidate the game for ranking purposes if
-            # so, and grab the map id at the same time.
-            result = await conn.execute(
-                "SELECT id, ranked FROM map_version "
-                "WHERE lower(filename) = lower(%s)", (self.map_file_path, )
-            )
-            row = await result.fetchone()
-
-        is_generated = (self.map_file_path and "neroxis_map_generator" in self.map_file_path)
-
-        if row:
-            self.map_id = row["id"]
-
-        if (
-            self.validity is ValidityState.VALID
-            and ((row and not row.ranked) or (not row and not is_generated))
-        ):
-            #@todo enable this test again when DB is made aware of more maps
-            #await self.mark_invalid(ValidityState.BAD_MAP)
-            pass
+        if self.validity is ValidityState.VALID and not self.map_ranked:
+            await self.mark_invalid(ValidityState.BAD_MAP)
 
         modId = self.game_service.featured_mods[self.game_mode].id
 
@@ -871,7 +871,7 @@ class Game:
             "game_type": GameType.to_string(self.game_type),
             "featured_mod": self.game_mode,
             "sim_mods": self.mods,
-            "mapname": self.map_folder_name,
+            "map_name": self.map_name,
             "map_file_path": self.map_file_path,
             "host": self.host.login if self.host else '',
             "num_players": len(self.players),
@@ -894,23 +894,12 @@ class Game:
         }
 
     @property
-    def map_folder_name(self):
-        """
-        Map folder name
-        :return:
-        """
-        try:
-            folder_name = str(self.map_scenario_path.split("/")[2])
-        except (IndexError, AttributeError):
-            if self.map_file_path:
-                folder_name = self.map_file_path[5:-4]
-            else:
-                folder_name = "scmp_007"
-
-        if config.CASE_SENSITIVE_MAP_NAMES:
-            return folder_name
+    def map_name(self):
+        if self.map_file_path:
+            map_name = self.map_file_path.split('/')[1]
         else:
-            return folder_name.lower()
+            map_name = "SHERWOOD"
+        return map_name
 
     def __eq__(self, other):
         if not isinstance(other, Game):

@@ -130,7 +130,7 @@ class GameConnection(GpgNetServerProtocol):
         player_state = self.player.state
         if player_state == PlayerState.HOSTING:
             self.game.state = GameState.STAGING
-            await self.send_HostGame(self.game.map_folder_name)
+            await self.send_HostGame(self.game.map_name)
             self.game.set_hosted_staging()
 
         elif player_state == PlayerState.JOINING:
@@ -265,20 +265,10 @@ class GameConnection(GpgNetServerProtocol):
 
         if key == "Slots":
             self.game.max_players = int(value)
-        elif key == "ScenarioFile":
-            # Forged alliance
-            raw = repr(value)
-            self.game.map_scenario_path = \
-                raw.replace("\\", "/").replace("//", "/").replace("'", "")
-            self.game.map_file_path = "maps/{}.zip".format(
-                self.game.map_scenario_path.split("/")[2].lower()
-            )
-        elif key == "MapName":
-            # Total annihilation
-            mapNameHint = repr(value).replace("'", "").strip(' ')
-            # @todo we only get the 1st 15 characters of the name ....
-            self.game.map_scenario_path = "maps/{}.ufo".format(mapNameHint)
-            self.game.map_file_path = "maps/{}.ufo".format(mapNameHint)
+        elif key == "MapDetails":
+            map_name, hpi_archive, crc = value.split(chr(0x1f))[0:3]
+            await self.game.fetch_map_file_path(hpi_archive,map_name,crc)
+
         elif key == "Title":
             self.game.name = self.game.sanitize_name(value)
 

@@ -319,7 +319,7 @@ class LadderService(Service):
                 max_players=len(all_players)
             )
             game.init_mode = InitMode.AUTO_LOBBY
-            game.map_file_path = map_path
+            game.set_map(map_id, map_path, True)
 
             for i, player in enumerate(alternate(team1, team2)):
                 if player is None:

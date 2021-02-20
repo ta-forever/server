@@ -128,12 +128,12 @@ async def test_handle_action_GameState_lobby_sends_HostGame(
 ):
     game_connection.player = players.hosting
     game.map_file_path = "maps/some_map.zip"
-    game.map_folder_name = "some_map"
+    game.map_name = "some_map"
 
     await game_connection.handle_action("GameState", ["Lobby"])
     await exhaust_callbacks(event_loop)
 
-    assert_message_sent(game_connection, "HostGame", [game.map_folder_name])
+    assert_message_sent(game_connection, "HostGame", [game.map_name])
 
 
 async def test_handle_action_GameState_lobby_calls_ConnectToHost(
@@ -148,7 +148,7 @@ async def test_handle_action_GameState_lobby_calls_ConnectToHost(
     players.joining.game = game
     game.host = players.hosting
     game.map_file_path = "maps/some_map.zip"
-    game.map_folder_name = "some_map"
+    game.map_name = "some_map"
 
     await game_connection.handle_action("GameState", ["Lobby"])
     await exhaust_callbacks(event_loop)
@@ -171,7 +171,7 @@ async def test_handle_action_GameState_lobby_calls_ConnectToPeer(
 
     game.host = players.hosting
     game.map_file_path = "maps/some_map.zip"
-    game.map_folder_name = "some_map"
+    game.map_name = "some_map"
     peer_conn = mock.Mock()
     players.peer.game_connection = peer_conn
     game.connections = [peer_conn]
@@ -217,7 +217,7 @@ async def test_handle_action_GameState_lobby_calls_abort(
     game.host = players.hosting
     game.host.state = PlayerState.IDLE
     game.map_file_path = "maps/some_map.zip"
-    game.map_folder_name = "some_map"
+    game.map_name = "some_map"
 
     await game_connection.handle_action("GameState", ["Lobby"])
     await exhaust_callbacks(event_loop)
