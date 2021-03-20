@@ -309,6 +309,8 @@ class LadderService(Service):
             if not pool:
                 raise RuntimeError(f"No map pool available for rating {rating}!")
             map_id, map_name, map_path = pool.choose_map(played_map_ids)
+            self._logger.info("chose map id=%s, name=%s, path=%s, queue=%s, mod=%s, rating_type=%s",
+                map_id, map_name, map_path, queue.name, queue.featured_mod, queue.rating_type)
 
             game = self.game_service.create_game(
                 game_class=LadderGame,
@@ -336,13 +338,12 @@ class LadderService(Service):
                 game.set_player_option(player.id, "Army", slot)
                 game.set_player_option(player.id, "Color", slot)
 
-            mapname = re.match("maps/(.+)\.[zip|ufo]", map_path).group(1)
-            # FIXME: Database filenames contain the maps/ prefix and .zip suffix.
-            # Really in the future, just send a better description
             self._logger.debug("Starting ladder game: %s", game)
             # Options shared by all players
             options = GameLaunchOptions(
-                mapname=mapname,
+                mapname=map_name,
+                map_archive=map_path.split('/')[0],
+                map_crc=map_path.split('/')[2],
                 expected_players=len(all_players),
             )
 

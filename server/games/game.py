@@ -236,7 +236,7 @@ class Game:
         return list(teams.values()) + ffa_players
 
     async def await_hosted(self):
-        if self.game_mode == FeatureModType.LADDER_1V1:
+        if self.game_mode == FeaturedModType.LADDER_1V1:
             return await asyncio.wait_for(self._is_hosted_battleroom, None)
         else:
             return await asyncio.wait_for(self._is_hosted_staging, None)
@@ -707,7 +707,7 @@ class Game:
         else:
             self._logger.debug(f"{map_name}/{crc} not found. defaulting to {default_hpi}/{map_name}/{crc} with id=None and unranked")
             self._logger.debug(repr(sql))
-            self.set_map(None, f"{default_hpi}/{map_name}/{crc}", False)
+            self.set_map(None, f"{default_hpi}/{map_name}/{crc}", True)
 
     async def persist_game_stats(self):
         """
@@ -872,7 +872,7 @@ class Game:
             "featured_mod": self.game_mode,
             "sim_mods": self.mods,
             "map_name": self.map_name,
-            "map_file_path": self.map_file_path,
+            "map_file_path": self.map_file_path,    # "archive.ufo/Map Name/deadbeef"
             "host": self.host.login if self.host else '',
             "num_players": len(self.players),
             "max_players": self.max_players,
