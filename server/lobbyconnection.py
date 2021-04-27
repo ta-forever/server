@@ -849,6 +849,15 @@ class LobbyConnection:
             })
             return
 
+        if not game or not game.is_visible_to_player(self.player):
+            self._logger.debug("Game %s not visible to player %s", game, self.player)
+            await self.send({
+                "command": "notice",
+                "style": "info",
+                "text": "Sincerest of apologies, but due to a personality conflict you cannot join this game. Please do feel free to create your own, much better, game. Or just join a different one."
+            })
+            return
+
         if not game or game.state not in (GameState.STAGING, GameState.BATTLEROOM):
             self._logger.debug("Game not joinable: %s state %s", game, game.state)
             await self.send({

@@ -833,6 +833,9 @@ class Game:
         self._process_pending_army_stats()
 
     def is_visible_to_player(self, player: Player) -> bool:
+        if self.game_mode is FeaturedModType.LADDER_1V1:
+            return True
+
         if player == self.host or player in self.players:
             return True
 
