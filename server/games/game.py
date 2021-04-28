@@ -839,6 +839,9 @@ class Game:
         if player == self.host or player in self.players:
             return True
 
+        if self.state in (GameState.LAUNCHING, GameState.LIVE, GameState.ENDED):
+            return True
+
         mean, dev = player.ratings[self.rating_type]
         displayed_rating = mean - 3 * dev
         if (
