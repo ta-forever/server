@@ -41,7 +41,7 @@ async def gather_without_exceptions(
             results.append(await fut)
         except exceptions:
             logger.debug(
-                "Ignoring error in gather_without_exceptions", exc_info=True
+                "Ignoring error in gather_without_exceptions", exc_info=False
             )
     return results
 

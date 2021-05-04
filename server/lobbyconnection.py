@@ -223,7 +223,7 @@ class LobbyConnection:
     async def send_game_list(self):
         await self.send({
             "command": "game_info",
-            "games": [game.to_dict() for game in self.game_service.open_games]
+            "games": [game.to_dict() for game in self.game_service.open_games if game.is_visible_to_player(self.player)]
         })
 
     async def command_social_remove(self, message):
@@ -498,6 +498,10 @@ class LobbyConnection:
         login = message["login"].strip()
         password = message["password"]
 
+        # ';' separated list of adresses that the client believes may be accessible for purpose of hosting games
+        # or None if client expects ICE adaper to work this out
+        local_ip = message.get("local_ip", None)
+
         async with self._db.acquire() as conn:
             player_id, login, steamid = await self.check_user_login(conn, login, password)
             metrics.user_logins.labels("success").inc()
@@ -543,6 +547,7 @@ class LobbyConnection:
         self.player = Player(
             login=str(login),
             session=self.session,
+            ip=local_ip,
             player_id=player_id,
             lobby_connection=self
         )
@@ -642,7 +647,7 @@ class LobbyConnection:
             return
 
         game = self.game_service[game_id]  # type: Game
-        if game.state is not GameState.LOBBY and game.state is not GameState.LIVE:
+        if game.state not in (GameState.STAGING, GameState.BATTLEROOM, GameState.LAUNCHING, GameState.LIVE):
             await self.send_warning("The game you were connected to is no longer available")
             return
 
@@ -658,7 +663,8 @@ class LobbyConnection:
         )
 
         game.add_game_connection(self.game_connection)
-        self.player.state = PlayerState.PLAYING
+        # or maybe HOSTING/HOSTED/JOINING/JOINED ... but do we have sufficient information to restore state correctly?
+        self.player_service.set_player_state(self.player, PlayerState.PLAYING)
         self.player.game = game
 
     async def command_ask_session(self, message):
@@ -699,7 +705,7 @@ class LobbyConnection:
             avatar_url = message["avatar"]
 
             async with self._db.acquire() as conn:
-                if avatar_url is not None:
+                if avatar_url is not None and len(avatar_url)>0:
                     result = await conn.execute(
                         select([
                             avatars_list.c.id, avatars_list.c.tooltip
@@ -725,7 +731,7 @@ class LobbyConnection:
                 )
                 self.player.avatar = None
 
-                if avatar_url is not None:
+                if avatar_url is not None and len(avatar_url)>0:
                     await conn.execute(
                         avatars.update().where(
                             and_(
@@ -797,12 +803,21 @@ class LobbyConnection:
             })
             return
 
-        if not game or game.state is not GameState.LOBBY:
-            self._logger.debug("Game not in lobby state: %s state %s", game, game.state)
+        if not game or not game.is_visible_to_player(self.player):
+            self._logger.debug("Game %s not visible to player %s", game, self.player)
             await self.send({
                 "command": "notice",
                 "style": "info",
-                "text": "The game you are trying to join is not ready."
+                "text": "Sincerest of apologies, but due to a personality conflict you cannot join this game. Please do feel free to create your own, much better, game. Or just join a different one."
+            })
+            return
+
+        if not game or game.state not in (GameState.STAGING, GameState.BATTLEROOM):
+            self._logger.debug("Game not joinable: %s state %s", game, game.state)
+            await self.send({
+                "command": "notice",
+                "style": "info",
+                "text": "The game you are trying to join is not joinable."
             })
             return
 
@@ -931,7 +946,7 @@ class LobbyConnection:
             games=self.game_service
         )
 
-        self.player.state = PlayerState.HOSTING if is_host else PlayerState.JOINING
+        self.player_service.set_player_state(self.player, PlayerState.HOSTING if is_host else PlayerState.JOINING)
         self.player.game = game
         cmd = {
             "command": "game_launch",

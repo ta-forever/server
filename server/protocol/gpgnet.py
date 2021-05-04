@@ -1,22 +1,24 @@
 from abc import ABCMeta, abstractmethod
-from typing import List, Union
+from typing import List, Union, Optional
 
 
 class GpgNetServerProtocol(metaclass=ABCMeta):
     """
     Defines an interface for the server side GPGNet protocol
     """
-    async def send_ConnectToPeer(self, player_name: str, player_uid: int, offer: bool):
+    async def send_ConnectToPeer(self, address: Optional[str], player_name: str, player_uid: int, offer: bool):
         """
         Tells a client that has a listening LobbyComm instance to connect to the given peer
+        :param address: Ignored
         :param player_name: Remote player name
         :param player_uid: Remote player identifier
         """
         await self.send_gpgnet_message("ConnectToPeer", [player_name, player_uid, offer])
 
-    async def send_JoinGame(self, remote_player_name: str, remote_player_uid: int):
+    async def send_JoinGame(self, address: Optional[str], remote_player_name: str, remote_player_uid: int):
         """
         Tells the game to join the given peer by ID
+        :param address: Ignored
         :param remote_player_name:
         :param remote_player_uid:
         """

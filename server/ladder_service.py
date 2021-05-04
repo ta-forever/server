@@ -29,6 +29,7 @@ from .db.models import (
 )
 from .decorators import with_logger
 from .game_service import GameService
+from .player_service import PlayerService
 from .games import LadderGame
 from .matchmaker import MapPool, MatchmakerQueue, OnMatchedCallback, Search
 from .players import Player, PlayerState
@@ -45,10 +46,12 @@ class LadderService(Service):
         self,
         database: FAFDatabase,
         game_service: GameService,
+        player_service: PlayerService
     ):
         self._db = database
         self._informed_players: Set[Player] = set()
         self.game_service = game_service
+        self.player_service = player_service
         self.queues = {}
 
         self._searches: Dict[Player, Dict[str, Search]] = defaultdict(dict)
@@ -205,7 +208,7 @@ class LadderService(Service):
         )
 
         for player in players:
-            player.state = PlayerState.SEARCHING_LADDER
+            self.player_service.set_player_state(player, PlayerState.SEARCHING_LADDER)
 
             self.write_rating_progress(player, queue.rating_type)
 
@@ -259,7 +262,7 @@ class LadderService(Service):
                 not self._searches[player]
                 and player.state == PlayerState.SEARCHING_LADDER
             ):
-                player.state = PlayerState.IDLE
+                self.player_service.set_player_state(player, PlayerState.IDLE)
         self._logger.info(
             "%s stopped searching for %s", cancelled_search, queue_name
         )
@@ -385,7 +388,9 @@ class LadderService(Service):
             pool = queue.get_map_pool_for_rating(rating)
             if not pool:
                 raise RuntimeError(f"No map pool available for rating {rating}!")
-            _, _, map_path, _ = pool.choose_map(played_map_ids)
+            map_id, map_name, map_path, _ = pool.choose_map(played_map_ids)
+            self._logger.info("chose map id=%s, name=%s, path=%s, queue=%s, mod=%s, rating_type=%s",
+                map_id, map_name, map_path, queue.name, queue.featured_mod, queue.rating_type)
 
             game = self.game_service.create_game(
                 game_class=LadderGame,
@@ -397,7 +402,7 @@ class LadderService(Service):
                 max_players=len(all_players)
             )
             game.init_mode = InitMode.AUTO_LOBBY
-            game.map_file_path = map_path
+            game.set_map(map_id, map_path, True)
             game.set_name_unchecked(game_name(team1, team2))
 
             def get_player_mean(player):
@@ -426,13 +431,15 @@ class LadderService(Service):
                 game.set_player_option(player.id, "Color", slot)
 
             mapname = re.match("maps/(.+).zip", map_path).group(1)
-            # FIXME: Database filenames contain the maps/ prefix and .zip suffix.
+            map_archive, mapname, map_crc = map_path.split('/')[0:3]
+            # FIXME: Database filenames contain <archive>/<mapname>/<crc>
             # Really in the future, just send a better description
-
             self._logger.debug("Starting ladder game: %s", game)
             # Options shared by all players
             options = GameLaunchOptions(
                 mapname=mapname,
+                map_archive=map_archive,
+                map_crc=map_crc,
                 expected_players=len(all_players),
             )
 

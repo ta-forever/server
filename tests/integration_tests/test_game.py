@@ -59,12 +59,12 @@ async def open_fa(proto):
     await proto.send_message({
         "target": "game",
         "command": "GameState",
-        "args": ["Idle"]
+        "args": ["Idle", "Idle"]
     })
     await proto.send_message({
         "target": "game",
         "command": "GameState",
-        "args": ["Lobby"]
+        "args": ["Lobby", "Staging"]
     })
 
 
@@ -173,7 +173,7 @@ async def test_game_ended_rates_game(lobby_server):
     await host_proto.send_message({
         "target": "game",
         "command": "GameState",
-        "args": ["Launching"]
+        "args": ["Lobby", "Staging"]
     })
 
     await read_until(
@@ -218,7 +218,7 @@ async def test_game_ended_rates_game(lobby_server):
         await proto.send_message({
             "target": "game",
             "command": "GameState",
-            "args": ["Ended"]
+            "args": ["Ended", "Ended"]
         })
 
     # The game should only be rated once
@@ -279,7 +279,7 @@ async def test_partial_game_ended_rates_game(lobby_server, tmp_user):
     await host_proto.send_message({
         "target": "game",
         "command": "GameState",
-        "args": ["Launching"]
+        "args": ["Lobby", "Staging"]
     })
     await read_until(
         host_proto,
@@ -315,7 +315,7 @@ async def test_partial_game_ended_rates_game(lobby_server, tmp_user):
         await guest_proto.send_message({
             "target": "game",
             "command": "GameState",
-            "args": ["Ended"]
+            "args": ["Ended", "Ended"]
         })
 
     # Check that the ratings were updated
@@ -334,7 +334,7 @@ async def test_partial_game_ended_rates_game(lobby_server, tmp_user):
     await host_proto.send_message({
         "target": "game",
         "command": "GameState",
-        "args": ["Ended"]
+        "args": ["Ended", "Ended"]
     })
 
     # The game should only be rated once
@@ -476,7 +476,7 @@ async def test_gamestate_ended_clears_references(
     await test_proto.send_message({
         "target": "game",
         "command": "GameState",
-        "args": ["Launching"]
+        "args": ["Launching", "Launching"]
     })
     await asyncio.sleep(0.1)
 
@@ -491,7 +491,7 @@ async def test_gamestate_ended_clears_references(
     await rhiza_proto.send_message({
         "command": "GameState",
         "target": "game",
-        "args": ["Ended"]
+        "args": ["Ended", "Ended"]
     })
     await rhiza_proto.send_message({
         "command": "GameResult",
@@ -513,7 +513,7 @@ async def test_gamestate_ended_clears_references(
     await test_proto.send_message({
         "command": "GameState",
         "target": "game",
-        "args": ["Ended"]
+        "args": ["Ended", "Ended"]
     })
 
     await read_until_command(

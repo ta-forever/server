@@ -13,11 +13,13 @@ from .weakattr import WeakAttribute
 @unique
 class PlayerState(Enum):
     IDLE = 1
-    PLAYING = 2
-    HOSTING = 3
-    JOINING = 4
-    SEARCHING_LADDER = 5
-    STARTING_AUTOMATCH = 6
+    HOSTING = 2
+    JOINING = 3
+    HOSTED = 4
+    JOINED = 5
+    PLAYING = 6
+    SEARCHING_LADDER = 7
+    STARTING_AUTOMATCH = 8
 
 
 class Player:
@@ -36,6 +38,7 @@ class Player:
         self,
         login: str = None,
         session: int = 0,
+        ip = None,
         player_id: int = 0,
         ratings=None,
         clan=None,
@@ -46,6 +49,7 @@ class Player:
 
         self.id = player_id
         self.login = login
+        self.ip = ip
 
         # The player_id of the user in the `login` table of the database.
         self.session = session
@@ -71,6 +75,10 @@ class Player:
         self.user_groups = set()
 
         self.state = PlayerState.IDLE
+        # nasty hack work-around ICE adapter dropping 2nd arg of GameState messages.
+        # we set substate using GameOption instead and examine it when we receive the GameState
+        # NB this reflects state of individual player's game, not hosts's game
+        self.own_game_substate = None
 
         if lobby_connection is not None:
             self.lobby_connection = lobby_connection
@@ -78,6 +86,10 @@ class Player:
     @property
     def faction(self) -> Faction:
         return self._faction
+
+    @property
+    def address(self) -> str:
+        return self.ip
 
     @faction.setter
     def faction(self, value: Union[str, int, Faction]) -> None:
@@ -137,6 +149,16 @@ class Player:
             _, v = t
             return v is not None
 
+        player_state = {
+            PlayerState.IDLE: "idle",
+            PlayerState.HOSTING: "hosting",
+            PlayerState.JOINING: "joining",
+            PlayerState.HOSTED: "hosted",
+            PlayerState.JOINED: "joined",
+            PlayerState.PLAYING: "playing",
+            PlayerState.SEARCHING_LADDER: "searching_ladder"
+        }.get(self.state, "idle")
+
         return dict(
             filter(
                 filter_none, (
@@ -152,6 +174,8 @@ class Player:
                         }
                         for rating_type in self.ratings
                     }),
+                    ("state", player_state),
+                    ("current_game_uid", self.game.id if self.game else -1),
                     # Deprecated
                     ("global_rating", self.ratings[RatingType.GLOBAL]),
                     ("ladder_rating", self.ratings[RatingType.LADDER_1V1]),

@@ -607,7 +607,7 @@ async def test_to_dict(game, player_factory):
         "state": "playing",
         "featured_mod": game.game_mode,
         "sim_mods": game.mods,
-        "mapname": game.map_folder_name,
+        "map_name": game.map_name,
         "map_file_path": game.map_file_path,
         "host": game.host.login,
         "num_players": len(game.players),

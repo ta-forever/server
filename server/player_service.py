@@ -27,6 +27,7 @@ from .db.models import (
     user_group,
     user_group_assignment
 )
+from .players import PlayerState
 
 
 @with_logger
@@ -71,6 +72,11 @@ class PlayerService(Service):
 
     def clear_dirty(self):
         self._dirty_players = set()
+
+    def set_player_state(self, player:Player, newState:PlayerState):
+        if player.state != newState:
+            player.state = newState
+            self.mark_dirty(player)
 
     async def fetch_player_data(self, player):
         async with self._db.acquire() as conn:

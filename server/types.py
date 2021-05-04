@@ -19,6 +19,8 @@ class GameLaunchOptions(NamedTuple):
     """Additional options used to configure the FA lobby"""
 
     mapname: Optional[str] = None
+    map_crc: Optional[str] = None
+    map_archive: Optional[str] = None
     team: Optional[int] = None
     faction: Optional[int] = None
     expected_players: Optional[int] = None

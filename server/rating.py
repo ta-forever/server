@@ -7,7 +7,7 @@ from trueskill import Rating
 # migrated.
 class RatingType():
     GLOBAL = "global"
-    LADDER_1V1 = "ladder_1v1"
+    LADDER_1V1 = "ladder1v1"
     TMM_2V2 = "tmm_2v2"
 
 

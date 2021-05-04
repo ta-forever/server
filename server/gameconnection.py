@@ -15,6 +15,8 @@ from .player_service import PlayerService
 from .players import Player, PlayerState
 from .protocol import DisconnectedError, GpgNetServerProtocol, Protocol
 
+class GameStateNotDirty(Exception):
+    pass
 
 @with_logger
 class GameConnection(GpgNetServerProtocol):
@@ -75,8 +77,8 @@ class GameConnection(GpgNetServerProtocol):
             return False
 
         return (
-            self.player.state == PlayerState.HOSTING and
-            self.player == self.game.host
+            self.player.state in (PlayerState.HOSTING, PlayerState.HOSTED, PlayerState.PLAYING) and
+            self.player is self.game.host
         )
 
     async def send(self, message):
@@ -103,30 +105,32 @@ class GameConnection(GpgNetServerProtocol):
         state = self.player.state
 
         if state == PlayerState.HOSTING:
-            self.game.state = GameState.LOBBY
+            self.game.state = GameState.STAGING
             self._state = GameConnectionState.CONNECTED_TO_HOST
             self.game.add_game_connection(self)
             self.game.host = self.player
         elif state == PlayerState.JOINING:
             return
         else:
-            self._logger.error("Unknown PlayerState: %s", state)
+            self._logger.error("Unexpected PlayerState: %s", state)
             await self.abort()
 
-    async def _handle_lobby_state(self):
+    async def _handle_staging_state(self):
         """
-        The game has told us it is ready and listening on
-        self.player.game_port for UDP.
+        gpgnet4ta has told us it is ready and listening on
+        self.player.game_port for UDP (but TA has not yet been launched)
         We determine the connectivity of the peer and respond
         appropriately
         """
         player_state = self.player.state
         if player_state == PlayerState.HOSTING:
-            await self.send_HostGame(self.game.map_folder_name)
-            self.game.set_hosted()
-        # If the player is joining, we connect him to host
-        # followed by the rest of the players.
+            self.game.state = GameState.STAGING
+            await self.send_HostGame(self.game.map_name)
+            self.game.set_hosted_staging()
+
         elif player_state == PlayerState.JOINING:
+            # If the player is joining, we connect him to host
+            # followed by the rest of the players.
             await self.connect_to_host(self.game.host.game_connection)
 
             if self._state is GameConnectionState.ENDED:
@@ -148,22 +152,46 @@ class GameConnection(GpgNetServerProtocol):
                     tasks.append(self.connect_to_peer(peer))
             await asyncio.gather(*tasks)
 
+    async def _handle_battleroom_state(self):
+        if self.player.state == PlayerState.HOSTING:
+            self.game.state = GameState.BATTLEROOM
+            self.player_service.set_player_state(self.player, PlayerState.HOSTED)
+            self.game.set_hosted_battleroom()
+        elif self.player.state == PlayerState.JOINING:
+            self.player_service.set_player_state(self.player, PlayerState.JOINED)
+        else:
+            raise GameStateNotDirty
+
+    async def _handle_launching_state(self):
+        if self.player.state != PlayerState.HOSTED:
+            raise GameStateNotDirty
+        self._logger.info( "Launching game %s in state %s", self.game, self.game.state)
+        await self.game.on_launching(self.player_service)
+
+    async def _handle_live_state(self):
+        if self.is_host():
+            self._logger.info( "Launching game %s in state %s", self.game, self.game.state)
+            await self.game.on_live()
+        else:
+            raise GameStateNotDirty
+
     async def connect_to_host(self, peer: "GameConnection"):
         """
         Connect self to a given peer (host)
         :return:
         """
-        if not peer or peer.player.state != PlayerState.HOSTING:
+        if not peer or peer.player.state not in (PlayerState.HOSTING, PlayerState.HOSTED):
             await self.abort("The host left the lobby")
             return
 
-        await self.send_JoinGame(peer.player.login, peer.player.id)
+        await self.send_JoinGame(peer.player.address, peer.player.login, peer.player.id)
 
         if not peer:
             await self.abort("The host left the lobby")
             return
 
         await peer.send_ConnectToPeer(
+            address=self.player.address,
             player_name=self.player.login,
             player_uid=self.player.id,
             offer=True
@@ -176,6 +204,7 @@ class GameConnection(GpgNetServerProtocol):
         """
         if peer is not None:
             await self.send_ConnectToPeer(
+                address=peer.player.address,
                 player_name=peer.player.login,
                 player_uid=peer.player.id,
                 offer=True
@@ -184,6 +213,7 @@ class GameConnection(GpgNetServerProtocol):
         if peer is not None:
             with contextlib.suppress(DisconnectedError):
                 await peer.send_ConnectToPeer(
+                    address=self.player.address,
                     player_name=self.player.login,
                     player_uid=self.player.id,
                     offer=False
@@ -215,6 +245,9 @@ class GameConnection(GpgNetServerProtocol):
         self.game.desyncs += 1
 
     async def handle_game_option(self, key, value):
+        if key == "SubState":
+            self.player.own_game_substate = value
+
         if not self.is_host():
             return
 
@@ -227,13 +260,10 @@ class GameConnection(GpgNetServerProtocol):
 
         if key == "Slots":
             self.game.max_players = int(value)
-        elif key == "ScenarioFile":
-            raw = repr(value)
-            self.game.map_scenario_path = \
-                raw.replace("\\", "/").replace("//", "/").replace("'", "")
-            self.game.map_file_path = "maps/{}.zip".format(
-                self.game.map_scenario_path.split("/")[2].lower()
-            )
+        elif key == "MapDetails":
+            map_name, hpi_archive, crc = value.split(chr(0x1f))[0:3]
+            await self.game.fetch_map_file_path(hpi_archive,map_name,crc)
+
         elif key == "Title":
             with contextlib.suppress(ValueError):
                 self.game.name = value
@@ -265,8 +295,10 @@ class GameConnection(GpgNetServerProtocol):
         self._mark_dirty()
 
     async def handle_player_option(self, player_id, command, value):
-        if not self.is_host():
-            return
+        # allow joiner to advertise that they've joined
+        # (gpgnet4ta can't work out for the host who's joined until game actually starts)
+        # if not self.is_host():
+        #     return
 
         self.game.set_player_option(int(player_id), command, value)
         self._mark_dirty()
@@ -406,41 +438,38 @@ class GameConnection(GpgNetServerProtocol):
         :return: None
         """
 
-        if state == "Idle":
-            await self._handle_idle_state()
-            # Don't mark as dirty
-            return
+        try:
+            # nasty hack work-around ICE adapter drops 2nd arg of GameState
+            # we bunged the substate arg into a GameOptions message just before we sent GameState
+            substate = self.player.own_game_substate
 
-        elif state == "Lobby":
-            # TODO: Do we still need to schedule with `ensure_future`?
-            #
-            # We do not yield from the task, since we
-            # need to keep processing other commands while it runs
-            await self._handle_lobby_state()
+            if state == "Idle":
+                await self._handle_idle_state()
+                raise GameStateNotDirty
 
-        elif state == "Launching":
-            if self.player.state != PlayerState.HOSTING:
-                return
+            elif state == "Lobby" and substate == "Staging":
+                # TODO: Do we still need to schedule with `ensure_future`?
+                #
+                # We do not yield from the task, since we
+                # need to keep processing other commands while it runs
+                await self._handle_staging_state()
 
-            self._logger.info(
-                "Launching game %s in state %s",
-                self.game,
-                self.game.state
-            )
+            elif state == "Lobby" and substate == "Battleroom":
+                await self._handle_battleroom_state()
 
-            await self.game.launch()
+            elif state == "Launching" and substate == "Launching":
+                await self._handle_launching_state()
 
-            if len(self.game.mods.keys()) > 0:
-                async with self._db.acquire() as conn:
-                    uids = list(self.game.mods.keys())
-                    await conn.execute(text(
-                        """ UPDATE mod_stats s JOIN mod_version v ON v.mod_id = s.mod_id
-                            SET s.times_played = s.times_played + 1 WHERE v.uid in :ids"""),
-                        ids=tuple(uids)
-                    )
-        elif state == "Ended":
-            await self.on_connection_lost()
-        self._mark_dirty()
+            elif state == "Launching" and substate == "Live":
+                await self._handle_live_state()
+
+            elif state == "Ended":
+                await self.on_connection_lost()
+
+            self._mark_dirty()
+
+        except GameStateNotDirty:
+            pass
 
     async def handle_game_ended(self, *args):
         """
@@ -501,7 +530,7 @@ class GameConnection(GpgNetServerProtocol):
         """
         Abort the connection
 
-        Removes the GameConnection object from the any associated Game object,
+        Removes the GameConnection object from any associated Game object,
         and deletes references to Player and Game held by this object.
         """
         try:
@@ -510,13 +539,13 @@ class GameConnection(GpgNetServerProtocol):
 
             self._logger.debug("%s.abort(%s)", self, log_message)
 
-            if self.game.state is GameState.LOBBY:
+            if self.game.state in (GameState.STAGING, GameState.BATTLEROOM):
                 await self.disconnect_all_peers()
 
             self._state = GameConnectionState.ENDED
             await self.game.remove_game_connection(self)
             self._mark_dirty()
-            self.player.state = PlayerState.IDLE
+            self.player_service.set_player_state(self.player, PlayerState.IDLE)
             if self.player.lobby_connection:
                 self.player.lobby_connection.game_connection = None
             del self.player.game

@@ -148,12 +148,12 @@ class FAFClient(object):
         await self.send_message({
             "target": "game",
             "command": "GameState",
-            "args": ["Idle"]
+            "args": ["Idle", "Idle"]
         })
         await self.send_message({
             "target": "game",
             "command": "GameState",
-            "args": ["Lobby"]
+            "args": ["Lobby", "Staging"]
         })
 
     async def configure_joining_player(self, player_id, army):
