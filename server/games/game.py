@@ -50,8 +50,11 @@ class Game():
     """
     Object that lasts for the lifetime of a game on FAF.
     """
-    init_mode = InitMode.NORMAL_LOBBY
-    game_type = GameType.CUSTOM
+
+    # these are overriden by derived classes
+    # Game.__init__() sees the derived classes' override
+    init_mode = None
+    game_type = None
 
     def __init__(
         self,
@@ -121,10 +124,6 @@ class Game():
         self._launch_fut = asyncio.Future()
 
         self._logger.debug("%s created", self)
-        if game_mode == FeaturedModType.LADDER_1V1:
-            asyncio.get_event_loop().create_task(self.timeout_hosted_battleroom())
-        else:
-            asyncio.get_event_loop().create_task(self.timeout_hosted_staging())
 
     async def timeout_hosted_staging(self, timeout: int = 30):
         await asyncio.sleep(timeout)
@@ -268,7 +267,7 @@ class Game():
         return list(teams.values()) + ffa_players
 
     async def wait_hosted(self, timeout: float):
-        if self.game_mode == FeaturedModType.LADDER_1V1:
+        if self.init_mode == InitMode.AUTO_LOBBY:
             return await asyncio.wait_for(asyncio.shield(
                 self._is_hosted_battleroom), timeout=timeout)
         else:

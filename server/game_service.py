@@ -164,6 +164,7 @@ class GameService(Service):
                 FeaturedModType.EQUILIBRIUM:  CustomGame
             }.get(game_mode, Game)
 
+        self._logger.info("[create_game] game_class=%s, game_args=%s", repr(game_class), repr(game_args))
         game = game_class(**game_args)
 
         self._games[game_id] = game

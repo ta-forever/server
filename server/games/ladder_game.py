@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import List, Optional
 
@@ -27,6 +28,7 @@ class LadderGame(Game):
         }
         new_kwargs.update(kwargs)
         super().__init__(id_, *args, **new_kwargs)
+        asyncio.get_event_loop().create_task(self.timeout_hosted_battleroom())
 
     def is_winner(self, player: Player) -> bool:
         return self.get_player_outcome(player) is ArmyOutcome.VICTORY

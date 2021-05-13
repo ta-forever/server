@@ -430,7 +430,6 @@ class LadderService(Service):
                 game.set_player_option(player.id, "Army", slot)
                 game.set_player_option(player.id, "Color", slot)
 
-            mapname = re.match("maps/(.+).zip", map_path).group(1)
             map_archive, mapname, map_crc = map_path.split('/')[0:3]
             # FIXME: Database filenames contain <archive>/<mapname>/<crc>
             # Really in the future, just send a better description
@@ -469,8 +468,7 @@ class LadderService(Service):
                     for guest in all_guests
                     if guest.lobby_connection is not None
                 ])
-            await game.wait_launched(60 + 10 * len(all_guests))
-            self._logger.debug("Ladder game launched successfully")
+
         except Exception:
             if game:
                 await game.on_game_end()
