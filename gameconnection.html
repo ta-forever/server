@@ -212,7 +212,7 @@ class GameConnection(GpgNetServerProtocol):
             await self.abort(&#34;The host left the lobby&#34;)
             return
 
-        await self.send_JoinGame(peer.player.address, peer.player.login, peer.player.id)
+        await self.send_JoinGame(peer.player.address, self.game.get_player_alias(peer.player), peer.player.id)
 
         if not peer:
             await self.abort(&#34;The host left the lobby&#34;)
@@ -220,7 +220,7 @@ class GameConnection(GpgNetServerProtocol):
 
         await peer.send_ConnectToPeer(
             address=self.player.address,
-            player_name=self.player.login,
+            player_name=self.game.get_player_alias(self.player),
             player_uid=self.player.id,
             offer=True
         )
@@ -233,7 +233,7 @@ class GameConnection(GpgNetServerProtocol):
         if peer is not None:
             await self.send_ConnectToPeer(
                 address=peer.player.address,
-                player_name=peer.player.login,
+                player_name=self.game.get_player_alias(peer.player),
                 player_uid=peer.player.id,
                 offer=True
             )
@@ -242,7 +242,7 @@ class GameConnection(GpgNetServerProtocol):
             with contextlib.suppress(DisconnectedError):
                 await peer.send_ConnectToPeer(
                     address=self.player.address,
-                    player_name=self.player.login,
+                    player_name=self.game.get_player_alias(self.player),
                     player_uid=self.player.id,
                     offer=False
                 )
@@ -821,7 +821,7 @@ COMMAND_HANDLERS = {
             await self.abort(&#34;The host left the lobby&#34;)
             return
 
-        await self.send_JoinGame(peer.player.address, peer.player.login, peer.player.id)
+        await self.send_JoinGame(peer.player.address, self.game.get_player_alias(peer.player), peer.player.id)
 
         if not peer:
             await self.abort(&#34;The host left the lobby&#34;)
@@ -829,7 +829,7 @@ COMMAND_HANDLERS = {
 
         await peer.send_ConnectToPeer(
             address=self.player.address,
-            player_name=self.player.login,
+            player_name=self.game.get_player_alias(self.player),
             player_uid=self.player.id,
             offer=True
         )
@@ -842,7 +842,7 @@ COMMAND_HANDLERS = {
         if peer is not None:
             await self.send_ConnectToPeer(
                 address=peer.player.address,
-                player_name=peer.player.login,
+                player_name=self.game.get_player_alias(peer.player),
                 player_uid=peer.player.id,
                 offer=True
             )
@@ -851,7 +851,7 @@ COMMAND_HANDLERS = {
             with contextlib.suppress(DisconnectedError):
                 await peer.send_ConnectToPeer(
                     address=self.player.address,
-                    player_name=self.player.login,
+                    player_name=self.game.get_player_alias(self.player),
                     player_uid=self.player.id,
                     offer=False
                 )
@@ -1322,7 +1322,7 @@ and deletes references to Player and Game held by this object.</p></div>
         await self.abort(&#34;The host left the lobby&#34;)
         return
 
-    await self.send_JoinGame(peer.player.address, peer.player.login, peer.player.id)
+    await self.send_JoinGame(peer.player.address, self.game.get_player_alias(peer.player), peer.player.id)
 
     if not peer:
         await self.abort(&#34;The host left the lobby&#34;)
@@ -1330,7 +1330,7 @@ and deletes references to Player and Game held by this object.</p></div>
 
     await peer.send_ConnectToPeer(
         address=self.player.address,
-        player_name=self.player.login,
+        player_name=self.game.get_player_alias(self.player),
         player_uid=self.player.id,
         offer=True
     )</code></pre>
@@ -1354,7 +1354,7 @@ and deletes references to Player and Game held by this object.</p></div>
     if peer is not None:
         await self.send_ConnectToPeer(
             address=peer.player.address,
-            player_name=peer.player.login,
+            player_name=self.game.get_player_alias(peer.player),
             player_uid=peer.player.id,
             offer=True
         )
@@ -1363,7 +1363,7 @@ and deletes references to Player and Game held by this object.</p></div>
         with contextlib.suppress(DisconnectedError):
             await peer.send_ConnectToPeer(
                 address=self.player.address,
-                player_name=self.player.login,
+                player_name=self.game.get_player_alias(self.player),
                 player_uid=self.player.id,
                 offer=False
             )</code></pre>

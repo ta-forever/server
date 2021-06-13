@@ -77,6 +77,7 @@ class Player:
 
         self.id = player_id
         self.login = login
+        self.alias = login
         self.ip = ip
 
         # The player_id of the user in the `login` table of the database.
@@ -192,6 +193,7 @@ class Player:
                 filter_none, (
                     (&#34;id&#34;, self.id),
                     (&#34;login&#34;, self.login),
+                    (&#34;alias&#34;, self.alias),
                     (&#34;avatar&#34;, self.avatar),
                     (&#34;country&#34;, self.country),
                     (&#34;clan&#34;, self.clan),
@@ -277,6 +279,7 @@ information about players.</p></div>
 
         self.id = player_id
         self.login = login
+        self.alias = login
         self.ip = ip
 
         # The player_id of the user in the `login` table of the database.
@@ -392,6 +395,7 @@ information about players.</p></div>
                 filter_none, (
                     (&#34;id&#34;, self.id),
                     (&#34;login&#34;, self.login),
+                    (&#34;alias&#34;, self.alias),
                     (&#34;avatar&#34;, self.avatar),
                     (&#34;country&#34;, self.country),
                     (&#34;clan&#34;, self.clan),
@@ -609,6 +613,7 @@ such as "Moderator"</p></div>
             filter_none, (
                 (&#34;id&#34;, self.id),
                 (&#34;login&#34;, self.login),
+                (&#34;alias&#34;, self.alias),
                 (&#34;avatar&#34;, self.avatar),
                 (&#34;country&#34;, self.country),
                 (&#34;clan&#34;, self.clan),

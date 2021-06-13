@@ -226,6 +226,9 @@ class Game():
                 if army is not None and army &gt;= 0
             )
 
+    def get_player_alias(self, player: Player) -&gt; str:
+        raise NotImplementedError()
+
     @property
     def connections(self):
         return self._connections.values()
@@ -1152,6 +1155,9 @@ class Game():
                 )
                 if army is not None and army &gt;= 0
             )
+
+    def get_player_alias(self, player: Player) -&gt; str:
+        raise NotImplementedError()
 
     @property
     def connections(self):
@@ -2317,6 +2323,19 @@ slot aren't assigned an army or team, and deletes any AI's.
     )</code></pre>
 </details>
 </dd>
+<dt id="server.games.game.Game.get_player_alias"><code class="name flex">
+<span>def <span class="ident">get_player_alias</span></span>(<span>self, player: <a title="server.players.Player" href="../players.html#server.players.Player">Player</a>) ‑> str</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_player_alias(self, player: Player) -&gt; str:
+    raise NotImplementedError()</code></pre>
+</details>
+</dd>
 <dt id="server.games.game.Game.get_player_option"><code class="name flex">
 <span>def <span class="ident">get_player_option</span></span>(<span>self, player_id: int, key: str) ‑> Union[Any, NoneType]</span>
 </code></dt>
@@ -3230,6 +3249,7 @@ care about recording stats for, after all).</p></div>
 <li><code><a title="server.games.game.Game.game_type" href="#server.games.game.Game.game_type">game_type</a></code></li>
 <li><code><a title="server.games.game.Game.get_army_score" href="#server.games.game.Game.get_army_score">get_army_score</a></code></li>
 <li><code><a title="server.games.game.Game.get_basic_info" href="#server.games.game.Game.get_basic_info">get_basic_info</a></code></li>
+<li><code><a title="server.games.game.Game.get_player_alias" href="#server.games.game.Game.get_player_alias">get_player_alias</a></code></li>
 <li><code><a title="server.games.game.Game.get_player_option" href="#server.games.game.Game.get_player_option">get_player_option</a></code></li>
 <li><code><a title="server.games.game.Game.get_player_outcome" href="#server.games.game.Game.get_player_outcome">get_player_outcome</a></code></li>
 <li><code><a title="server.games.game.Game.get_team_sets" href="#server.games.game.Game.get_team_sets">get_team_sets</a></code></li>

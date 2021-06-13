@@ -258,7 +258,10 @@ __all__ = (
     async def _run_pre_rate_validity_checks(self):
         limit = len(self.players) * 60
         if not self.enforce_rating and time.time() - self.launched_at &lt; limit:
-            await self.mark_invalid(ValidityState.TOO_SHORT)</code></pre>
+            await self.mark_invalid(ValidityState.TOO_SHORT)
+
+    def get_player_alias(self, player: Player) -&gt; str:
+        return player.login</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
@@ -273,6 +276,22 @@ __all__ = (
 <dt id="server.games.CustomGame.init_mode"><code class="name">var <span class="ident">init_mode</span></code></dt>
 <dd>
 <div class="desc"></div>
+</dd>
+</dl>
+<h3>Methods</h3>
+<dl>
+<dt id="server.games.CustomGame.get_player_alias"><code class="name flex">
+<span>def <span class="ident">get_player_alias</span></span>(<span>self, player: <a title="server.players.Player" href="../players.html#server.players.Player">Player</a>) ‑> str</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_player_alias(self, player: Player) -&gt; str:
+    return player.login</code></pre>
+</details>
 </dd>
 </dl>
 <h3>Inherited members</h3>
@@ -556,6 +575,9 @@ __all__ = (
                 )
                 if army is not None and army &gt;= 0
             )
+
+    def get_player_alias(self, player: Player) -&gt; str:
+        raise NotImplementedError()
 
     @property
     def connections(self):
@@ -1721,6 +1743,19 @@ slot aren't assigned an army or team, and deletes any AI's.
     )</code></pre>
 </details>
 </dd>
+<dt id="server.games.Game.get_player_alias"><code class="name flex">
+<span>def <span class="ident">get_player_alias</span></span>(<span>self, player: <a title="server.players.Player" href="../players.html#server.players.Player">Player</a>) ‑> str</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_player_alias(self, player: Player) -&gt; str:
+    raise NotImplementedError()</code></pre>
+</details>
+</dd>
 <dt id="server.games.Game.get_player_option"><code class="name flex">
 <span>def <span class="ident">get_player_option</span></span>(<span>self, player_id: int, key: str) ‑> Union[Any, NoneType]</span>
 </code></dt>
@@ -2704,7 +2739,10 @@ care about recording stats for, after all).</p></div>
         elif army_scores[0] &lt; army_scores[1]:
             return [GameOutcome.DEFEAT, GameOutcome.VICTORY]
         else:
-            return [GameOutcome.DRAW, GameOutcome.DRAW]</code></pre>
+            return [GameOutcome.DRAW, GameOutcome.DRAW]
+
+    def get_player_alias(self, player: Player) -&gt; str:
+        return player.alias</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
@@ -2739,6 +2777,19 @@ as 1 for win and 0 for anything else.</p></div>
     as 1 for win and 0 for anything else.
     &#34;&#34;&#34;
     return self._results.victory_only_score(army)</code></pre>
+</details>
+</dd>
+<dt id="server.games.LadderGame.get_player_alias"><code class="name flex">
+<span>def <span class="ident">get_player_alias</span></span>(<span>self, player: <a title="server.players.Player" href="../players.html#server.players.Player">Player</a>) ‑> str</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_player_alias(self, player: Player) -&gt; str:
+    return player.alias</code></pre>
 </details>
 </dd>
 <dt id="server.games.LadderGame.is_winner"><code class="name flex">
@@ -3035,6 +3086,7 @@ as 1 for win and 0 for anything else.</p></div>
 <h4><code><a title="server.games.CustomGame" href="#server.games.CustomGame">CustomGame</a></code></h4>
 <ul class="">
 <li><code><a title="server.games.CustomGame.game_type" href="#server.games.CustomGame.game_type">game_type</a></code></li>
+<li><code><a title="server.games.CustomGame.get_player_alias" href="#server.games.CustomGame.get_player_alias">get_player_alias</a></code></li>
 <li><code><a title="server.games.CustomGame.init_mode" href="#server.games.CustomGame.init_mode">init_mode</a></code></li>
 </ul>
 </li>
@@ -3072,6 +3124,7 @@ as 1 for win and 0 for anything else.</p></div>
 <li><code><a title="server.games.Game.game_type" href="#server.games.Game.game_type">game_type</a></code></li>
 <li><code><a title="server.games.Game.get_army_score" href="#server.games.Game.get_army_score">get_army_score</a></code></li>
 <li><code><a title="server.games.Game.get_basic_info" href="#server.games.Game.get_basic_info">get_basic_info</a></code></li>
+<li><code><a title="server.games.Game.get_player_alias" href="#server.games.Game.get_player_alias">get_player_alias</a></code></li>
 <li><code><a title="server.games.Game.get_player_option" href="#server.games.Game.get_player_option">get_player_option</a></code></li>
 <li><code><a title="server.games.Game.get_player_outcome" href="#server.games.Game.get_player_outcome">get_player_outcome</a></code></li>
 <li><code><a title="server.games.Game.get_team_sets" href="#server.games.Game.get_team_sets">get_team_sets</a></code></li>
@@ -3133,6 +3186,7 @@ as 1 for win and 0 for anything else.</p></div>
 <ul class="">
 <li><code><a title="server.games.LadderGame.game_type" href="#server.games.LadderGame.game_type">game_type</a></code></li>
 <li><code><a title="server.games.LadderGame.get_army_score" href="#server.games.LadderGame.get_army_score">get_army_score</a></code></li>
+<li><code><a title="server.games.LadderGame.get_player_alias" href="#server.games.LadderGame.get_player_alias">get_player_alias</a></code></li>
 <li><code><a title="server.games.LadderGame.init_mode" href="#server.games.LadderGame.init_mode">init_mode</a></code></li>
 <li><code><a title="server.games.LadderGame.is_winner" href="#server.games.LadderGame.is_winner">is_winner</a></code></li>
 </ul>

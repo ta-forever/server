@@ -667,7 +667,7 @@ class ServerInstance(object):
             await self.abort(&#34;The host left the lobby&#34;)
             return
 
-        await self.send_JoinGame(peer.player.address, peer.player.login, peer.player.id)
+        await self.send_JoinGame(peer.player.address, self.game.get_player_alias(peer.player), peer.player.id)
 
         if not peer:
             await self.abort(&#34;The host left the lobby&#34;)
@@ -675,7 +675,7 @@ class ServerInstance(object):
 
         await peer.send_ConnectToPeer(
             address=self.player.address,
-            player_name=self.player.login,
+            player_name=self.game.get_player_alias(self.player),
             player_uid=self.player.id,
             offer=True
         )
@@ -688,7 +688,7 @@ class ServerInstance(object):
         if peer is not None:
             await self.send_ConnectToPeer(
                 address=peer.player.address,
-                player_name=peer.player.login,
+                player_name=self.game.get_player_alias(peer.player),
                 player_uid=peer.player.id,
                 offer=True
             )
@@ -697,7 +697,7 @@ class ServerInstance(object):
             with contextlib.suppress(DisconnectedError):
                 await peer.send_ConnectToPeer(
                     address=self.player.address,
-                    player_name=self.player.login,
+                    player_name=self.game.get_player_alias(self.player),
                     player_uid=self.player.id,
                     offer=False
                 )
@@ -1168,7 +1168,7 @@ and deletes references to Player and Game held by this object.</p></div>
         await self.abort(&#34;The host left the lobby&#34;)
         return
 
-    await self.send_JoinGame(peer.player.address, peer.player.login, peer.player.id)
+    await self.send_JoinGame(peer.player.address, self.game.get_player_alias(peer.player), peer.player.id)
 
     if not peer:
         await self.abort(&#34;The host left the lobby&#34;)
@@ -1176,7 +1176,7 @@ and deletes references to Player and Game held by this object.</p></div>
 
     await peer.send_ConnectToPeer(
         address=self.player.address,
-        player_name=self.player.login,
+        player_name=self.game.get_player_alias(self.player),
         player_uid=self.player.id,
         offer=True
     )</code></pre>
@@ -1200,7 +1200,7 @@ and deletes references to Player and Game held by this object.</p></div>
     if peer is not None:
         await self.send_ConnectToPeer(
             address=peer.player.address,
-            player_name=peer.player.login,
+            player_name=self.game.get_player_alias(peer.player),
             player_uid=peer.player.id,
             offer=True
         )
@@ -1209,7 +1209,7 @@ and deletes references to Player and Game held by this object.</p></div>
         with contextlib.suppress(DisconnectedError):
             await peer.send_ConnectToPeer(
                 address=self.player.address,
-                player_name=self.player.login,
+                player_name=self.game.get_player_alias(self.player),
                 player_uid=self.player.id,
                 offer=False
             )</code></pre>
@@ -4699,6 +4699,29 @@ with other players.</p></div>
         party.set_factions(player, factions)
         self.mark_dirty(party)
 
+    def set_player_alias(self, player: Player, alias: str):
+        if player not in self.player_parties:
+            self.player_parties[player] = PlayerParty(player)
+
+        alias = re.sub(r&#34;[^a-zA-Z0-9À-ÿ\-_]&#34;, &#34;&#34;, alias)[0:16]
+        if len(alias) == 0:
+            return
+
+        # here we ensure aliases are unique since gpgnet4ta unfortunately can&#39;t cope with duplicated names
+        all_party_players = [party.players for party in self.player_parties.values()]
+        used_aliases = {p.alias: p for one_party_players in all_party_players for p in one_party_players if p is not player}
+        self._logger.info(&#34;used_aliases: %s&#34;, used_aliases.keys())
+
+        n, unique_alias = 0, alias
+        while unique_alias in used_aliases:
+            n_str = str(n)
+            unique_alias = alias[0:16-len(n_str)] + n_str
+            n += 1
+
+        player.alias = unique_alias
+        party = self.player_parties[player]
+        self.mark_dirty(party)
+
     def remove_party(self, party):
         # Remove all players who were in the party
         self._logger.info(&#34;Removing party: %s&#34;, party.members)
@@ -4929,6 +4952,39 @@ with other players.</p></div>
 
     party = self.player_parties[player]
     party.set_factions(player, factions)
+    self.mark_dirty(party)</code></pre>
+</details>
+</dd>
+<dt id="server.PartyService.set_player_alias"><code class="name flex">
+<span>def <span class="ident">set_player_alias</span></span>(<span>self, player: <a title="server.players.Player" href="players.html#server.players.Player">Player</a>, alias: str)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def set_player_alias(self, player: Player, alias: str):
+    if player not in self.player_parties:
+        self.player_parties[player] = PlayerParty(player)
+
+    alias = re.sub(r&#34;[^a-zA-Z0-9À-ÿ\-_]&#34;, &#34;&#34;, alias)[0:16]
+    if len(alias) == 0:
+        return
+
+    # here we ensure aliases are unique since gpgnet4ta unfortunately can&#39;t cope with duplicated names
+    all_party_players = [party.players for party in self.player_parties.values()]
+    used_aliases = {p.alias: p for one_party_players in all_party_players for p in one_party_players if p is not player}
+    self._logger.info(&#34;used_aliases: %s&#34;, used_aliases.keys())
+
+    n, unique_alias = 0, alias
+    while unique_alias in used_aliases:
+        n_str = str(n)
+        unique_alias = alias[0:16-len(n_str)] + n_str
+        n += 1
+
+    player.alias = unique_alias
+    party = self.player_parties[player]
     self.mark_dirty(party)</code></pre>
 </details>
 </dd>
@@ -5913,6 +5969,7 @@ state, i.e. the same players, games, etc.</p></div>
 <li><code><a title="server.PartyService.remove_party" href="#server.PartyService.remove_party">remove_party</a></code></li>
 <li><code><a title="server.PartyService.services" href="#server.PartyService.services">services</a></code></li>
 <li><code><a title="server.PartyService.set_factions" href="#server.PartyService.set_factions">set_factions</a></code></li>
+<li><code><a title="server.PartyService.set_player_alias" href="#server.PartyService.set_player_alias">set_player_alias</a></code></li>
 <li><code><a title="server.PartyService.update_dirties" href="#server.PartyService.update_dirties">update_dirties</a></code></li>
 <li><code><a title="server.PartyService.write_broadcast_party" href="#server.PartyService.write_broadcast_party">write_broadcast_party</a></code></li>
 </ul>

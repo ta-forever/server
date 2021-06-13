@@ -1126,6 +1126,9 @@ class LobbyConnection:
 
         self.party_service.set_factions(self.player, list(factions))
 
+    async def command_set_player_alias(self, message):
+        self.party_service.set_player_alias(self.player, message[&#34;alias&#34;])
+
     async def send_warning(self, message: str, fatal: bool = False):
         &#34;&#34;&#34;
         Display a warning message to the client
@@ -2269,6 +2272,9 @@ class LobbyConnection:
 
         self.party_service.set_factions(self.player, list(factions))
 
+    async def command_set_player_alias(self, message):
+        self.party_service.set_player_alias(self.player, message[&#34;alias&#34;])
+
     async def send_warning(self, message: str, fatal: bool = False):
         &#34;&#34;&#34;
         Display a warning message to the client
@@ -3401,6 +3407,19 @@ async def command_kick_player_from_party(self, message):
     self.party_service.set_factions(self.player, list(factions))</code></pre>
 </details>
 </dd>
+<dt id="server.lobbyconnection.LobbyConnection.command_set_player_alias"><code class="name flex">
+<span>async def <span class="ident">command_set_player_alias</span></span>(<span>self, message)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">async def command_set_player_alias(self, message):
+    self.party_service.set_player_alias(self.player, message[&#34;alias&#34;])</code></pre>
+</details>
+</dd>
 <dt id="server.lobbyconnection.LobbyConnection.command_social_add"><code class="name flex">
 <span>async def <span class="ident">command_social_add</span></span>(<span>self, message)</span>
 </code></dt>
@@ -3883,6 +3902,7 @@ and not attempt to reconnect.
 <li><code><a title="server.lobbyconnection.LobbyConnection.command_pong" href="#server.lobbyconnection.LobbyConnection.command_pong">command_pong</a></code></li>
 <li><code><a title="server.lobbyconnection.LobbyConnection.command_restore_game_session" href="#server.lobbyconnection.LobbyConnection.command_restore_game_session">command_restore_game_session</a></code></li>
 <li><code><a title="server.lobbyconnection.LobbyConnection.command_set_party_factions" href="#server.lobbyconnection.LobbyConnection.command_set_party_factions">command_set_party_factions</a></code></li>
+<li><code><a title="server.lobbyconnection.LobbyConnection.command_set_player_alias" href="#server.lobbyconnection.LobbyConnection.command_set_player_alias">command_set_player_alias</a></code></li>
 <li><code><a title="server.lobbyconnection.LobbyConnection.command_social_add" href="#server.lobbyconnection.LobbyConnection.command_social_add">command_social_add</a></code></li>
 <li><code><a title="server.lobbyconnection.LobbyConnection.command_social_remove" href="#server.lobbyconnection.LobbyConnection.command_social_remove">command_social_remove</a></code></li>
 <li><code><a title="server.lobbyconnection.LobbyConnection.ensure_authenticated" href="#server.lobbyconnection.LobbyConnection.ensure_authenticated">ensure_authenticated</a></code></li>

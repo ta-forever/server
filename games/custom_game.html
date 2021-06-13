@@ -34,6 +34,7 @@ from server.decorators import with_logger
 from server.rating import RatingType
 
 from .game import Game, GameType, ValidityState
+from ..players import Player
 
 
 @with_logger
@@ -52,7 +53,10 @@ class CustomGame(Game):
     async def _run_pre_rate_validity_checks(self):
         limit = len(self.players) * 60
         if not self.enforce_rating and time.time() - self.launched_at &lt; limit:
-            await self.mark_invalid(ValidityState.TOO_SHORT)</code></pre>
+            await self.mark_invalid(ValidityState.TOO_SHORT)
+
+    def get_player_alias(self, player: Player) -&gt; str:
+        return player.login</code></pre>
 </details>
 </section>
 <section>
@@ -89,7 +93,10 @@ class CustomGame(Game):
     async def _run_pre_rate_validity_checks(self):
         limit = len(self.players) * 60
         if not self.enforce_rating and time.time() - self.launched_at &lt; limit:
-            await self.mark_invalid(ValidityState.TOO_SHORT)</code></pre>
+            await self.mark_invalid(ValidityState.TOO_SHORT)
+
+    def get_player_alias(self, player: Player) -&gt; str:
+        return player.login</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
@@ -104,6 +111,22 @@ class CustomGame(Game):
 <dt id="server.games.custom_game.CustomGame.init_mode"><code class="name">var <span class="ident">init_mode</span></code></dt>
 <dd>
 <div class="desc"></div>
+</dd>
+</dl>
+<h3>Methods</h3>
+<dl>
+<dt id="server.games.custom_game.CustomGame.get_player_alias"><code class="name flex">
+<span>def <span class="ident">get_player_alias</span></span>(<span>self, player: <a title="server.players.Player" href="../players.html#server.players.Player">Player</a>) ‑> str</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_player_alias(self, player: Player) -&gt; str:
+    return player.login</code></pre>
+</details>
 </dd>
 </dl>
 <h3>Inherited members</h3>
@@ -152,6 +175,7 @@ class CustomGame(Game):
 <h4><code><a title="server.games.custom_game.CustomGame" href="#server.games.custom_game.CustomGame">CustomGame</a></code></h4>
 <ul class="">
 <li><code><a title="server.games.custom_game.CustomGame.game_type" href="#server.games.custom_game.CustomGame.game_type">game_type</a></code></li>
+<li><code><a title="server.games.custom_game.CustomGame.get_player_alias" href="#server.games.custom_game.CustomGame.get_player_alias">get_player_alias</a></code></li>
 <li><code><a title="server.games.custom_game.CustomGame.init_mode" href="#server.games.custom_game.CustomGame.init_mode">init_mode</a></code></li>
 </ul>
 </li>

@@ -54,6 +54,7 @@ class PartyMember:
     def to_dict(self):
         return {
             &#34;player&#34;: self.player.id,
+            &#34;alias&#34;: self.player.alias,
             &#34;factions&#34;: list(faction.name for faction in self.factions)
         }</code></pre>
 </details>
@@ -98,6 +99,7 @@ class PartyMember:
     def to_dict(self):
         return {
             &#34;player&#34;: self.player.id,
+            &#34;alias&#34;: self.player.alias,
             &#34;factions&#34;: list(faction.name for faction in self.factions)
         }</code></pre>
 </details>
@@ -133,6 +135,7 @@ class PartyMember:
 <pre><code class="python">def to_dict(self):
     return {
         &#34;player&#34;: self.player.id,
+        &#34;alias&#34;: self.player.alias,
         &#34;factions&#34;: list(faction.name for faction in self.factions)
     }</code></pre>
 </details>
