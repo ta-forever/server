@@ -1098,6 +1098,9 @@ class LobbyConnection:
 
         self.party_service.set_factions(self.player, list(factions))
 
+    async def command_set_player_alias(self, message):
+        self.party_service.set_player_alias(self.player, message["alias"])
+
     async def send_warning(self, message: str, fatal: bool = False):
         """
         Display a warning message to the client

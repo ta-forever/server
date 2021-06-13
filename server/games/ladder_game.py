@@ -54,3 +54,6 @@ class LadderGame(Game):
             return [GameOutcome.DEFEAT, GameOutcome.VICTORY]
         else:
             return [GameOutcome.DRAW, GameOutcome.DRAW]
+
+    def get_player_alias(self, player: Player) -> str:
+        return player.alias

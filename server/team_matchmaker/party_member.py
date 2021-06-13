@@ -26,5 +26,6 @@ class PartyMember:
     def to_dict(self):
         return {
             "player": self.player.id,
+            "alias": self.player.alias,
             "factions": list(faction.name for faction in self.factions)
         }

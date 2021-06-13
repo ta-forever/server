@@ -184,7 +184,7 @@ class GameConnection(GpgNetServerProtocol):
             await self.abort("The host left the lobby")
             return
 
-        await self.send_JoinGame(peer.player.address, peer.player.login, peer.player.id)
+        await self.send_JoinGame(peer.player.address, self.game.get_player_alias(peer.player), peer.player.id)
 
         if not peer:
             await self.abort("The host left the lobby")
@@ -192,7 +192,7 @@ class GameConnection(GpgNetServerProtocol):
 
         await peer.send_ConnectToPeer(
             address=self.player.address,
-            player_name=self.player.login,
+            player_name=self.game.get_player_alias(self.player),
             player_uid=self.player.id,
             offer=True
         )
@@ -205,7 +205,7 @@ class GameConnection(GpgNetServerProtocol):
         if peer is not None:
             await self.send_ConnectToPeer(
                 address=peer.player.address,
-                player_name=peer.player.login,
+                player_name=self.game.get_player_alias(peer.player),
                 player_uid=peer.player.id,
                 offer=True
             )
@@ -214,7 +214,7 @@ class GameConnection(GpgNetServerProtocol):
             with contextlib.suppress(DisconnectedError):
                 await peer.send_ConnectToPeer(
                     address=self.player.address,
-                    player_name=self.player.login,
+                    player_name=self.game.get_player_alias(self.player),
                     player_uid=self.player.id,
                     offer=False
                 )

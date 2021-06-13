@@ -49,6 +49,7 @@ class Player:
 
         self.id = player_id
         self.login = login
+        self.alias = login
         self.ip = ip
 
         # The player_id of the user in the `login` table of the database.
@@ -164,6 +165,7 @@ class Player:
                 filter_none, (
                     ("id", self.id),
                     ("login", self.login),
+                    ("alias", self.alias),
                     ("avatar", self.avatar),
                     ("country", self.country),
                     ("clan", self.clan),

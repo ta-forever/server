@@ -198,6 +198,9 @@ class Game():
                 if army is not None and army >= 0
             )
 
+    def get_player_alias(self, player: Player) -> str:
+        raise NotImplementedError()
+
     @property
     def connections(self):
         return self._connections.values()

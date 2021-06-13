@@ -6,6 +6,7 @@ from server.decorators import with_logger
 from server.rating import RatingType
 
 from .game import Game, GameType, ValidityState
+from ..players import Player
 
 
 @with_logger
@@ -25,3 +26,6 @@ class CustomGame(Game):
         limit = len(self.players) * 60
         if not self.enforce_rating and time.time() - self.launched_at < limit:
             await self.mark_invalid(ValidityState.TOO_SHORT)
+
+    def get_player_alias(self, player: Player) -> str:
+        return player.login

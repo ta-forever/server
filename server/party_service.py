@@ -1,3 +1,4 @@
+import re
 from typing import Dict, List, Set
 
 from .core import Service
@@ -163,6 +164,29 @@ class PartyService(Service):
 
         party = self.player_parties[player]
         party.set_factions(player, factions)
+        self.mark_dirty(party)
+
+    def set_player_alias(self, player: Player, alias: str):
+        if player not in self.player_parties:
+            self.player_parties[player] = PlayerParty(player)
+
+        alias = re.sub(r"[^a-zA-Z0-9À-ÿ\-_]", "", alias)[0:16]
+        if len(alias) == 0:
+            return
+
+        # here we ensure aliases are unique since gpgnet4ta unfortunately can't cope with duplicated names
+        all_party_players = [party.players for party in self.player_parties.values()]
+        used_aliases = {p.alias: p for one_party_players in all_party_players for p in one_party_players if p is not player}
+        self._logger.info("used_aliases: %s", used_aliases.keys())
+
+        n, unique_alias = 0, alias
+        while unique_alias in used_aliases:
+            n_str = str(n)
+            unique_alias = alias[0:16-len(n_str)] + n_str
+            n += 1
+
+        player.alias = unique_alias
+        party = self.player_parties[player]
         self.mark_dirty(party)
 
     def remove_party(self, party):
