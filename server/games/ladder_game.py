@@ -56,4 +56,7 @@ class LadderGame(Game):
             return [GameOutcome.DRAW, GameOutcome.DRAW]
 
     def get_player_alias(self, player: Player) -> str:
-        return player.alias
+        if player.alias == player.login:
+            return player.login
+        else:
+            return "{}/{}".format(player.alias, player.login)
