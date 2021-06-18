@@ -2742,7 +2742,10 @@ care about recording stats for, after all).</p></div>
             return [GameOutcome.DRAW, GameOutcome.DRAW]
 
     def get_player_alias(self, player: Player) -&gt; str:
-        return player.alias</code></pre>
+        if player.alias == player.login:
+            return player.login
+        else:
+            return &#34;{}/{}&#34;.format(player.alias, player.login)</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
@@ -2789,7 +2792,10 @@ as 1 for win and 0 for anything else.</p></div>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def get_player_alias(self, player: Player) -&gt; str:
-    return player.alias</code></pre>
+    if player.alias == player.login:
+        return player.login
+    else:
+        return &#34;{}/{}&#34;.format(player.alias, player.login)</code></pre>
 </details>
 </dd>
 <dt id="server.games.LadderGame.is_winner"><code class="name flex">
