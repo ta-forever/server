@@ -104,6 +104,7 @@ class Player:
         self.user_groups = set()
 
         self.state = PlayerState.IDLE
+        self._afk_seconds = 0
         # nasty hack work-around ICE adapter dropping 2nd arg of GameState messages.
         # we set substate using GameOption instead and examine it when we receive the GameState
         # NB this reflects state of individual player&#39;s game, not hosts&#39;s game
@@ -119,6 +120,12 @@ class Player:
     @property
     def address(self) -&gt; str:
         return self.ip
+
+    def set_afk_seconds(self, afk_seconds: int):
+        self._afk_seconds = afk_seconds
+
+    def get_afk_seconds(self) -&gt; int:
+        return self._afk_seconds
 
     @faction.setter
     def faction(self, value: Union[str, int, Faction]) -&gt; None:
@@ -205,6 +212,7 @@ class Player:
                         for rating_type in self.ratings
                     }),
                     (&#34;state&#34;, player_state),
+                    (&#34;afk_seconds&#34;, self._afk_seconds),
                     (&#34;current_game_uid&#34;, self.game.id if self.game else -1),
                     # Deprecated
                     (&#34;global_rating&#34;, self.ratings[RatingType.GLOBAL]),
@@ -306,6 +314,7 @@ information about players.</p></div>
         self.user_groups = set()
 
         self.state = PlayerState.IDLE
+        self._afk_seconds = 0
         # nasty hack work-around ICE adapter dropping 2nd arg of GameState messages.
         # we set substate using GameOption instead and examine it when we receive the GameState
         # NB this reflects state of individual player&#39;s game, not hosts&#39;s game
@@ -321,6 +330,12 @@ information about players.</p></div>
     @property
     def address(self) -&gt; str:
         return self.ip
+
+    def set_afk_seconds(self, afk_seconds: int):
+        self._afk_seconds = afk_seconds
+
+    def get_afk_seconds(self) -&gt; int:
+        return self._afk_seconds
 
     @faction.setter
     def faction(self, value: Union[str, int, Faction]) -&gt; None:
@@ -407,6 +422,7 @@ information about players.</p></div>
                         for rating_type in self.ratings
                     }),
                     (&#34;state&#34;, player_state),
+                    (&#34;afk_seconds&#34;, self._afk_seconds),
                     (&#34;current_game_uid&#34;, self.game.id if self.game else -1),
                     # Deprecated
                     (&#34;global_rating&#34;, self.ratings[RatingType.GLOBAL]),
@@ -506,6 +522,19 @@ weak reference.</p></div>
 </dl>
 <h3>Methods</h3>
 <dl>
+<dt id="server.players.Player.get_afk_seconds"><code class="name flex">
+<span>def <span class="ident">get_afk_seconds</span></span>(<span>self) ‑> int</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_afk_seconds(self) -&gt; int:
+    return self._afk_seconds</code></pre>
+</details>
+</dd>
 <dt id="server.players.Player.is_admin"><code class="name flex">
 <span>def <span class="ident">is_admin</span></span>(<span>self) ‑> bool</span>
 </code></dt>
@@ -578,6 +607,19 @@ such as "Moderator"</p></div>
     await self.lobby_connection.send(message)</code></pre>
 </details>
 </dd>
+<dt id="server.players.Player.set_afk_seconds"><code class="name flex">
+<span>def <span class="ident">set_afk_seconds</span></span>(<span>self, afk_seconds: int)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def set_afk_seconds(self, afk_seconds: int):
+    self._afk_seconds = afk_seconds</code></pre>
+</details>
+</dd>
 <dt id="server.players.Player.to_dict"><code class="name flex">
 <span>def <span class="ident">to_dict</span></span>(<span>self)</span>
 </code></dt>
@@ -625,6 +667,7 @@ such as "Moderator"</p></div>
                     for rating_type in self.ratings
                 }),
                 (&#34;state&#34;, player_state),
+                (&#34;afk_seconds&#34;, self._afk_seconds),
                 (&#34;current_game_uid&#34;, self.game.id if self.game else -1),
                 # Deprecated
                 (&#34;global_rating&#34;, self.ratings[RatingType.GLOBAL]),
@@ -743,11 +786,13 @@ such as "Moderator"</p></div>
 <li><code><a title="server.players.Player.faction" href="#server.players.Player.faction">faction</a></code></li>
 <li><code><a title="server.players.Player.game" href="#server.players.Player.game">game</a></code></li>
 <li><code><a title="server.players.Player.game_connection" href="#server.players.Player.game_connection">game_connection</a></code></li>
+<li><code><a title="server.players.Player.get_afk_seconds" href="#server.players.Player.get_afk_seconds">get_afk_seconds</a></code></li>
 <li><code><a title="server.players.Player.is_admin" href="#server.players.Player.is_admin">is_admin</a></code></li>
 <li><code><a title="server.players.Player.is_moderator" href="#server.players.Player.is_moderator">is_moderator</a></code></li>
 <li><code><a title="server.players.Player.lobby_connection" href="#server.players.Player.lobby_connection">lobby_connection</a></code></li>
 <li><code><a title="server.players.Player.power" href="#server.players.Player.power">power</a></code></li>
 <li><code><a title="server.players.Player.send_message" href="#server.players.Player.send_message">send_message</a></code></li>
+<li><code><a title="server.players.Player.set_afk_seconds" href="#server.players.Player.set_afk_seconds">set_afk_seconds</a></code></li>
 <li><code><a title="server.players.Player.to_dict" href="#server.players.Player.to_dict">to_dict</a></code></li>
 <li><code><a title="server.players.Player.write_message" href="#server.players.Player.write_message">write_message</a></code></li>
 </ul>

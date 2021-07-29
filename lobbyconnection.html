@@ -202,6 +202,8 @@ class LobbyConnection:
             await self.abort(&#34;Error processing command&#34;)
 
     async def command_ping(self, msg):
+        if &#34;afk_seconds&#34; in msg and self.player is not None:
+            self.player_service.set_player_afk_seconds(self.player, int(msg[&#34;afk_seconds&#34;]))
         await self.send({&#34;command&#34;: &#34;pong&#34;})
 
     async def command_pong(self, msg):
@@ -1348,6 +1350,8 @@ class LobbyConnection:
             await self.abort(&#34;Error processing command&#34;)
 
     async def command_ping(self, msg):
+        if &#34;afk_seconds&#34; in msg and self.player is not None:
+            self.player_service.set_player_afk_seconds(self.player, int(msg[&#34;afk_seconds&#34;]))
         await self.send({&#34;command&#34;: &#34;pong&#34;})
 
     async def command_pong(self, msg):
@@ -3329,6 +3333,8 @@ async def command_kick_player_from_party(self, message):
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">async def command_ping(self, msg):
+    if &#34;afk_seconds&#34; in msg and self.player is not None:
+        self.player_service.set_player_afk_seconds(self.player, int(msg[&#34;afk_seconds&#34;]))
     await self.send({&#34;command&#34;: &#34;pong&#34;})</code></pre>
 </details>
 </dd>

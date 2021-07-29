@@ -87,6 +87,13 @@ class PlayerService(Service):
         self._players[player_id] = player
         metrics.players_online.set(len(self._players))
 
+    def set_player_afk_seconds(self, player: Player, seconds: int):
+        old_afk_time, new_afk_time = (&#34;0:{}0&#34;.format(t//600) if t &lt; 3600 else &#34;{}:00&#34;.format(t//3600)
+                                      for t in (player.get_afk_seconds(), seconds))
+        player.set_afk_seconds(seconds)
+        if old_afk_time != new_afk_time:
+            self.mark_dirty(player)
+
     @property
     def all_players(self) -&gt; ValuesView[Player]:
         return self._players.values()
@@ -371,6 +378,13 @@ class PlayerService(Service):
     def __setitem__(self, player_id: int, player: Player):
         self._players[player_id] = player
         metrics.players_online.set(len(self._players))
+
+    def set_player_afk_seconds(self, player: Player, seconds: int):
+        old_afk_time, new_afk_time = (&#34;0:{}0&#34;.format(t//600) if t &lt; 3600 else &#34;{}:00&#34;.format(t//3600)
+                                      for t in (player.get_afk_seconds(), seconds))
+        player.set_afk_seconds(seconds)
+        if old_afk_time != new_afk_time:
+            self.mark_dirty(player)
 
     @property
     def all_players(self) -&gt; ValuesView[Player]:
@@ -800,6 +814,23 @@ def dirty_players(self) -&gt; Set[Player]:
         metrics.players_online.set(len(self._players))</code></pre>
 </details>
 </dd>
+<dt id="server.player_service.PlayerService.set_player_afk_seconds"><code class="name flex">
+<span>def <span class="ident">set_player_afk_seconds</span></span>(<span>self, player: <a title="server.players.Player" href="players.html#server.players.Player">Player</a>, seconds: int)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def set_player_afk_seconds(self, player: Player, seconds: int):
+    old_afk_time, new_afk_time = (&#34;0:{}0&#34;.format(t//600) if t &lt; 3600 else &#34;{}:00&#34;.format(t//3600)
+                                  for t in (player.get_afk_seconds(), seconds))
+    player.set_afk_seconds(seconds)
+    if old_afk_time != new_afk_time:
+        self.mark_dirty(player)</code></pre>
+</details>
+</dd>
 <dt id="server.player_service.PlayerService.set_player_state"><code class="name flex">
 <span>def <span class="ident">set_player_state</span></span>(<span>self, player: <a title="server.players.Player" href="players.html#server.players.Player">Player</a>, newState: <a title="server.players.PlayerState" href="players.html#server.players.PlayerState">PlayerState</a>)</span>
 </code></dt>
@@ -908,6 +939,7 @@ uniqueid check.</p></div>
 <li><code><a title="server.player_service.PlayerService.mark_dirty" href="#server.player_service.PlayerService.mark_dirty">mark_dirty</a></code></li>
 <li><code><a title="server.player_service.PlayerService.remove_player" href="#server.player_service.PlayerService.remove_player">remove_player</a></code></li>
 <li><code><a title="server.player_service.PlayerService.services" href="#server.player_service.PlayerService.services">services</a></code></li>
+<li><code><a title="server.player_service.PlayerService.set_player_afk_seconds" href="#server.player_service.PlayerService.set_player_afk_seconds">set_player_afk_seconds</a></code></li>
 <li><code><a title="server.player_service.PlayerService.set_player_state" href="#server.player_service.PlayerService.set_player_state">set_player_state</a></code></li>
 <li><code><a title="server.player_service.PlayerService.signal_player_rating_change" href="#server.player_service.PlayerService.signal_player_rating_change">signal_player_rating_change</a></code></li>
 <li><code><a title="server.player_service.PlayerService.update_data" href="#server.player_service.PlayerService.update_data">update_data</a></code></li>
