@@ -59,6 +59,13 @@ class PlayerService(Service):
         self._players[player_id] = player
         metrics.players_online.set(len(self._players))
 
+    def set_player_afk_seconds(self, player: Player, seconds: int):
+        old_afk_time, new_afk_time = ("0:{}0".format(t//600) if t < 3600 else "{}:00".format(t//3600)
+                                      for t in (player.get_afk_seconds(), seconds))
+        player.set_afk_seconds(seconds)
+        if old_afk_time != new_afk_time:
+            self.mark_dirty(player)
+
     @property
     def all_players(self) -> ValuesView[Player]:
         return self._players.values()

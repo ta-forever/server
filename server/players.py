@@ -76,6 +76,7 @@ class Player:
         self.user_groups = set()
 
         self.state = PlayerState.IDLE
+        self._afk_seconds = 0
         # nasty hack work-around ICE adapter dropping 2nd arg of GameState messages.
         # we set substate using GameOption instead and examine it when we receive the GameState
         # NB this reflects state of individual player's game, not hosts's game
@@ -91,6 +92,12 @@ class Player:
     @property
     def address(self) -> str:
         return self.ip
+
+    def set_afk_seconds(self, afk_seconds: int):
+        self._afk_seconds = afk_seconds
+
+    def get_afk_seconds(self) -> int:
+        return self._afk_seconds
 
     @faction.setter
     def faction(self, value: Union[str, int, Faction]) -> None:
@@ -177,6 +184,7 @@ class Player:
                         for rating_type in self.ratings
                     }),
                     ("state", player_state),
+                    ("afk_seconds", self._afk_seconds),
                     ("current_game_uid", self.game.id if self.game else -1),
                     # Deprecated
                     ("global_rating", self.ratings[RatingType.GLOBAL]),

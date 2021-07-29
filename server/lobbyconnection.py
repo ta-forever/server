@@ -174,6 +174,8 @@ class LobbyConnection:
             await self.abort("Error processing command")
 
     async def command_ping(self, msg):
+        if "afk_seconds" in msg and self.player is not None:
+            self.player_service.set_player_afk_seconds(self.player, int(msg["afk_seconds"]))
         await self.send({"command": "pong"})
 
     async def command_pong(self, msg):
