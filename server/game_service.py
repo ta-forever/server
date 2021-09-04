@@ -2,6 +2,8 @@ from collections import Counter
 from typing import Dict, List, Optional, Type, Union, ValuesView
 
 import aiocron
+import glob
+import os
 
 from server.config import config
 
@@ -64,6 +66,9 @@ class GameService(Service):
         self._update_cron = aiocron.crontab(
             "*/10 * * * *", func=self.update_data
         )
+        self._archive_replays_cron = aiocron.crontab(
+            "* * * * *", func=self.archive_new_replays
+        )
 
         await self._message_queue_service.declare_exchange(config.MQ_EXCHANGE_NAME)
 
@@ -102,6 +107,26 @@ class GameService(Service):
 
             # Turn resultset into a list of uids
             self.ranked_mods = set(map(lambda x: x[0], rows))
+
+    async def archive_new_replays(self):
+        """
+        looks for /content/replays/mmnnooppqq.tad and archive them into /content/replays/mm/nn/oo/pp/mmnnooppqq.tad
+        """
+        for file_path in glob.glob("/content/replays/*.tad"):
+            file_name = os.path.basename(file_path)
+            game_id = int(os.path.splitext(file_name)[0])
+            mm = game_id // 100000000
+            nn = (game_id // 1000000) % 100
+            oo = (game_id // 10000) % 100
+            pp = (game_id // 100) % 100
+            archive_dir = f"/content/replays/{mm}/{nn}/{oo}/{pp}"
+            os.makedirs(archive_dir, exist_ok=True)
+
+            async with self._db.acquire() as conn:
+                dest = os.path.join(archive_dir, file_name)
+                self._logger.info("[archive_new_replays] archiving replay %s to %s", file_path, dest)
+                os.rename(file_path, dest)
+                await conn.execute(f"UPDATE `game_stats` SET `game_stats`.`replay_available` = 1 WHERE `game_stats`.`id` = {game_id}")
 
     @property
     def dirty_games(self):
