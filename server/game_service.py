@@ -4,6 +4,7 @@ from typing import Dict, List, Optional, Type, Union, ValuesView
 import aiocron
 import glob
 import os
+import shutil
 
 from server.config import config
 
@@ -112,20 +113,22 @@ class GameService(Service):
         """
         looks for /content/replays/mmnnooppqq.tad and archive them into /content/replays/mm/nn/oo/pp/mmnnooppqq.tad
         """
-        for file_path in glob.glob("/content/replays/*.tad"):
+        replays_path = "/content/replays"
+        for file_path in glob.glob(f"{replays_path}/*.tad"):
             file_name = os.path.basename(file_path)
             game_id = int(os.path.splitext(file_name)[0])
             mm = game_id // 100000000
             nn = (game_id // 1000000) % 100
             oo = (game_id // 10000) % 100
             pp = (game_id // 100) % 100
-            archive_dir = f"/content/replays/{mm}/{nn}/{oo}/{pp}"
+            archive_dir = f"{replays_path}/{mm}/{nn}/{oo}/{pp}"
+
+            self._logger.info("[archive_new_replays] archiving replay %s to %s", file_path, archive_dir)
             os.makedirs(archive_dir, exist_ok=True)
+            shutil.make_archive(os.path.join(archive_dir, str(game_id)), "zip", replays_path, f"{game_id}.tad")
+            os.remove(file_path)
 
             async with self._db.acquire() as conn:
-                dest = os.path.join(archive_dir, file_name)
-                self._logger.info("[archive_new_replays] archiving replay %s to %s", file_path, dest)
-                os.rename(file_path, dest)
                 await conn.execute(f"UPDATE `game_stats` SET `game_stats`.`replay_available` = 1 WHERE `game_stats`.`id` = {game_id}")
 
     @property
