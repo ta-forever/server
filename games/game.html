@@ -98,7 +98,8 @@ class Game():
         rating_type: Optional[str] = None,
         displayed_rating_range: Optional[InclusiveRange] = None,
         enforce_rating_range: bool = False,
-        max_players: int = 10
+        max_players: int = 10,
+        replay_delay_seconds: int = 300     # or negative to disable
     ):
         self._db = database
         self._results = GameResultReports(id_)
@@ -131,6 +132,7 @@ class Game():
         self.enforce_rating_range = enforce_rating_range
         self.matchmaker_queue_id = matchmaker_queue_id
         self.state = GameState.INITIALIZING
+        self.replay_delay_seconds = replay_delay_seconds
         self._connections = {}
         self.enforce_rating = False
         self.gameOptions = {
@@ -723,7 +725,7 @@ class Game():
         assert self.state is GameState.BATTLEROOM
         self.state = GameState.LAUNCHING
         self.launched_at = time.time()
-        self._logger.info(&#34;Game launched&#34;)
+        self._logger.info(&#34;Game LAUNCHING&#34;)
         for player in self.players:
             player_service.set_player_state(player, PlayerState.PLAYING)
 
@@ -936,6 +938,7 @@ class Game():
             &#34;uid&#34;: self.id,
             &#34;title&#34;: self.name,
             &#34;state&#34;: client_state,
+            &#34;replay_delay_seconds&#34;: self.replay_delay_seconds,
             &#34;game_type&#34;: GameType.to_string(self.game_type),
             &#34;featured_mod&#34;: self.game_mode,
             &#34;sim_mods&#34;: self.mods,
@@ -996,7 +999,7 @@ class Game():
 <dl>
 <dt id="server.games.game.Game"><code class="flex name class">
 <span>class <span class="ident">Game</span></span>
-<span>(</span><span>id_: int, database: FAFDatabase, game_service: GameService, game_stats_service: GameStatsService, host: Optional[<a title="server.players.Player" href="../players.html#server.players.Player">Player</a>] = None, name: str = 'None', map_: str = 'SHERWOOD', game_mode: str = 'faf', matchmaker_queue_id: Optional[int] = None, rating_type: Optional[str] = None, displayed_rating_range: Optional[<a title="server.rating.InclusiveRange" href="../rating.html#server.rating.InclusiveRange">InclusiveRange</a>] = None, enforce_rating_range: bool = False, max_players: int = 10)</span>
+<span>(</span><span>id_: int, database: FAFDatabase, game_service: GameService, game_stats_service: GameStatsService, host: Optional[<a title="server.players.Player" href="../players.html#server.players.Player">Player</a>] = None, name: str = 'None', map_: str = 'SHERWOOD', game_mode: str = 'faf', matchmaker_queue_id: Optional[int] = None, rating_type: Optional[str] = None, displayed_rating_range: Optional[<a title="server.rating.InclusiveRange" href="../rating.html#server.rating.InclusiveRange">InclusiveRange</a>] = None, enforce_rating_range: bool = False, max_players: int = 10, replay_delay_seconds: int = 300)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Object that lasts for the lifetime of a game on FAF.</p></div>
@@ -1028,7 +1031,8 @@ class Game():
         rating_type: Optional[str] = None,
         displayed_rating_range: Optional[InclusiveRange] = None,
         enforce_rating_range: bool = False,
-        max_players: int = 10
+        max_players: int = 10,
+        replay_delay_seconds: int = 300     # or negative to disable
     ):
         self._db = database
         self._results = GameResultReports(id_)
@@ -1061,6 +1065,7 @@ class Game():
         self.enforce_rating_range = enforce_rating_range
         self.matchmaker_queue_id = matchmaker_queue_id
         self.state = GameState.INITIALIZING
+        self.replay_delay_seconds = replay_delay_seconds
         self._connections = {}
         self.enforce_rating = False
         self.gameOptions = {
@@ -1653,7 +1658,7 @@ class Game():
         assert self.state is GameState.BATTLEROOM
         self.state = GameState.LAUNCHING
         self.launched_at = time.time()
-        self._logger.info(&#34;Game launched&#34;)
+        self._logger.info(&#34;Game LAUNCHING&#34;)
         for player in self.players:
             player_service.set_player_state(player, PlayerState.PLAYING)
 
@@ -1866,6 +1871,7 @@ class Game():
             &#34;uid&#34;: self.id,
             &#34;title&#34;: self.name,
             &#34;state&#34;: client_state,
+            &#34;replay_delay_seconds&#34;: self.replay_delay_seconds,
             &#34;game_type&#34;: GameType.to_string(self.game_type),
             &#34;featured_mod&#34;: self.game_mode,
             &#34;sim_mods&#34;: self.mods,
@@ -2542,7 +2548,7 @@ Note that FFA players will be separated into individual teams.</p></div>
     assert self.state is GameState.BATTLEROOM
     self.state = GameState.LAUNCHING
     self.launched_at = time.time()
-    self._logger.info(&#34;Game launched&#34;)
+    self._logger.info(&#34;Game LAUNCHING&#34;)
     for player in self.players:
         player_service.set_player_state(player, PlayerState.PLAYING)</code></pre>
 </details>
@@ -3068,6 +3074,7 @@ care about recording stats for, after all).</p></div>
         &#34;uid&#34;: self.id,
         &#34;title&#34;: self.name,
         &#34;state&#34;: client_state,
+        &#34;replay_delay_seconds&#34;: self.replay_delay_seconds,
         &#34;game_type&#34;: GameType.to_string(self.game_type),
         &#34;featured_mod&#34;: self.game_mode,
         &#34;sim_mods&#34;: self.mods,
