@@ -179,7 +179,7 @@ class GameService(Service):
             "game_mode": game_mode,
             "game_service": self,
             "game_stats_service": self.game_stats_service,
-            "matchmaker_queue_id": matchmaker_queue_id,
+            "matchmaker_queue_id": matchmaker_queue_id
         }
         game_args.update(kwargs)
 

@@ -907,6 +907,7 @@ class LobbyConnection:
         rating_min = message.get("rating_min")
         rating_max = message.get("rating_max")
         enforce_rating_range = bool(message.get("enforce_rating_range", False))
+        replay_delay_seconds = int(message.get("replay_delay_seconds", 300))
         if rating_min is not None:
             rating_min = float(rating_min)
         if rating_max is not None:
@@ -922,7 +923,8 @@ class LobbyConnection:
             password=password,
             rating_type=RatingType.GLOBAL,
             displayed_rating_range=InclusiveRange(rating_min, rating_max),
-            enforce_rating_range=enforce_rating_range
+            enforce_rating_range=enforce_rating_range,
+            replay_delay_seconds=replay_delay_seconds
         )
         await self.launch_game(game, is_host=True)
 
@@ -979,10 +981,10 @@ class LobbyConnection:
                 async for row in result:
                     uid, name, version, author, ui, date, downloads, likes, played, description, filename, icon = (row[i] for i in range(12))
                     try:
-                        link = urllib.parse.urljoin(config.CONTENT_URL, "faf/vault/" + filename)
+                        link = urllib.parse.urljoin(config.CONTENT_URL, "taf/vault/" + filename)
                         thumbstr = ""
                         if icon:
-                            thumbstr = urllib.parse.urljoin(config.CONTENT_URL, "faf/vault/mods_thumbs/" + urllib.parse.quote(icon))
+                            thumbstr = urllib.parse.urljoin(config.CONTENT_URL, "taf/vault/mods_thumbs/" + urllib.parse.quote(icon))
 
                         out = dict(command="modvault_info", thumbnail=thumbstr, link=link, bugreports=[],
                                    comments=[], description=description, played=played, likes=likes,
@@ -999,10 +1001,10 @@ class LobbyConnection:
 
                 row = await result.fetchone()
                 uid, name, version, author, ui, date, downloads, likes, played, description, filename, icon, likerList = (row[i] for i in range(13))
-                link = urllib.parse.urljoin(config.CONTENT_URL, "faf/vault/" + filename)
+                link = urllib.parse.urljoin(config.CONTENT_URL, "taf/vault/" + filename)
                 thumbstr = ""
                 if icon:
-                    thumbstr = urllib.parse.urljoin(config.CONTENT_URL, "faf/vault/mods_thumbs/" + urllib.parse.quote(icon))
+                    thumbstr = urllib.parse.urljoin(config.CONTENT_URL, "taf/vault/mods_thumbs/" + urllib.parse.quote(icon))
 
                 out = dict(command="modvault_info", thumbnail=thumbstr, link=link, bugreports=[],
                            comments=[], description=description, played=played, likes=likes + 1,

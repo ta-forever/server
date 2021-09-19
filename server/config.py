@@ -47,8 +47,8 @@ class ConfigurationStore:
 
         self.API_CLIENT_ID = "client_id"
         self.API_CLIENT_SECRET = "banana"
-        self.API_TOKEN_URI = "https://api.test.faforever.com/oauth/token"
-        self.API_BASE_URL = "https://api.test.faforever.com/"
+        self.API_TOKEN_URI = "https://api.test.taforever.com/oauth/token"
+        self.API_BASE_URL = "https://api.test.taforever.com/"
         self.USE_API = True
 
         self.MQ_USER = "faf-lobby"
@@ -58,8 +58,8 @@ class ConfigurationStore:
         self.MQ_VHOST = "/faf-lobby"
         self.MQ_EXCHANGE_NAME = "faf-rabbitmq"
 
-        self.WWW_URL = "https://www.faforever.com"
-        self.CONTENT_URL = "http://content.faforever.com"
+        self.WWW_URL = "https://www.taforever.com"
+        self.CONTENT_URL = "http://content.taforever.com"
         self.FAF_POLICY_SERVER_BASE_URL = "http://faf-policy-server"
         self.USE_POLICY_SERVER = True
 

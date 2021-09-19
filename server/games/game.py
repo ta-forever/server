@@ -70,7 +70,8 @@ class Game():
         rating_type: Optional[str] = None,
         displayed_rating_range: Optional[InclusiveRange] = None,
         enforce_rating_range: bool = False,
-        max_players: int = 10
+        max_players: int = 10,
+        replay_delay_seconds: int = 300     # or negative to disable
     ):
         self._db = database
         self._results = GameResultReports(id_)
@@ -103,6 +104,7 @@ class Game():
         self.enforce_rating_range = enforce_rating_range
         self.matchmaker_queue_id = matchmaker_queue_id
         self.state = GameState.INITIALIZING
+        self.replay_delay_seconds = replay_delay_seconds
         self._connections = {}
         self.enforce_rating = False
         self.gameOptions = {
@@ -695,7 +697,7 @@ class Game():
         assert self.state is GameState.BATTLEROOM
         self.state = GameState.LAUNCHING
         self.launched_at = time.time()
-        self._logger.info("Game launched")
+        self._logger.info("Game LAUNCHING")
         for player in self.players:
             player_service.set_player_state(player, PlayerState.PLAYING)
 
@@ -908,6 +910,7 @@ class Game():
             "uid": self.id,
             "title": self.name,
             "state": client_state,
+            "replay_delay_seconds": self.replay_delay_seconds,
             "game_type": GameType.to_string(self.game_type),
             "featured_mod": self.game_mode,
             "sim_mods": self.mods,

@@ -21,7 +21,7 @@ API_BASE_URL: "https://api.test.faforever.com/"
 USE_API: true
 
 WWW_URL: "https://www.faforever.com"
-CONTENT_URL: "http://content.faforever.com"
+CONTENT_URL: "http://content.taforever.com"
 FAF_POLICY_SERVER_BASE_URL: "http://faf-policy-server"
 
 FORCE_STEAM_LINK_AFTER_DATE: 1536105599
