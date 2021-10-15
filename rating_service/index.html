@@ -58,7 +58,7 @@ __all__ = (&#34;RatingService&#34;, &#34;GameRatingSummary&#34;)</code></pre>
 <dl>
 <dt id="server.rating_service.GameRatingSummary"><code class="flex name class">
 <span>class <span class="ident">GameRatingSummary</span></span>
-<span>(</span><span>game_id: int, rating_type: str, teams: List[<a title="server.games.typedefs.TeamRatingSummary" href="../games/typedefs.html#server.games.typedefs.TeamRatingSummary">TeamRatingSummary</a>])</span>
+<span>(</span><span>game_id: int, rating_type: str, featured_mod: str, teams: List[<a title="server.games.typedefs.TeamRatingSummary" href="../games/typedefs.html#server.games.typedefs.TeamRatingSummary">TeamRatingSummary</a>])</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Holds minimal information needed to rate a game.
@@ -81,6 +81,7 @@ Fields:
 
     game_id: int
     rating_type: str
+    featured_mod: str
     teams: List[TeamRatingSummary]
 
     @classmethod
@@ -91,6 +92,7 @@ Fields:
         return cls(
             game_info[&#34;game_id&#34;],
             game_info[&#34;rating_type&#34;],
+            game_info[&#34;featured_mod&#34;],
             [
                 TeamRatingSummary(
                     getattr(GameOutcome, summary[&#34;outcome&#34;]), set(summary[&#34;player_ids&#34;])
@@ -122,6 +124,7 @@ def from_game_info_dict(cls, game_info: Dict) -&gt; &#34;GameRatingSummary&#34;:
     return cls(
         game_info[&#34;game_id&#34;],
         game_info[&#34;rating_type&#34;],
+        game_info[&#34;featured_mod&#34;],
         [
             TeamRatingSummary(
                 getattr(GameOutcome, summary[&#34;outcome&#34;]), set(summary[&#34;player_ids&#34;])
@@ -134,6 +137,10 @@ def from_game_info_dict(cls, game_info: Dict) -&gt; &#34;GameRatingSummary&#34;:
 </dl>
 <h3>Instance variables</h3>
 <dl>
+<dt id="server.rating_service.GameRatingSummary.featured_mod"><code class="name">var <span class="ident">featured_mod</span> : str</code></dt>
+<dd>
+<div class="desc"><p>Alias for field number 2</p></div>
+</dd>
 <dt id="server.rating_service.GameRatingSummary.game_id"><code class="name">var <span class="ident">game_id</span> : int</code></dt>
 <dd>
 <div class="desc"><p>Alias for field number 0</p></div>
@@ -144,7 +151,7 @@ def from_game_info_dict(cls, game_info: Dict) -&gt; &#34;GameRatingSummary&#34;:
 </dd>
 <dt id="server.rating_service.GameRatingSummary.teams"><code class="name">var <span class="ident">teams</span> : List[<a title="server.games.typedefs.TeamRatingSummary" href="../games/typedefs.html#server.games.typedefs.TeamRatingSummary">TeamRatingSummary</a>]</code></dt>
 <dd>
-<div class="desc"><p>Alias for field number 2</p></div>
+<div class="desc"><p>Alias for field number 3</p></div>
 </dd>
 </dl>
 </dd>
@@ -253,7 +260,7 @@ atomic.</p></div>
             for player_id, rating in team.ratings.items()
         }
         await self._persist_rating_changes(
-            summary.game_id, summary.rating_type, old_ratings, new_ratings, outcome_map
+            summary.game_id, summary.rating_type, summary.featured_mod, old_ratings, new_ratings, outcome_map
         )
 
     async def _get_rating_data(self, summary: GameRatingSummary) -&gt; GameRatingData:
@@ -332,6 +339,8 @@ atomic.</p></div>
             deviation=dev,
             total_games=0,
             won_games=0,
+            streak=0,
+            recent_scores=&#34;&#34;,
             leaderboard_id=self._rating_type_ids[RatingType.TMM_2V2],
         )
         await conn.execute(insertion_sql)
@@ -373,6 +382,8 @@ atomic.</p></div>
             deviation=row[&#34;deviation&#34;],
             total_games=row[&#34;numGames&#34;],
             won_games=won_games,
+            streak=0,
+            recent_scores=&#34;&#34;,
             leaderboard_id=self._rating_type_ids[rating_type],
         )
         await conn.execute(insertion_sql)
@@ -392,6 +403,8 @@ atomic.</p></div>
             deviation=default_deviation,
             total_games=0,
             won_games=0,
+            streak=0,
+            recent_scores=&#34;&#34;,
             leaderboard_id=rating_type_id,
         )
         await conn.execute(insertion_sql)
@@ -402,6 +415,7 @@ atomic.</p></div>
         self,
         game_id: int,
         rating_type: str,
+        featured_mod: str,
         old_ratings: Dict[PlayerID, Rating],
         new_ratings: Dict[PlayerID, Rating],
         outcomes: Dict[PlayerID, GameOutcome],
@@ -464,6 +478,10 @@ atomic.</p></div>
                 victory_increment = (
                     1 if outcomes[player_id] is GameOutcome.VICTORY else 0
                 )
+                score = (
+                    1 if outcomes[player_id] is GameOutcome.VICTORY else
+                    0 if outcomes[player_id] is GameOutcome.DRAW else
+                    -1)
                 rating_update_sql = (
                     leaderboard_rating.update()
                     .where(
@@ -477,6 +495,9 @@ atomic.</p></div>
                         deviation=new_rating.sigma,
                         total_games=leaderboard_rating.c.total_games + 1,
                         won_games=leaderboard_rating.c.won_games + victory_increment,
+                        streak=case([(leaderboard_rating.c.streak * score &gt;= 0, leaderboard_rating.c.streak + score)], else_ = score),
+                        recent_scores=func.substr(func.concat(str(score+1), leaderboard_rating.c.recent_scores), 1, 10),
+                        recent_mod=featured_mod
                     )
                 )
                 await conn.execute(rating_update_sql)
@@ -660,6 +681,7 @@ atomic.</p></div>
 <li>
 <h4><code><a title="server.rating_service.GameRatingSummary" href="#server.rating_service.GameRatingSummary">GameRatingSummary</a></code></h4>
 <ul class="">
+<li><code><a title="server.rating_service.GameRatingSummary.featured_mod" href="#server.rating_service.GameRatingSummary.featured_mod">featured_mod</a></code></li>
 <li><code><a title="server.rating_service.GameRatingSummary.from_game_info_dict" href="#server.rating_service.GameRatingSummary.from_game_info_dict">from_game_info_dict</a></code></li>
 <li><code><a title="server.rating_service.GameRatingSummary.game_id" href="#server.rating_service.GameRatingSummary.game_id">game_id</a></code></li>
 <li><code><a title="server.rating_service.GameRatingSummary.rating_type" href="#server.rating_service.GameRatingSummary.rating_type">rating_type</a></code></li>

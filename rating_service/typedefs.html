@@ -55,6 +55,7 @@ class GameRatingSummary(NamedTuple):
 
     game_id: int
     rating_type: str
+    featured_mod: str
     teams: List[TeamRatingSummary]
 
     @classmethod
@@ -65,6 +66,7 @@ class GameRatingSummary(NamedTuple):
         return cls(
             game_info[&#34;game_id&#34;],
             game_info[&#34;rating_type&#34;],
+            game_info[&#34;featured_mod&#34;],
             [
                 TeamRatingSummary(
                     getattr(GameOutcome, summary[&#34;outcome&#34;]), set(summary[&#34;player_ids&#34;])
@@ -93,7 +95,7 @@ class ServiceNotReadyError(RatingServiceError):
 <dl>
 <dt id="server.rating_service.typedefs.GameRatingSummary"><code class="flex name class">
 <span>class <span class="ident">GameRatingSummary</span></span>
-<span>(</span><span>game_id: int, rating_type: str, teams: List[<a title="server.games.typedefs.TeamRatingSummary" href="../games/typedefs.html#server.games.typedefs.TeamRatingSummary">TeamRatingSummary</a>])</span>
+<span>(</span><span>game_id: int, rating_type: str, featured_mod: str, teams: List[<a title="server.games.typedefs.TeamRatingSummary" href="../games/typedefs.html#server.games.typedefs.TeamRatingSummary">TeamRatingSummary</a>])</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Holds minimal information needed to rate a game.
@@ -116,6 +118,7 @@ Fields:
 
     game_id: int
     rating_type: str
+    featured_mod: str
     teams: List[TeamRatingSummary]
 
     @classmethod
@@ -126,6 +129,7 @@ Fields:
         return cls(
             game_info[&#34;game_id&#34;],
             game_info[&#34;rating_type&#34;],
+            game_info[&#34;featured_mod&#34;],
             [
                 TeamRatingSummary(
                     getattr(GameOutcome, summary[&#34;outcome&#34;]), set(summary[&#34;player_ids&#34;])
@@ -157,6 +161,7 @@ def from_game_info_dict(cls, game_info: Dict) -&gt; &#34;GameRatingSummary&#34;:
     return cls(
         game_info[&#34;game_id&#34;],
         game_info[&#34;rating_type&#34;],
+        game_info[&#34;featured_mod&#34;],
         [
             TeamRatingSummary(
                 getattr(GameOutcome, summary[&#34;outcome&#34;]), set(summary[&#34;player_ids&#34;])
@@ -169,6 +174,10 @@ def from_game_info_dict(cls, game_info: Dict) -&gt; &#34;GameRatingSummary&#34;:
 </dl>
 <h3>Instance variables</h3>
 <dl>
+<dt id="server.rating_service.typedefs.GameRatingSummary.featured_mod"><code class="name">var <span class="ident">featured_mod</span> : str</code></dt>
+<dd>
+<div class="desc"><p>Alias for field number 2</p></div>
+</dd>
 <dt id="server.rating_service.typedefs.GameRatingSummary.game_id"><code class="name">var <span class="ident">game_id</span> : int</code></dt>
 <dd>
 <div class="desc"><p>Alias for field number 0</p></div>
@@ -179,7 +188,7 @@ def from_game_info_dict(cls, game_info: Dict) -&gt; &#34;GameRatingSummary&#34;:
 </dd>
 <dt id="server.rating_service.typedefs.GameRatingSummary.teams"><code class="name">var <span class="ident">teams</span> : List[<a title="server.games.typedefs.TeamRatingSummary" href="../games/typedefs.html#server.games.typedefs.TeamRatingSummary">TeamRatingSummary</a>]</code></dt>
 <dd>
-<div class="desc"><p>Alias for field number 2</p></div>
+<div class="desc"><p>Alias for field number 3</p></div>
 </dd>
 </dl>
 </dd>
@@ -275,6 +284,7 @@ def from_game_info_dict(cls, game_info: Dict) -&gt; &#34;GameRatingSummary&#34;:
 <li>
 <h4><code><a title="server.rating_service.typedefs.GameRatingSummary" href="#server.rating_service.typedefs.GameRatingSummary">GameRatingSummary</a></code></h4>
 <ul class="">
+<li><code><a title="server.rating_service.typedefs.GameRatingSummary.featured_mod" href="#server.rating_service.typedefs.GameRatingSummary.featured_mod">featured_mod</a></code></li>
 <li><code><a title="server.rating_service.typedefs.GameRatingSummary.from_game_info_dict" href="#server.rating_service.typedefs.GameRatingSummary.from_game_info_dict">from_game_info_dict</a></code></li>
 <li><code><a title="server.rating_service.typedefs.GameRatingSummary.game_id" href="#server.rating_service.typedefs.GameRatingSummary.game_id">game_id</a></code></li>
 <li><code><a title="server.rating_service.typedefs.GameRatingSummary.rating_type" href="#server.rating_service.typedefs.GameRatingSummary.rating_type">rating_type</a></code></li>
