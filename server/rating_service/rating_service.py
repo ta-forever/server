@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from typing import Dict
 
 import aiocron
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, case, func, select
 from trueskill import Rating
 
 from server.config import config
@@ -136,7 +136,7 @@ class RatingService(Service):
             for player_id, rating in team.ratings.items()
         }
         await self._persist_rating_changes(
-            summary.game_id, summary.rating_type, old_ratings, new_ratings, outcome_map
+            summary.game_id, summary.rating_type, summary.featured_mod, old_ratings, new_ratings, outcome_map
         )
 
     async def _get_rating_data(self, summary: GameRatingSummary) -> GameRatingData:
@@ -215,6 +215,8 @@ class RatingService(Service):
             deviation=dev,
             total_games=0,
             won_games=0,
+            streak=0,
+            recent_scores="",
             leaderboard_id=self._rating_type_ids[RatingType.TMM_2V2],
         )
         await conn.execute(insertion_sql)
@@ -256,6 +258,8 @@ class RatingService(Service):
             deviation=row["deviation"],
             total_games=row["numGames"],
             won_games=won_games,
+            streak=0,
+            recent_scores="",
             leaderboard_id=self._rating_type_ids[rating_type],
         )
         await conn.execute(insertion_sql)
@@ -275,6 +279,8 @@ class RatingService(Service):
             deviation=default_deviation,
             total_games=0,
             won_games=0,
+            streak=0,
+            recent_scores="",
             leaderboard_id=rating_type_id,
         )
         await conn.execute(insertion_sql)
@@ -285,6 +291,7 @@ class RatingService(Service):
         self,
         game_id: int,
         rating_type: str,
+        featured_mod: str,
         old_ratings: Dict[PlayerID, Rating],
         new_ratings: Dict[PlayerID, Rating],
         outcomes: Dict[PlayerID, GameOutcome],
@@ -347,6 +354,10 @@ class RatingService(Service):
                 victory_increment = (
                     1 if outcomes[player_id] is GameOutcome.VICTORY else 0
                 )
+                score = (
+                    1 if outcomes[player_id] is GameOutcome.VICTORY else
+                    0 if outcomes[player_id] is GameOutcome.DRAW else
+                    -1)
                 rating_update_sql = (
                     leaderboard_rating.update()
                     .where(
@@ -360,6 +371,9 @@ class RatingService(Service):
                         deviation=new_rating.sigma,
                         total_games=leaderboard_rating.c.total_games + 1,
                         won_games=leaderboard_rating.c.won_games + victory_increment,
+                        streak=case([(leaderboard_rating.c.streak * score >= 0, leaderboard_rating.c.streak + score)], else_ = score),
+                        recent_scores=func.substr(func.concat(str(score+1), leaderboard_rating.c.recent_scores), 1, 10),
+                        recent_mod=featured_mod
                     )
                 )
                 await conn.execute(rating_update_sql)

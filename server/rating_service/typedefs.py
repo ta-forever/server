@@ -27,6 +27,7 @@ class GameRatingSummary(NamedTuple):
 
     game_id: int
     rating_type: str
+    featured_mod: str
     teams: List[TeamRatingSummary]
 
     @classmethod
@@ -37,6 +38,7 @@ class GameRatingSummary(NamedTuple):
         return cls(
             game_info["game_id"],
             game_info["rating_type"],
+            game_info["featured_mod"],
             [
                 TeamRatingSummary(
                     getattr(GameOutcome, summary["outcome"]), set(summary["player_ids"])

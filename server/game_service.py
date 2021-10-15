@@ -3,6 +3,7 @@ from typing import Dict, List, Optional, Type, Union, ValuesView
 
 import aiocron
 import glob
+import json
 import os
 import shutil
 
@@ -35,13 +36,14 @@ class GameService(Service):
     """
     Utility class for maintaining lifecycle of games
     """
+
     def __init__(
-        self,
-        database: FAFDatabase,
-        player_service,
-        game_stats_service,
-        rating_service: RatingService,
-        message_queue_service: MessageQueueService
+            self,
+            database: FAFDatabase,
+            player_service,
+            game_stats_service,
+            rating_service: RatingService,
+            message_queue_service: MessageQueueService
     ):
         self._db = database
         self._dirty_games = set()
@@ -64,13 +66,9 @@ class GameService(Service):
     async def initialize(self) -> None:
         await self.initialise_game_counter()
         await self.update_data()
-        self._update_cron = aiocron.crontab(
-            "*/10 * * * *", func=self.update_data
-        )
-        self._archive_replays_cron = aiocron.crontab(
-            "* * * * *", func=self.archive_new_replays
-        )
-
+        self._update_cron = aiocron.crontab("*/10 * * * *", func=self.update_data)
+        self._archive_replays_cron = aiocron.crontab("* * * * *", func=self.archive_new_replays)
+        self._archive_replays_cron = aiocron.crontab("* * * * *", func=self.process_replay_metadata)
         await self._message_queue_service.declare_exchange(config.MQ_EXCHANGE_NAME)
 
     async def initialise_game_counter(self):
@@ -96,7 +94,8 @@ class GameService(Service):
         time we need, but which can in principle change over time.
         """
         async with self._db.acquire() as conn:
-            result = await conn.execute("SELECT `id`, `gamemod`, `name`, description, publish, `order` FROM game_featuredMods")
+            result = await conn.execute(
+                "SELECT `id`, `gamemod`, `name`, description, publish, `order` FROM game_featuredMods")
 
             async for row in result:
                 mod_id, name, full_name, description, publish, order = (row[i] for i in range(6))
@@ -129,7 +128,52 @@ class GameService(Service):
             os.remove(file_path)
 
             async with self._db.acquire() as conn:
-                await conn.execute(f"UPDATE `game_stats` SET `game_stats`.`replay_available` = 1 WHERE `game_stats`.`id` = {game_id}")
+                await conn.execute(
+                    f"UPDATE `game_stats` SET `game_stats`.`replay_available` = 1 WHERE `game_stats`.`id` = {game_id}")
+
+    async def process_replay_metadata(self):
+        """
+        Looks for /content/replays/*.json and processes the meta data recorded in there by the demo compiler.
+        It informs TAF about map and mod hashes so they can be used to install the correct map and mod versions
+        when users later want to watch replays
+        :return:
+        """
+        replays_path = "/content/replays"
+        for file_path in glob.glob(f"{replays_path}/*.json"):
+            self._logger.info("[process_replay_metadata] processing metadata for %s", file_path)
+            with open(file_path) as fp:
+                data = json.load(fp)
+
+            game_id = data.get("gameId")
+            ta_version = "{}.{}".format(data.get("taVersionMajor"), data.get("taVersionMinor"))
+            units_hash = data.get("unitsHash")
+            map_hash = data.get("taMapHash")
+
+            async with self._db.acquire() as conn:
+                result = await conn.execute(f"SELECT `gameMod`, `mapId` from `game_stats` WHERE id = {game_id}")
+                row = await result.fetchone()
+                if row is None:
+                    if game_id not in self._games:
+                        self._logger.info(
+                            f"[process_replay_metadata] ditching {file_path} because game_id {game_id} not known")
+                        os.remove(file_path)
+                    return
+
+                featured_mod_id = int(row[0])
+                map_version_id = int(row[1])
+                self._logger.info(
+                    f"[process_replay_metadata] game_id={game_id}, ta_version={ta_version}, units_hash={units_hash}, map_hash={map_hash}, featured_mod_id={featured_mod_id}, map_version_id={map_version_id}")
+                os.remove(file_path)
+
+                sql = f"""
+                    INSERT INTO `game_featuredMods_version` (`game_featuredMods_id`, `version`, `ta_hash`, `observation_count`)
+                    VALUES ({featured_mod_id}, '{ta_version}', '{units_hash}', 1)
+                    ON DUPLICATE KEY UPDATE observation_count = observation_count+1;
+                    """
+                await conn.execute(sql)
+
+                sql = f"UPDATE `map_version` SET ta_hash = '{map_hash}' WHERE id = {map_version_id};"
+                await conn.execute(sql)
 
     @property
     def dirty_games(self):
@@ -155,16 +199,16 @@ class GameService(Service):
         return self.game_id_counter
 
     def create_game(
-        self,
-        game_mode: str,
-        game_class: Type[Game] = None,
-        visibility=VisibilityState.PUBLIC,
-        host: Optional[Player] = None,
-        name: Optional[str] = None,
-        mapname: Optional[str] = None,
-        password: Optional[str] = None,
-        matchmaker_queue_id: Optional[int] = None,
-        **kwargs
+            self,
+            game_mode: str,
+            game_class: Type[Game] = None,
+            visibility=VisibilityState.PUBLIC,
+            host: Optional[Player] = None,
+            name: Optional[str] = None,
+            mapname: Optional[str] = None,
+            password: Optional[str] = None,
+            matchmaker_queue_id: Optional[int] = None,
+            **kwargs
     ):
         """
         Main entrypoint for creating new games
@@ -185,11 +229,11 @@ class GameService(Service):
 
         if not game_class:
             game_class = {
-                FeaturedModType.LADDER_1V1:   LadderGame,
-                FeaturedModType.COOP:         CoopGame,
-                FeaturedModType.FAF:          CustomGame,
-                FeaturedModType.FAFBETA:      CustomGame,
-                FeaturedModType.EQUILIBRIUM:  CustomGame
+                FeaturedModType.LADDER_1V1: LadderGame,
+                FeaturedModType.COOP: CoopGame,
+                FeaturedModType.FAF: CustomGame,
+                FeaturedModType.FAFBETA: CustomGame,
+                FeaturedModType.EQUILIBRIUM: CustomGame
             }.get(game_mode, Game)
 
         self._logger.info("[create_game] game_class=%s, game_args=%s", repr(game_class), repr(game_args))
@@ -263,7 +307,7 @@ class GameService(Service):
 
         # TODO: Remove when rating service starts listening to message queue
         if (
-            game_results.validity is ValidityState.VALID
-            and game_results.rating_type is not None
+                game_results.validity is ValidityState.VALID
+                and game_results.rating_type is not None
         ):
             await self._rating_service.enqueue(result_dict)
