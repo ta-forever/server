@@ -157,7 +157,16 @@ class GameService(Service):
                         self._logger.info(
                             f"[process_replay_metadata] ditching {file_path} because game_id {game_id} not known")
                         os.remove(file_path)
-                    return
+                        return
+                    else:
+                        # try again later
+                        continue
+
+                if row[1] is None:
+                    os.rename(file_path, file_path + ".unknown_map")
+                    self._logger.info(
+                        f"[process_replay_metadata] ditching {file_path} because row[1] is None (unknown map)")
+                    continue
 
                 featured_mod_id = int(row[0])
                 map_version_id = int(row[1])
