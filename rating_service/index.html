@@ -339,6 +339,8 @@ atomic.</p></div>
             deviation=dev,
             total_games=0,
             won_games=0,
+            lost_games=0,
+            drawn_games=0,
             streak=0,
             recent_scores=&#34;&#34;,
             leaderboard_id=self._rating_type_ids[RatingType.TMM_2V2],
@@ -382,6 +384,8 @@ atomic.</p></div>
             deviation=row[&#34;deviation&#34;],
             total_games=row[&#34;numGames&#34;],
             won_games=won_games,
+            lost_games=row[&#34;numGames&#34;] - won_games,
+            drawn_games=0,
             streak=0,
             recent_scores=&#34;&#34;,
             leaderboard_id=self._rating_type_ids[rating_type],
@@ -403,6 +407,8 @@ atomic.</p></div>
             deviation=default_deviation,
             total_games=0,
             won_games=0,
+            lost_games=0,
+            drawn_games=0,
             streak=0,
             recent_scores=&#34;&#34;,
             leaderboard_id=rating_type_id,
@@ -478,6 +484,12 @@ atomic.</p></div>
                 victory_increment = (
                     1 if outcomes[player_id] is GameOutcome.VICTORY else 0
                 )
+                draw_increment = (
+                    1 if outcomes[player_id] is GameOutcome.DRAW else 0
+                )
+                defeat_increment = (
+                    1 if outcomes[player_id] is GameOutcome.DEFEAT else 0
+                )
                 score = (
                     1 if outcomes[player_id] is GameOutcome.VICTORY else
                     0 if outcomes[player_id] is GameOutcome.DRAW else
@@ -495,6 +507,8 @@ atomic.</p></div>
                         deviation=new_rating.sigma,
                         total_games=leaderboard_rating.c.total_games + 1,
                         won_games=leaderboard_rating.c.won_games + victory_increment,
+                        drawn_games=leaderboard_rating.c.drawn_games + draw_increment,
+                        lost_games=leaderboard_rating.c.lost_games + defeat_increment,
                         streak=case([(leaderboard_rating.c.streak * score &gt;= 0, leaderboard_rating.c.streak + score)], else_ = score),
                         recent_scores=func.substr(func.concat(str(score+1), leaderboard_rating.c.recent_scores), 1, 10),
                         recent_mod=featured_mod
