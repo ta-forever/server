@@ -210,6 +210,8 @@ leaderboard_rating = Table(
     Column("deviation",         Float),
     Column("total_games",       Integer,    nullable=False),
     Column("won_games",         Integer,    nullable=False),
+    Column("lost_games",        Integer,    nullable=False),
+    Column("drawn_games",       Integer,    nullable=False),
     Column("streak",            Integer,    nullable=False),
     Column("recent_scores",     String,     nullable=False),
     Column("recent_mod",        String),
