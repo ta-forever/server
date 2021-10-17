@@ -136,7 +136,7 @@ class LobbyConnection:
 
             if target == "connectivity" and message.get("command") == "InitiateTest":
                 self._attempted_connectivity_test = True
-                raise ClientError("Your client version is no longer supported. Please update to the newest version: https://faforever.com")
+                raise ClientError("Your client version is no longer supported. Please update to the newest version: https://taforever.com")
 
             handler = getattr(self, "command_{}".format(cmd))
             await handler(message)
