@@ -164,7 +164,7 @@ class LobbyConnection:
 
             if target == &#34;connectivity&#34; and message.get(&#34;command&#34;) == &#34;InitiateTest&#34;:
                 self._attempted_connectivity_test = True
-                raise ClientError(&#34;Your client version is no longer supported. Please update to the newest version: https://faforever.com&#34;)
+                raise ClientError(&#34;Your client version is no longer supported. Please update to the newest version: https://taforever.com&#34;)
 
             handler = getattr(self, &#34;command_{}&#34;.format(cmd))
             await handler(message)
@@ -1314,7 +1314,7 @@ class LobbyConnection:
 
             if target == &#34;connectivity&#34; and message.get(&#34;command&#34;) == &#34;InitiateTest&#34;:
                 self._attempted_connectivity_test = True
-                raise ClientError(&#34;Your client version is no longer supported. Please update to the newest version: https://faforever.com&#34;)
+                raise ClientError(&#34;Your client version is no longer supported. Please update to the newest version: https://taforever.com&#34;)
 
             handler = getattr(self, &#34;command_{}&#34;.format(cmd))
             await handler(message)
@@ -3685,7 +3685,7 @@ async def command_kick_player_from_party(self, message):
 
         if target == &#34;connectivity&#34; and message.get(&#34;command&#34;) == &#34;InitiateTest&#34;:
             self._attempted_connectivity_test = True
-            raise ClientError(&#34;Your client version is no longer supported. Please update to the newest version: https://faforever.com&#34;)
+            raise ClientError(&#34;Your client version is no longer supported. Please update to the newest version: https://taforever.com&#34;)
 
         handler = getattr(self, &#34;command_{}&#34;.format(cmd))
         await handler(message)
