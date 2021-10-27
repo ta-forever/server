@@ -97,6 +97,7 @@ class ConfigurationStore:
         self.QUEUE_POP_TIME_MOVING_AVG_SIZE = 5
 
         self.CASE_SENSITIVE_MAP_NAMES = False
+        self.TADA_API_URL = 'https://z151e60yl7.execute-api.us-east-2.amazonaws.com'
 
         self._defaults = {
             key: value for key, value in vars(self).items() if key.isupper()

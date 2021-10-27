@@ -39,6 +39,7 @@ from .ice_servers.nts import TwilioNTS
 from .ladder_service import LadderService
 from .party_service import PartyService
 from .player_service import PlayerService
+from .tada_service import TadaService
 from .players import Player, PlayerState
 from .protocol import DisconnectedError, Protocol
 from .rating import InclusiveRange, RatingType
@@ -56,7 +57,8 @@ class LobbyConnection:
         nts_client: Optional[TwilioNTS],
         geoip: GeoIpService,
         ladder_service: LadderService,
-        party_service: PartyService
+        party_service: PartyService,
+        tada_service: TadaService
     ):
         self._db = database
         self.geoip_service = geoip
@@ -66,6 +68,7 @@ class LobbyConnection:
         self.coturn_generator = CoturnHMAC(config.COTURN_HOSTS, config.COTURN_KEYS)
         self.ladder_service = ladder_service
         self.party_service = party_service
+        self.tada_service = tada_service
         self._authenticated = False
         self.player = None  # type: Player
         self.game_connection = None  # type: GameConnection
@@ -172,6 +175,33 @@ class LobbyConnection:
             await self.send({"command": "invalid"})
             self._logger.exception(ex)
             await self.abort("Error processing command")
+
+    async def command_upload_replay_to_tada(self, msg):
+        replay_id = msg["replay_id"]
+        archive_dir = self.game_service.get_archive_dir_for_game_id(replay_id)
+        archive_path = f"{archive_dir}/{replay_id}.zip"
+
+        async with self._db.acquire() as conn:
+            replay_info = await self.game_service.get_replay_info(conn, replay_id)
+            if not replay_info.tada_available:
+                await self.game_service.set_game_tada_available(conn, replay_id, True)
+
+        if replay_info.tada_available:
+            await self.send({
+                "command": "notice",
+                "style": "error",
+                "text": "This replay has already been uploaded to TADA (or has been queued for upload)",
+                "i18n_key": "tada.server.upload.already"
+            })
+            return
+
+        await self.send({
+            "command": "notice",
+            "style": "info",
+            "text": "Thank you, replay has been queued for upload to TADA",
+            "i18n_key": "tada.server.upload.confirm"
+        })
+        await self.tada_service.upload(replay_id, replay_info.replay_meta, archive_path, 2)
 
     async def command_ping(self, msg):
         if "afk_seconds" in msg and self.player is not None:

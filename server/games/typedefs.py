@@ -1,9 +1,11 @@
+from collections import namedtuple
 from enum import Enum, unique
 from typing import Any, Dict, List, NamedTuple, Optional, Set
 
 from server.games.game_results import GameOutcome
 from server.players import Player
 
+ReplayInfo = namedtuple('ReplayInfo', ['tada_available', 'replay_meta'])
 
 @unique
 class GameState(Enum):

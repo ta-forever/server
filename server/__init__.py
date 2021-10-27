@@ -7,6 +7,7 @@ Copyright (c) 2015-2016 Michael Søndergaard <sheeo@faforever.com>
 Distributed under GPLv3, see license.txt
 """
 import asyncio
+import datetime
 import logging
 from typing import Dict, Optional, Set, Tuple, Type
 
@@ -35,6 +36,7 @@ from .protocol import Protocol, QDataStreamProtocol
 from .rating_service.rating_service import RatingService
 from .servercontext import ServerContext
 from .stats.game_stats_service import GameStatsService
+from .tada_service import TadaService
 from .timing import at_interval
 
 __author__ = "Askaholic, Chris Kitching, Dragonfire, Gael Honorez, Jeroen De Dauw, Crotalus, Michael Søndergaard, Michel Jung"
@@ -59,6 +61,7 @@ __all__ = (
     "game_service",
     "protocol",
     "run_control_server",
+    "TadaService"
 )
 
 DIRTY_REPORT_INTERVAL = 1  # Seconds
@@ -110,7 +113,8 @@ class ServerInstance(object):
             nts_client=twilio_nts,
             players=self.services["player_service"],
             ladder_service=self.services["ladder_service"],
-            party_service=self.services["party_service"]
+            party_service=self.services["party_service"],
+            tada_service=self.services["tada_service"]
         )
 
     def write_broadcast(self, message, predicate=lambda conn: conn.authenticated):
@@ -137,6 +141,7 @@ class ServerInstance(object):
 
         game_service: GameService = self.services["game_service"]
         player_service: PlayerService = self.services["player_service"]
+        tada_service: TadaService = self.services["tada_service"]
 
         @at_interval(DIRTY_REPORT_INTERVAL, loop=self.loop)
         def do_report_dirties():
@@ -144,8 +149,10 @@ class ServerInstance(object):
             dirty_games = game_service.dirty_games
             dirty_queues = game_service.dirty_queues
             dirty_players = player_service.dirty_players
+            dirty_replay_uploads = tada_service.dirty_uploads
             game_service.clear_dirty()
             player_service.clear_dirty()
+            tada_service.clear_dirty()
 
             if dirty_queues:
                 self.write_broadcast({
@@ -177,6 +184,23 @@ class ServerInstance(object):
                         conn.authenticated
                         and game.is_visible_to_player(conn.player)
                     )
+                )
+
+            def get_game_datetime(iso_date_string):
+                iso_date_string = iso_date_string.split('.')[0]+"Z"
+                return datetime.datetime.strptime(iso_date_string, "%Y-%m-%dT%H:%M:%SZ")
+
+            for taf_replay_id, tada_game_info in dirty_replay_uploads:
+                self.write_broadcast(
+                    {
+                        "command": "new_tada_replay",
+                        "taf_replay_id": str(taf_replay_id),
+                        "tada_replay_id": tada_game_info["party"],
+                        "map_name": tada_game_info["mapName"],
+                        "timestamp": get_game_datetime(tada_game_info["date"]).timestamp(),
+                        "players": [p["name"] for p in tada_game_info["players"] if p["side"] != "WATCH"]
+                    },
+                    lambda lobby_conn: lobby_conn.authenticated
                 )
 
         @at_interval(45, loop=self.loop)

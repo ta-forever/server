@@ -24,7 +24,7 @@ from .games import (
     ValidityState,
     VisibilityState
 )
-from .games.typedefs import EndedGameInfo
+from .games.typedefs import EndedGameInfo, ReplayInfo
 from .matchmaker import MatchmakerQueue
 from .message_queue_service import MessageQueueService
 from .players import Player
@@ -62,6 +62,14 @@ class GameService(Service):
 
         # The set of active games
         self._games: Dict[int, Game] = dict()
+
+    def get_archive_dir_for_game_id(self, replay_id: int):
+        replays_path = "/content/replays"
+        mm = replay_id // 100000000
+        nn = (replay_id // 1000000) % 100
+        oo = (replay_id // 10000) % 100
+        pp = (replay_id // 100) % 100
+        return f"{replays_path}/{mm}/{nn}/{oo}/{pp}"
 
     async def initialize(self) -> None:
         await self.initialise_game_counter()
@@ -116,11 +124,7 @@ class GameService(Service):
         for file_path in glob.glob(f"{replays_path}/*.tad"):
             file_name = os.path.basename(file_path)
             game_id = int(os.path.splitext(file_name)[0])
-            mm = game_id // 100000000
-            nn = (game_id // 1000000) % 100
-            oo = (game_id // 10000) % 100
-            pp = (game_id // 100) % 100
-            archive_dir = f"{replays_path}/{mm}/{nn}/{oo}/{pp}"
+            archive_dir = self.get_archive_dir_for_game_id(game_id)
 
             self._logger.info("[archive_new_replays] archiving replay %s to %s", file_path, archive_dir)
             os.makedirs(archive_dir, exist_ok=True)
@@ -141,8 +145,10 @@ class GameService(Service):
         replays_path = "/content/replays"
         for file_path in glob.glob(f"{replays_path}/*.json"):
             self._logger.info("[process_replay_metadata] processing metadata for %s", file_path)
-            with open(file_path) as fp:
-                data = json.load(fp)
+            with open(file_path, "rb") as fp:
+                file_content = fp.read()
+                data = json.loads(file_content)
+                file_content = file_content.decode("utf-8")
 
             game_id = data.get("gameId")
             ta_version = "{}.{}".format(data.get("taVersionMajor"), data.get("taVersionMinor"))
@@ -162,17 +168,20 @@ class GameService(Service):
                         # try again later
                         continue
 
+                await conn.execute(f"UPDATE `game_stats` SET replay_meta='{file_content}' WHERE id = {game_id}")
+
                 if row[1] is None:
                     os.rename(file_path, file_path + ".unknown_map")
                     self._logger.info(
                         f"[process_replay_metadata] ditching {file_path} because row[1] is None (unknown map)")
                     continue
+                else:
+                    os.remove(file_path)
 
                 featured_mod_id = int(row[0])
                 map_version_id = int(row[1])
                 self._logger.info(
                     f"[process_replay_metadata] game_id={game_id}, ta_version={ta_version}, units_hash={units_hash}, map_hash={map_hash}, featured_mod_id={featured_mod_id}, map_version_id={map_version_id}")
-                os.remove(file_path)
 
                 sql = f"""
                     INSERT INTO `game_featuredMods_version` (`game_featuredMods_id`, `version`, `ta_hash`, `observation_count`)
@@ -183,6 +192,18 @@ class GameService(Service):
 
                 sql = f"UPDATE `map_version` SET ta_hash = '{map_hash}' WHERE id = {map_version_id};"
                 await conn.execute(sql)
+
+    async def get_replay_info(self, db_connection, game_id: int):
+        result = await db_connection.execute(f"SELECT replay_meta, tada_available FROM `game_stats` WHERE id = {game_id}")
+        row = await result.fetchone()
+        if row is None:
+            raise ValueError(f"Unable to find any information about replay id={game_id}")
+        replay_meta = json.loads(row[0]) if row[0] is not None else None
+        return ReplayInfo(replay_meta=replay_meta, tada_available=row[1])
+
+    async def set_game_tada_available(self, db_connection, game_id: int, available: bool):
+        available = 1 if available else 0
+        await db_connection.execute(f"UPDATE `game_stats` SET `tada_available`={available} WHERE id={game_id}")
 
     @property
     def dirty_games(self):
