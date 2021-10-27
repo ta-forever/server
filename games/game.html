@@ -31,7 +31,7 @@ import json
 import logging
 import time
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple, Iterable
 
 import pymysql
 from sqlalchemy import and_, bindparam
@@ -99,7 +99,8 @@ class Game():
         displayed_rating_range: Optional[InclusiveRange] = None,
         enforce_rating_range: bool = False,
         max_players: int = 10,
-        replay_delay_seconds: int = 300     # or negative to disable
+        replay_delay_seconds: int = 300,     # or negative to disable
+        map_pool_map_ids: Iterable[int] = None
     ):
         self._db = database
         self._results = GameResultReports(id_)
@@ -121,6 +122,7 @@ class Game():
         self.map_id = None
         self.map_file_path = f&#34;/{map_}/&#34;
         self.map_ranked = False
+        self.map_pool_map_ids = set(id_ for id_ in map_pool_map_ids)
         self.password = None
         self._players = []
         self.AIs = {}
@@ -154,6 +156,12 @@ class Game():
         self._launch_fut = asyncio.Future()
 
         self._logger.debug(&#34;%s created&#34;, self)
+
+    def is_pooled_map(self, map_id):
+        &#34;&#34;&#34;
+        :return: True if given map_id is a member of the game&#39;s map pool, or if game&#39;s map pool is None
+        &#34;&#34;&#34;
+        return self.map_pool_map_ids is None or map_id in self.map_pool_map_ids
 
     async def timeout_hosted_staging(self, timeout: int = 30):
         await asyncio.sleep(timeout)
@@ -999,7 +1007,7 @@ class Game():
 <dl>
 <dt id="server.games.game.Game"><code class="flex name class">
 <span>class <span class="ident">Game</span></span>
-<span>(</span><span>id_: int, database: FAFDatabase, game_service: GameService, game_stats_service: GameStatsService, host: Optional[<a title="server.players.Player" href="../players.html#server.players.Player">Player</a>] = None, name: str = 'None', map_: str = 'SHERWOOD', game_mode: str = 'faf', matchmaker_queue_id: Optional[int] = None, rating_type: Optional[str] = None, displayed_rating_range: Optional[<a title="server.rating.InclusiveRange" href="../rating.html#server.rating.InclusiveRange">InclusiveRange</a>] = None, enforce_rating_range: bool = False, max_players: int = 10, replay_delay_seconds: int = 300)</span>
+<span>(</span><span>id_: int, database: FAFDatabase, game_service: GameService, game_stats_service: GameStatsService, host: Optional[<a title="server.players.Player" href="../players.html#server.players.Player">Player</a>] = None, name: str = 'None', map_: str = 'SHERWOOD', game_mode: str = 'faf', matchmaker_queue_id: Optional[int] = None, rating_type: Optional[str] = None, displayed_rating_range: Optional[<a title="server.rating.InclusiveRange" href="../rating.html#server.rating.InclusiveRange">InclusiveRange</a>] = None, enforce_rating_range: bool = False, max_players: int = 10, replay_delay_seconds: int = 300, map_pool_map_ids: Iterable[int] = None)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Object that lasts for the lifetime of a game on FAF.</p></div>
@@ -1032,7 +1040,8 @@ class Game():
         displayed_rating_range: Optional[InclusiveRange] = None,
         enforce_rating_range: bool = False,
         max_players: int = 10,
-        replay_delay_seconds: int = 300     # or negative to disable
+        replay_delay_seconds: int = 300,     # or negative to disable
+        map_pool_map_ids: Iterable[int] = None
     ):
         self._db = database
         self._results = GameResultReports(id_)
@@ -1054,6 +1063,7 @@ class Game():
         self.map_id = None
         self.map_file_path = f&#34;/{map_}/&#34;
         self.map_ranked = False
+        self.map_pool_map_ids = set(id_ for id_ in map_pool_map_ids)
         self.password = None
         self._players = []
         self.AIs = {}
@@ -1087,6 +1097,12 @@ class Game():
         self._launch_fut = asyncio.Future()
 
         self._logger.debug(&#34;%s created&#34;, self)
+
+    def is_pooled_map(self, map_id):
+        &#34;&#34;&#34;
+        :return: True if given map_id is a member of the game&#39;s map pool, or if game&#39;s map pool is None
+        &#34;&#34;&#34;
+        return self.map_pool_map_ids is None or map_id in self.map_pool_map_ids
 
     async def timeout_hosted_staging(self, timeout: int = 30):
         await asyncio.sleep(timeout)
@@ -2413,6 +2429,22 @@ Note that FFA players will be separated into individual teams.</p></div>
     return list(teams.values()) + ffa_players</code></pre>
 </details>
 </dd>
+<dt id="server.games.game.Game.is_pooled_map"><code class="name flex">
+<span>def <span class="ident">is_pooled_map</span></span>(<span>self, map_id)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>:return: True if given map_id is a member of the game's map pool, or if game's map pool is None</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def is_pooled_map(self, map_id):
+    &#34;&#34;&#34;
+    :return: True if given map_id is a member of the game&#39;s map pool, or if game&#39;s map pool is None
+    &#34;&#34;&#34;
+    return self.map_pool_map_ids is None or map_id in self.map_pool_map_ids</code></pre>
+</details>
+</dd>
 <dt id="server.games.game.Game.is_visible_to_player"><code class="name flex">
 <span>def <span class="ident">is_visible_to_player</span></span>(<span>self, player: <a title="server.players.Player" href="../players.html#server.players.Player">Player</a>) ‑> bool</span>
 </code></dt>
@@ -3266,6 +3298,7 @@ care about recording stats for, after all).</p></div>
 <li><code><a title="server.games.game.Game.is_ffa" href="#server.games.game.Game.is_ffa">is_ffa</a></code></li>
 <li><code><a title="server.games.game.Game.is_multi_team" href="#server.games.game.Game.is_multi_team">is_multi_team</a></code></li>
 <li><code><a title="server.games.game.Game.is_mutually_agreed_draw" href="#server.games.game.Game.is_mutually_agreed_draw">is_mutually_agreed_draw</a></code></li>
+<li><code><a title="server.games.game.Game.is_pooled_map" href="#server.games.game.Game.is_pooled_map">is_pooled_map</a></code></li>
 <li><code><a title="server.games.game.Game.is_visible_to_player" href="#server.games.game.Game.is_visible_to_player">is_visible_to_player</a></code></li>
 <li><code><a title="server.games.game.Game.load_results" href="#server.games.game.Game.load_results">load_results</a></code></li>
 <li><code><a title="server.games.game.Game.map_name" href="#server.games.game.Game.map_name">map_name</a></code></li>

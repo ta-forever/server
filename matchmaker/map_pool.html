@@ -47,6 +47,9 @@ class MapPool(object):
         self.maps = None
         self.set_maps(maps)
 
+    def get_map_ids(self):
+        return self.maps.keys()
+
     def set_maps(self, maps: Iterable[Union[Map, NeroxisGeneratedMap]]) -&gt; None:
         self.maps = {map_.id: map_ for map_ in maps}
 
@@ -117,6 +120,9 @@ class MapPool(object):
         self.name = name
         self.maps = None
         self.set_maps(maps)
+
+    def get_map_ids(self):
+        return self.maps.keys()
 
     def set_maps(self, maps: Iterable[Union[Map, NeroxisGeneratedMap]]) -&gt; None:
         self.maps = {map_.id: map_ for map_ in maps}
@@ -204,6 +210,19 @@ amount of times.</p></div>
     return self.maps[random.choices(least_common, weights=weights, k=1)[0][0]].get_map()</code></pre>
 </details>
 </dd>
+<dt id="server.matchmaker.map_pool.MapPool.get_map_ids"><code class="name flex">
+<span>def <span class="ident">get_map_ids</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_map_ids(self):
+    return self.maps.keys()</code></pre>
+</details>
+</dd>
 <dt id="server.matchmaker.map_pool.MapPool.set_maps"><code class="name flex">
 <span>def <span class="ident">set_maps</span></span>(<span>self, maps: Iterable[Union[<a title="server.types.Map" href="../types.html#server.types.Map">Map</a>, <a title="server.types.NeroxisGeneratedMap" href="../types.html#server.types.NeroxisGeneratedMap">NeroxisGeneratedMap</a>]]) ‑> None</span>
 </code></dt>
@@ -239,6 +258,7 @@ amount of times.</p></div>
 <h4><code><a title="server.matchmaker.map_pool.MapPool" href="#server.matchmaker.map_pool.MapPool">MapPool</a></code></h4>
 <ul class="">
 <li><code><a title="server.matchmaker.map_pool.MapPool.choose_map" href="#server.matchmaker.map_pool.MapPool.choose_map">choose_map</a></code></li>
+<li><code><a title="server.matchmaker.map_pool.MapPool.get_map_ids" href="#server.matchmaker.map_pool.MapPool.get_map_ids">get_map_ids</a></code></li>
 <li><code><a title="server.matchmaker.map_pool.MapPool.set_maps" href="#server.matchmaker.map_pool.MapPool.set_maps">set_maps</a></code></li>
 </ul>
 </li>

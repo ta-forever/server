@@ -39,6 +39,7 @@ Copyright (c) 2015-2016 Michael Søndergaard &lt;sheeo@faforever.com&gt;
 Distributed under GPLv3, see license.txt
 &#34;&#34;&#34;
 import asyncio
+import datetime
 import logging
 from typing import Dict, Optional, Set, Tuple, Type
 
@@ -67,6 +68,7 @@ from .protocol import Protocol, QDataStreamProtocol
 from .rating_service.rating_service import RatingService
 from .servercontext import ServerContext
 from .stats.game_stats_service import GameStatsService
+from .tada_service import TadaService
 from .timing import at_interval
 
 __author__ = &#34;Askaholic, Chris Kitching, Dragonfire, Gael Honorez, Jeroen De Dauw, Crotalus, Michael Søndergaard, Michel Jung&#34;
@@ -91,6 +93,7 @@ __all__ = (
     &#34;game_service&#34;,
     &#34;protocol&#34;,
     &#34;run_control_server&#34;,
+    &#34;TadaService&#34;
 )
 
 DIRTY_REPORT_INTERVAL = 1  # Seconds
@@ -142,7 +145,8 @@ class ServerInstance(object):
             nts_client=twilio_nts,
             players=self.services[&#34;player_service&#34;],
             ladder_service=self.services[&#34;ladder_service&#34;],
-            party_service=self.services[&#34;party_service&#34;]
+            party_service=self.services[&#34;party_service&#34;],
+            tada_service=self.services[&#34;tada_service&#34;]
         )
 
     def write_broadcast(self, message, predicate=lambda conn: conn.authenticated):
@@ -169,6 +173,7 @@ class ServerInstance(object):
 
         game_service: GameService = self.services[&#34;game_service&#34;]
         player_service: PlayerService = self.services[&#34;player_service&#34;]
+        tada_service: TadaService = self.services[&#34;tada_service&#34;]
 
         @at_interval(DIRTY_REPORT_INTERVAL, loop=self.loop)
         def do_report_dirties():
@@ -176,8 +181,10 @@ class ServerInstance(object):
             dirty_games = game_service.dirty_games
             dirty_queues = game_service.dirty_queues
             dirty_players = player_service.dirty_players
+            dirty_replay_uploads = tada_service.dirty_uploads
             game_service.clear_dirty()
             player_service.clear_dirty()
+            tada_service.clear_dirty()
 
             if dirty_queues:
                 self.write_broadcast({
@@ -209,6 +216,23 @@ class ServerInstance(object):
                         conn.authenticated
                         and game.is_visible_to_player(conn.player)
                     )
+                )
+
+            def get_game_datetime(iso_date_string):
+                iso_date_string = iso_date_string.split(&#39;.&#39;)[0]+&#34;Z&#34;
+                return datetime.datetime.strptime(iso_date_string, &#34;%Y-%m-%dT%H:%M:%SZ&#34;)
+
+            for taf_replay_id, tada_game_info in dirty_replay_uploads:
+                self.write_broadcast(
+                    {
+                        &#34;command&#34;: &#34;new_tada_replay&#34;,
+                        &#34;taf_replay_id&#34;: str(taf_replay_id),
+                        &#34;tada_replay_id&#34;: tada_game_info[&#34;party&#34;],
+                        &#34;map_name&#34;: tada_game_info[&#34;mapName&#34;],
+                        &#34;timestamp&#34;: get_game_datetime(tada_game_info[&#34;date&#34;]).timestamp(),
+                        &#34;players&#34;: [p[&#34;name&#34;] for p in tada_game_info[&#34;players&#34;] if p[&#34;side&#34;] != &#34;WATCH&#34;]
+                    },
+                    lambda lobby_conn: lobby_conn.authenticated
                 )
 
         @at_interval(45, loop=self.loop)
@@ -381,6 +405,10 @@ class ServerInstance(object):
 <div class="desc"></div>
 </dd>
 <dt><code class="name"><a title="server.stats" href="stats/index.html">server.stats</a></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+<dt><code class="name"><a title="server.tada_service" href="tada_service.html">server.tada_service</a></code></dt>
 <dd>
 <div class="desc"></div>
 </dd>
@@ -1906,6 +1934,14 @@ cause the caller to be disconnected as well.</p></div>
         # The set of active games
         self._games: Dict[int, Game] = dict()
 
+    def get_archive_dir_for_game_id(self, replay_id: int):
+        replays_path = &#34;/content/replays&#34;
+        mm = replay_id // 100000000
+        nn = (replay_id // 1000000) % 100
+        oo = (replay_id // 10000) % 100
+        pp = (replay_id // 100) % 100
+        return f&#34;{replays_path}/{mm}/{nn}/{oo}/{pp}&#34;
+
     async def initialize(self) -&gt; None:
         await self.initialise_game_counter()
         await self.update_data()
@@ -1959,11 +1995,7 @@ cause the caller to be disconnected as well.</p></div>
         for file_path in glob.glob(f&#34;{replays_path}/*.tad&#34;):
             file_name = os.path.basename(file_path)
             game_id = int(os.path.splitext(file_name)[0])
-            mm = game_id // 100000000
-            nn = (game_id // 1000000) % 100
-            oo = (game_id // 10000) % 100
-            pp = (game_id // 100) % 100
-            archive_dir = f&#34;{replays_path}/{mm}/{nn}/{oo}/{pp}&#34;
+            archive_dir = self.get_archive_dir_for_game_id(game_id)
 
             self._logger.info(&#34;[archive_new_replays] archiving replay %s to %s&#34;, file_path, archive_dir)
             os.makedirs(archive_dir, exist_ok=True)
@@ -1984,8 +2016,10 @@ cause the caller to be disconnected as well.</p></div>
         replays_path = &#34;/content/replays&#34;
         for file_path in glob.glob(f&#34;{replays_path}/*.json&#34;):
             self._logger.info(&#34;[process_replay_metadata] processing metadata for %s&#34;, file_path)
-            with open(file_path) as fp:
-                data = json.load(fp)
+            with open(file_path, &#34;rb&#34;) as fp:
+                file_content = fp.read()
+                data = json.loads(file_content)
+                file_content = file_content.decode(&#34;utf-8&#34;)
 
             game_id = data.get(&#34;gameId&#34;)
             ta_version = &#34;{}.{}&#34;.format(data.get(&#34;taVersionMajor&#34;), data.get(&#34;taVersionMinor&#34;))
@@ -2005,17 +2039,20 @@ cause the caller to be disconnected as well.</p></div>
                         # try again later
                         continue
 
+                await conn.execute(f&#34;UPDATE `game_stats` SET replay_meta=&#39;{file_content}&#39; WHERE id = {game_id}&#34;)
+
                 if row[1] is None:
                     os.rename(file_path, file_path + &#34;.unknown_map&#34;)
                     self._logger.info(
                         f&#34;[process_replay_metadata] ditching {file_path} because row[1] is None (unknown map)&#34;)
                     continue
+                else:
+                    os.remove(file_path)
 
                 featured_mod_id = int(row[0])
                 map_version_id = int(row[1])
                 self._logger.info(
                     f&#34;[process_replay_metadata] game_id={game_id}, ta_version={ta_version}, units_hash={units_hash}, map_hash={map_hash}, featured_mod_id={featured_mod_id}, map_version_id={map_version_id}&#34;)
-                os.remove(file_path)
 
                 sql = f&#34;&#34;&#34;
                     INSERT INTO `game_featuredMods_version` (`game_featuredMods_id`, `version`, `ta_hash`, `observation_count`)
@@ -2026,6 +2063,18 @@ cause the caller to be disconnected as well.</p></div>
 
                 sql = f&#34;UPDATE `map_version` SET ta_hash = &#39;{map_hash}&#39; WHERE id = {map_version_id};&#34;
                 await conn.execute(sql)
+
+    async def get_replay_info(self, db_connection, game_id: int):
+        result = await db_connection.execute(f&#34;SELECT replay_meta, tada_available FROM `game_stats` WHERE id = {game_id}&#34;)
+        row = await result.fetchone()
+        if row is None:
+            raise ValueError(f&#34;Unable to find any information about replay id={game_id}&#34;)
+        replay_meta = json.loads(row[0]) if row[0] is not None else None
+        return ReplayInfo(replay_meta=replay_meta, tada_available=row[1])
+
+    async def set_game_tada_available(self, db_connection, game_id: int, available: bool):
+        available = 1 if available else 0
+        await db_connection.execute(f&#34;UPDATE `game_stats` SET `tada_available`={available} WHERE id={game_id}&#34;)
 
     @property
     def dirty_games(self):
@@ -2277,11 +2326,7 @@ def pending_games(self) -&gt; List[Game]:
     for file_path in glob.glob(f&#34;{replays_path}/*.tad&#34;):
         file_name = os.path.basename(file_path)
         game_id = int(os.path.splitext(file_name)[0])
-        mm = game_id // 100000000
-        nn = (game_id // 1000000) % 100
-        oo = (game_id // 10000) % 100
-        pp = (game_id // 100) % 100
-        archive_dir = f&#34;{replays_path}/{mm}/{nn}/{oo}/{pp}&#34;
+        archive_dir = self.get_archive_dir_for_game_id(game_id)
 
         self._logger.info(&#34;[archive_new_replays] archiving replay %s to %s&#34;, file_path, archive_dir)
         os.makedirs(archive_dir, exist_ok=True)
@@ -2381,6 +2426,42 @@ def pending_games(self) -&gt; List[Game]:
     return self.game_id_counter</code></pre>
 </details>
 </dd>
+<dt id="server.GameService.get_archive_dir_for_game_id"><code class="name flex">
+<span>def <span class="ident">get_archive_dir_for_game_id</span></span>(<span>self, replay_id: int)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_archive_dir_for_game_id(self, replay_id: int):
+    replays_path = &#34;/content/replays&#34;
+    mm = replay_id // 100000000
+    nn = (replay_id // 1000000) % 100
+    oo = (replay_id // 10000) % 100
+    pp = (replay_id // 100) % 100
+    return f&#34;{replays_path}/{mm}/{nn}/{oo}/{pp}&#34;</code></pre>
+</details>
+</dd>
+<dt id="server.GameService.get_replay_info"><code class="name flex">
+<span>async def <span class="ident">get_replay_info</span></span>(<span>self, db_connection, game_id: int)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">async def get_replay_info(self, db_connection, game_id: int):
+    result = await db_connection.execute(f&#34;SELECT replay_meta, tada_available FROM `game_stats` WHERE id = {game_id}&#34;)
+    row = await result.fetchone()
+    if row is None:
+        raise ValueError(f&#34;Unable to find any information about replay id={game_id}&#34;)
+    replay_meta = json.loads(row[0]) if row[0] is not None else None
+    return ReplayInfo(replay_meta=replay_meta, tada_available=row[1])</code></pre>
+</details>
+</dd>
 <dt id="server.GameService.initialise_game_counter"><code class="name flex">
 <span>async def <span class="ident">initialise_game_counter</span></span>(<span>self)</span>
 </code></dt>
@@ -2446,8 +2527,10 @@ when users later want to watch replays
     replays_path = &#34;/content/replays&#34;
     for file_path in glob.glob(f&#34;{replays_path}/*.json&#34;):
         self._logger.info(&#34;[process_replay_metadata] processing metadata for %s&#34;, file_path)
-        with open(file_path) as fp:
-            data = json.load(fp)
+        with open(file_path, &#34;rb&#34;) as fp:
+            file_content = fp.read()
+            data = json.loads(file_content)
+            file_content = file_content.decode(&#34;utf-8&#34;)
 
         game_id = data.get(&#34;gameId&#34;)
         ta_version = &#34;{}.{}&#34;.format(data.get(&#34;taVersionMajor&#34;), data.get(&#34;taVersionMinor&#34;))
@@ -2467,17 +2550,20 @@ when users later want to watch replays
                     # try again later
                     continue
 
+            await conn.execute(f&#34;UPDATE `game_stats` SET replay_meta=&#39;{file_content}&#39; WHERE id = {game_id}&#34;)
+
             if row[1] is None:
                 os.rename(file_path, file_path + &#34;.unknown_map&#34;)
                 self._logger.info(
                     f&#34;[process_replay_metadata] ditching {file_path} because row[1] is None (unknown map)&#34;)
                 continue
+            else:
+                os.remove(file_path)
 
             featured_mod_id = int(row[0])
             map_version_id = int(row[1])
             self._logger.info(
                 f&#34;[process_replay_metadata] game_id={game_id}, ta_version={ta_version}, units_hash={units_hash}, map_hash={map_hash}, featured_mod_id={featured_mod_id}, map_version_id={map_version_id}&#34;)
-            os.remove(file_path)
 
             sql = f&#34;&#34;&#34;
                 INSERT INTO `game_featuredMods_version` (`game_featuredMods_id`, `version`, `ta_hash`, `observation_count`)
@@ -2527,6 +2613,20 @@ when users later want to watch replays
 <pre><code class="python">def remove_game(self, game: Game):
     if game.id in self._games:
         del self._games[game.id]</code></pre>
+</details>
+</dd>
+<dt id="server.GameService.set_game_tada_available"><code class="name flex">
+<span>async def <span class="ident">set_game_tada_available</span></span>(<span>self, db_connection, game_id: int, available: bool)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">async def set_game_tada_available(self, db_connection, game_id: int, available: bool):
+    available = 1 if available else 0
+    await db_connection.execute(f&#34;UPDATE `game_stats` SET `tada_available`={available} WHERE id={game_id}&#34;)</code></pre>
 </details>
 </dd>
 <dt id="server.GameService.update_active_game_metrics"><code class="name flex">
@@ -3800,7 +3900,8 @@ statistics, and launches the games.</p></div>
                 name=&#34;Matchmaker Game&#34;,
                 matchmaker_queue_id=queue.id,
                 rating_type=queue.rating_type,
-                max_players=len(all_players)
+                max_players=len(all_players),
+                map_pool_map_ids=pool.get_map_ids()
             )
             game.init_mode = InitMode.AUTO_LOBBY
             game.set_map(map_id, map_path, True)
@@ -4210,7 +4311,8 @@ so it should only perform fast operations.</p></div>
             name=&#34;Matchmaker Game&#34;,
             matchmaker_queue_id=queue.id,
             rating_type=queue.rating_type,
-            max_players=len(all_players)
+            max_players=len(all_players),
+            map_pool_map_ids=pool.get_map_ids()
         )
         game.init_mode = InitMode.AUTO_LOBBY
         game.set_map(map_id, map_path, True)
@@ -5797,7 +5899,8 @@ state, i.e. the same players, games, etc.</p></div>
             nts_client=twilio_nts,
             players=self.services[&#34;player_service&#34;],
             ladder_service=self.services[&#34;ladder_service&#34;],
-            party_service=self.services[&#34;party_service&#34;]
+            party_service=self.services[&#34;party_service&#34;],
+            tada_service=self.services[&#34;tada_service&#34;]
         )
 
     def write_broadcast(self, message, predicate=lambda conn: conn.authenticated):
@@ -5824,6 +5927,7 @@ state, i.e. the same players, games, etc.</p></div>
 
         game_service: GameService = self.services[&#34;game_service&#34;]
         player_service: PlayerService = self.services[&#34;player_service&#34;]
+        tada_service: TadaService = self.services[&#34;tada_service&#34;]
 
         @at_interval(DIRTY_REPORT_INTERVAL, loop=self.loop)
         def do_report_dirties():
@@ -5831,8 +5935,10 @@ state, i.e. the same players, games, etc.</p></div>
             dirty_games = game_service.dirty_games
             dirty_queues = game_service.dirty_queues
             dirty_players = player_service.dirty_players
+            dirty_replay_uploads = tada_service.dirty_uploads
             game_service.clear_dirty()
             player_service.clear_dirty()
+            tada_service.clear_dirty()
 
             if dirty_queues:
                 self.write_broadcast({
@@ -5864,6 +5970,23 @@ state, i.e. the same players, games, etc.</p></div>
                         conn.authenticated
                         and game.is_visible_to_player(conn.player)
                     )
+                )
+
+            def get_game_datetime(iso_date_string):
+                iso_date_string = iso_date_string.split(&#39;.&#39;)[0]+&#34;Z&#34;
+                return datetime.datetime.strptime(iso_date_string, &#34;%Y-%m-%dT%H:%M:%SZ&#34;)
+
+            for taf_replay_id, tada_game_info in dirty_replay_uploads:
+                self.write_broadcast(
+                    {
+                        &#34;command&#34;: &#34;new_tada_replay&#34;,
+                        &#34;taf_replay_id&#34;: str(taf_replay_id),
+                        &#34;tada_replay_id&#34;: tada_game_info[&#34;party&#34;],
+                        &#34;map_name&#34;: tada_game_info[&#34;mapName&#34;],
+                        &#34;timestamp&#34;: get_game_datetime(tada_game_info[&#34;date&#34;]).timestamp(),
+                        &#34;players&#34;: [p[&#34;name&#34;] for p in tada_game_info[&#34;players&#34;] if p[&#34;side&#34;] != &#34;WATCH&#34;]
+                    },
+                    lambda lobby_conn: lobby_conn.authenticated
                 )
 
         @at_interval(45, loop=self.loop)
@@ -6005,6 +6128,239 @@ state, i.e. the same players, games, etc.</p></div>
 </dd>
 </dl>
 </dd>
+<dt id="server.TadaService"><code class="flex name class">
+<span>class <span class="ident">TadaService</span></span>
+<span>(</span><span>database: <a title="server.db.FAFDatabase" href="db/index.html#server.db.FAFDatabase">FAFDatabase</a>)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>All services should inherit from this class.</p>
+<p>Services are singleton objects which manage some server task.</p>
+<p>:param tada_endpoint: eg
+'https://z151e60yl7.execute-api.us-east-2.amazonaws.com'</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TadaService(Service):
+    def __init__(self, database: FAFDatabase):
+        &#34;&#34;&#34;
+        :param tada_endpoint: eg  &#39;https://z151e60yl7.execute-api.us-east-2.amazonaws.com&#39;
+        &#34;&#34;&#34;
+        self._db = database
+        tada_api_url = config.TADA_API_URL
+        self._upload_endpoint = f&#39;{tada_api_url}/staging/upload&#39;
+        self._games_endpoint = f&#39;{tada_api_url}/staging/games&#39;
+        self._dirty_uploads = []
+        self._upload_queue = []
+
+    @property
+    def dirty_uploads(self):
+        return self._dirty_uploads
+
+    def clear_dirty(self):
+        self._dirty_uploads = []
+
+    def mark_dirty(self, taf_id: int, tada_id: str):
+        self._dirty_uploads.append((taf_id, tada_id))
+
+    async def initialize(self) -&gt; None:
+        self._upload_cron = aiocron.crontab(&#34;* * * * *&#34;, func=self._service_queue)
+
+    async def shutdown(self):
+        pass
+
+    def on_connection_lost(self, conn: &#34;LobbyConnection&#34;) -&gt; None:
+        pass
+
+    async def upload(self, taf_replay_id: int, replay_meta: dict, zip_or_tad_file_path: str, retry_count: int):
+        try:
+            await self._upload(taf_replay_id, replay_meta, zip_or_tad_file_path)
+
+        except Exception as e:
+            if retry_count &lt;= 0:
+                self._logger.exception(e)
+                self._logger.info(&#34;giving up. restoring game_stats.tada_available=0&#34;)
+                async with self._db.acquire() as conn:
+                    await conn.execute(f&#34;UPDATE `game_stats` SET `tada_available`=0 WHERE id={taf_replay_id}&#34;)
+
+            else:
+                self._logger.info(f&#34;Exception uploading replay:{str(e)}. retry_count:{retry_count}&#34;)
+                self._upload_queue.append((taf_replay_id, replay_meta, zip_or_tad_file_path, retry_count-1))
+
+    async def _service_queue(self):
+        queue_items, self._upload_queue = self._upload_queue, []
+        for args in queue_items:
+            await self.upload(*args)
+
+    async def _upload(self, taf_replay_id: int, replay_meta: dict, zip_or_tad_file_path: str):
+        if zip_or_tad_file_path.endswith(&#34;.zip&#34;):
+            tad_file_path = os.path.splitext(zip_or_tad_file_path)[0] + &#34;.tad&#34;
+            def cleanup(): os.remove(tad_file_path)
+            shutil.unpack_archive(zip_or_tad_file_path, os.path.dirname(zip_or_tad_file_path) or &#39;./&#39;)
+
+        else:
+            def cleanup(): pass
+            tad_file_path = zip_or_tad_file_path
+
+        try:
+            #await self._do_upload(tad_file_path)
+            upload_time = datetime.datetime.utcnow()
+
+            tada_game_info, map_name, players = None, None, None
+            if replay_meta is not None:
+                map_name = replay_meta[&#34;mapName&#34;]
+                players = set(p[&#34;name&#34;] for p in replay_meta[&#34;players&#34;])
+            for n in range(5):
+                await asyncio.sleep(3)
+                latest_games = await self._get_latest_games()
+                tada_game_info = self._find_tada_game(latest_games, upload_time, map_name, players)
+                if tada_game_info is not None:
+                    tada_game_id = tada_game_info[&#34;party&#34;]
+                    self._logger.info(f&#34;game successfully uploaded. id={tada_game_id}&#34;)
+                    self.mark_dirty(taf_replay_id, tada_game_info)
+                    break
+
+            if tada_game_info is None:
+                self._logger.info(f&#34;Unable to find uploaded game in TADA list of latest uploads&#34;)
+
+        finally:
+            cleanup()
+
+    def _find_tada_game(self, tada_games, upload_time: datetime.datetime, map_name: str, players: Set[str]):
+        self._logger.info(f&#34;_find_tada_game: upload_time={upload_time}, map_name={map_name}, players={players}&#34;)
+        for game in tada_games:
+            tada_upload_time = game[&#34;uploaded&#34;].split(&#34;.&#34;)[0]+&#34;Z&#34;
+            tada_upload_time = datetime.datetime.strptime(tada_upload_time, &#34;%Y-%m-%dT%H:%M:%SZ&#34;)
+            tada_map = game[&#34;mapName&#34;]
+            tada_players = set(p[&#34;name&#34;] for p in game[&#34;players&#34;])
+            self._logger.info(f&#34;tada_upload_time={tada_upload_time}, tada_map={tada_map}, tada_players={tada_players}&#34;)
+            if abs(upload_time-tada_upload_time) &lt; datetime.timedelta(seconds=10) and \
+                    (map_name is None or map_name == tada_map) and \
+                    (players is None or players == tada_players):
+                self._logger.info(&#34;uploaded game found&#34;)
+                return game
+
+        self._logger.info(&#34;uploaded game NOT found.  just returning a random.&#34;)
+        for game in tada_games:
+            return game
+
+    async def _do_upload(self, tad_file_path: str) -&gt; str:
+        async with aiohttp.ClientSession() as session:
+            self._logger.info(f&#34;retrieving signed url for upload to TADA&#34;)
+            async with session.get(self._upload_endpoint, verify_ssl=False) as r:
+                if r.status != 200:
+                    raise ValueError(&#34;Unable to get signed url&#34;)
+
+                signed_url = await r.json()[&#34;signedUrl&#34;]
+
+            self._logger.info(f&#34;uploading file={tad_file_path} to signed_url={signed_url}&#34;)
+            with open(tad_file_path, &#34;rb&#34;) as f:
+                async with session.put(signed_url, data=f) as r:
+                    if r.status != 200:
+                        raise ValueError(&#34;Unable to upload replay to TADA&#34;)
+
+        self._logger.info(f&#34;upload completed&#34;)
+
+    async def _get_latest_games(self):
+        async with aiohttp.ClientSession() as session:
+            self._logger.info(f&#34;retrieving latest games&#34;)
+            async with session.get(f&#34;{self._games_endpoint}?order=Uploaded&#34;, verify_ssl=False) as r:
+                if r.status != 200:
+                    raise ValueError(f&#34;Got {r.status} from TADA endpoign!&#34;)
+                games = await r.json()
+        return games[&#39;games&#39;]</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="server.core.service.Service" href="core/service.html#server.core.service.Service">Service</a></li>
+</ul>
+<h3>Class variables</h3>
+<dl>
+<dt id="server.TadaService.services"><code class="name">var <span class="ident">services</span> : Dict[str, type]</code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+</dl>
+<h3>Instance variables</h3>
+<dl>
+<dt id="server.TadaService.dirty_uploads"><code class="name">var <span class="ident">dirty_uploads</span></code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def dirty_uploads(self):
+    return self._dirty_uploads</code></pre>
+</details>
+</dd>
+</dl>
+<h3>Methods</h3>
+<dl>
+<dt id="server.TadaService.clear_dirty"><code class="name flex">
+<span>def <span class="ident">clear_dirty</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def clear_dirty(self):
+    self._dirty_uploads = []</code></pre>
+</details>
+</dd>
+<dt id="server.TadaService.mark_dirty"><code class="name flex">
+<span>def <span class="ident">mark_dirty</span></span>(<span>self, taf_id: int, tada_id: str)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def mark_dirty(self, taf_id: int, tada_id: str):
+    self._dirty_uploads.append((taf_id, tada_id))</code></pre>
+</details>
+</dd>
+<dt id="server.TadaService.upload"><code class="name flex">
+<span>async def <span class="ident">upload</span></span>(<span>self, taf_replay_id: int, replay_meta: dict, zip_or_tad_file_path: str, retry_count: int)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">async def upload(self, taf_replay_id: int, replay_meta: dict, zip_or_tad_file_path: str, retry_count: int):
+    try:
+        await self._upload(taf_replay_id, replay_meta, zip_or_tad_file_path)
+
+    except Exception as e:
+        if retry_count &lt;= 0:
+            self._logger.exception(e)
+            self._logger.info(&#34;giving up. restoring game_stats.tada_available=0&#34;)
+            async with self._db.acquire() as conn:
+                await conn.execute(f&#34;UPDATE `game_stats` SET `tada_available`=0 WHERE id={taf_replay_id}&#34;)
+
+        else:
+            self._logger.info(f&#34;Exception uploading replay:{str(e)}. retry_count:{retry_count}&#34;)
+            self._upload_queue.append((taf_replay_id, replay_meta, zip_or_tad_file_path, retry_count-1))</code></pre>
+</details>
+</dd>
+</dl>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="server.core.service.Service" href="core/service.html#server.core.service.Service">Service</a></b></code>:
+<ul class="hlist">
+<li><code><a title="server.core.service.Service.initialize" href="core/service.html#server.core.service.Service.initialize">initialize</a></code></li>
+<li><code><a title="server.core.service.Service.on_connection_lost" href="core/service.html#server.core.service.Service.on_connection_lost">on_connection_lost</a></code></li>
+<li><code><a title="server.core.service.Service.shutdown" href="core/service.html#server.core.service.Service.shutdown">shutdown</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
 </dl>
 </section>
 </article>
@@ -6046,6 +6402,7 @@ state, i.e. the same players, games, etc.</p></div>
 <li><code><a title="server.rating_service" href="rating_service/index.html">server.rating_service</a></code></li>
 <li><code><a title="server.servercontext" href="servercontext.html">server.servercontext</a></code></li>
 <li><code><a title="server.stats" href="stats/index.html">server.stats</a></code></li>
+<li><code><a title="server.tada_service" href="tada_service.html">server.tada_service</a></code></li>
 <li><code><a title="server.team_matchmaker" href="team_matchmaker/index.html">server.team_matchmaker</a></code></li>
 <li><code><a title="server.timing" href="timing/index.html">server.timing</a></code></li>
 <li><code><a title="server.types" href="types.html">server.types</a></code></li>
@@ -6112,6 +6469,8 @@ state, i.e. the same players, games, etc.</p></div>
 <li><code><a title="server.GameService.create_uid" href="#server.GameService.create_uid">create_uid</a></code></li>
 <li><code><a title="server.GameService.dirty_games" href="#server.GameService.dirty_games">dirty_games</a></code></li>
 <li><code><a title="server.GameService.dirty_queues" href="#server.GameService.dirty_queues">dirty_queues</a></code></li>
+<li><code><a title="server.GameService.get_archive_dir_for_game_id" href="#server.GameService.get_archive_dir_for_game_id">get_archive_dir_for_game_id</a></code></li>
+<li><code><a title="server.GameService.get_replay_info" href="#server.GameService.get_replay_info">get_replay_info</a></code></li>
 <li><code><a title="server.GameService.initialise_game_counter" href="#server.GameService.initialise_game_counter">initialise_game_counter</a></code></li>
 <li><code><a title="server.GameService.live_games" href="#server.GameService.live_games">live_games</a></code></li>
 <li><code><a title="server.GameService.mark_dirty" href="#server.GameService.mark_dirty">mark_dirty</a></code></li>
@@ -6121,6 +6480,7 @@ state, i.e. the same players, games, etc.</p></div>
 <li><code><a title="server.GameService.publish_game_results" href="#server.GameService.publish_game_results">publish_game_results</a></code></li>
 <li><code><a title="server.GameService.remove_game" href="#server.GameService.remove_game">remove_game</a></code></li>
 <li><code><a title="server.GameService.services" href="#server.GameService.services">services</a></code></li>
+<li><code><a title="server.GameService.set_game_tada_available" href="#server.GameService.set_game_tada_available">set_game_tada_available</a></code></li>
 <li><code><a title="server.GameService.update_active_game_metrics" href="#server.GameService.update_active_game_metrics">update_active_game_metrics</a></code></li>
 <li><code><a title="server.GameService.update_data" href="#server.GameService.update_data">update_data</a></code></li>
 </ul>
@@ -6201,6 +6561,16 @@ state, i.e. the same players, games, etc.</p></div>
 <li><code><a title="server.ServerInstance.listen" href="#server.ServerInstance.listen">listen</a></code></li>
 <li><code><a title="server.ServerInstance.shutdown" href="#server.ServerInstance.shutdown">shutdown</a></code></li>
 <li><code><a title="server.ServerInstance.write_broadcast" href="#server.ServerInstance.write_broadcast">write_broadcast</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="server.TadaService" href="#server.TadaService">TadaService</a></code></h4>
+<ul class="">
+<li><code><a title="server.TadaService.clear_dirty" href="#server.TadaService.clear_dirty">clear_dirty</a></code></li>
+<li><code><a title="server.TadaService.dirty_uploads" href="#server.TadaService.dirty_uploads">dirty_uploads</a></code></li>
+<li><code><a title="server.TadaService.mark_dirty" href="#server.TadaService.mark_dirty">mark_dirty</a></code></li>
+<li><code><a title="server.TadaService.services" href="#server.TadaService.services">services</a></code></li>
+<li><code><a title="server.TadaService.upload" href="#server.TadaService.upload">upload</a></code></li>
 </ul>
 </li>
 </ul>

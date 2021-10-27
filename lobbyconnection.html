@@ -67,6 +67,7 @@ from .ice_servers.nts import TwilioNTS
 from .ladder_service import LadderService
 from .party_service import PartyService
 from .player_service import PlayerService
+from .tada_service import TadaService
 from .players import Player, PlayerState
 from .protocol import DisconnectedError, Protocol
 from .rating import InclusiveRange, RatingType
@@ -84,7 +85,8 @@ class LobbyConnection:
         nts_client: Optional[TwilioNTS],
         geoip: GeoIpService,
         ladder_service: LadderService,
-        party_service: PartyService
+        party_service: PartyService,
+        tada_service: TadaService
     ):
         self._db = database
         self.geoip_service = geoip
@@ -94,6 +96,7 @@ class LobbyConnection:
         self.coturn_generator = CoturnHMAC(config.COTURN_HOSTS, config.COTURN_KEYS)
         self.ladder_service = ladder_service
         self.party_service = party_service
+        self.tada_service = tada_service
         self._authenticated = False
         self.player = None  # type: Player
         self.game_connection = None  # type: GameConnection
@@ -200,6 +203,33 @@ class LobbyConnection:
             await self.send({&#34;command&#34;: &#34;invalid&#34;})
             self._logger.exception(ex)
             await self.abort(&#34;Error processing command&#34;)
+
+    async def command_upload_replay_to_tada(self, msg):
+        replay_id = msg[&#34;replay_id&#34;]
+        archive_dir = self.game_service.get_archive_dir_for_game_id(replay_id)
+        archive_path = f&#34;{archive_dir}/{replay_id}.zip&#34;
+
+        async with self._db.acquire() as conn:
+            replay_info = await self.game_service.get_replay_info(conn, replay_id)
+            if not replay_info.tada_available:
+                await self.game_service.set_game_tada_available(conn, replay_id, True)
+
+        if replay_info.tada_available:
+            await self.send({
+                &#34;command&#34;: &#34;notice&#34;,
+                &#34;style&#34;: &#34;error&#34;,
+                &#34;text&#34;: &#34;This replay has already been uploaded to TADA (or has been queued for upload)&#34;,
+                &#34;i18n_key&#34;: &#34;tada.server.upload.already&#34;
+            })
+            return
+
+        await self.send({
+            &#34;command&#34;: &#34;notice&#34;,
+            &#34;style&#34;: &#34;info&#34;,
+            &#34;text&#34;: &#34;Thank you, replay has been queued for upload to TADA&#34;,
+            &#34;i18n_key&#34;: &#34;tada.server.upload.confirm&#34;
+        })
+        await self.tada_service.upload(replay_id, replay_info.replay_meta, archive_path, 2)
 
     async def command_ping(self, msg):
         if &#34;afk_seconds&#34; in msg and self.player is not None:
@@ -1216,7 +1246,7 @@ class LobbyConnection:
 <dl>
 <dt id="server.lobbyconnection.LobbyConnection"><code class="flex name class">
 <span>class <span class="ident">LobbyConnection</span></span>
-<span>(</span><span>database: <a title="server.db.FAFDatabase" href="db/index.html#server.db.FAFDatabase">FAFDatabase</a>, game_service: <a title="server.game_service.GameService" href="game_service.html#server.game_service.GameService">GameService</a>, players: <a title="server.player_service.PlayerService" href="player_service.html#server.player_service.PlayerService">PlayerService</a>, nts_client: Optional[<a title="server.ice_servers.nts.TwilioNTS" href="ice_servers/nts.html#server.ice_servers.nts.TwilioNTS">TwilioNTS</a>], geoip: <a title="server.geoip_service.GeoIpService" href="geoip_service.html#server.geoip_service.GeoIpService">GeoIpService</a>, ladder_service: <a title="server.ladder_service.LadderService" href="ladder_service.html#server.ladder_service.LadderService">LadderService</a>, party_service: <a title="server.party_service.PartyService" href="party_service.html#server.party_service.PartyService">PartyService</a>)</span>
+<span>(</span><span>database: <a title="server.db.FAFDatabase" href="db/index.html#server.db.FAFDatabase">FAFDatabase</a>, game_service: <a title="server.game_service.GameService" href="game_service.html#server.game_service.GameService">GameService</a>, players: <a title="server.player_service.PlayerService" href="player_service.html#server.player_service.PlayerService">PlayerService</a>, nts_client: Optional[<a title="server.ice_servers.nts.TwilioNTS" href="ice_servers/nts.html#server.ice_servers.nts.TwilioNTS">TwilioNTS</a>], geoip: <a title="server.geoip_service.GeoIpService" href="geoip_service.html#server.geoip_service.GeoIpService">GeoIpService</a>, ladder_service: <a title="server.ladder_service.LadderService" href="ladder_service.html#server.ladder_service.LadderService">LadderService</a>, party_service: <a title="server.party_service.PartyService" href="party_service.html#server.party_service.PartyService">PartyService</a>, tada_service: <a title="server.tada_service.TadaService" href="tada_service.html#server.tada_service.TadaService">TadaService</a>)</span>
 </code></dt>
 <dd>
 <div class="desc"></div>
@@ -1234,7 +1264,8 @@ class LobbyConnection:
         nts_client: Optional[TwilioNTS],
         geoip: GeoIpService,
         ladder_service: LadderService,
-        party_service: PartyService
+        party_service: PartyService,
+        tada_service: TadaService
     ):
         self._db = database
         self.geoip_service = geoip
@@ -1244,6 +1275,7 @@ class LobbyConnection:
         self.coturn_generator = CoturnHMAC(config.COTURN_HOSTS, config.COTURN_KEYS)
         self.ladder_service = ladder_service
         self.party_service = party_service
+        self.tada_service = tada_service
         self._authenticated = False
         self.player = None  # type: Player
         self.game_connection = None  # type: GameConnection
@@ -1350,6 +1382,33 @@ class LobbyConnection:
             await self.send({&#34;command&#34;: &#34;invalid&#34;})
             self._logger.exception(ex)
             await self.abort(&#34;Error processing command&#34;)
+
+    async def command_upload_replay_to_tada(self, msg):
+        replay_id = msg[&#34;replay_id&#34;]
+        archive_dir = self.game_service.get_archive_dir_for_game_id(replay_id)
+        archive_path = f&#34;{archive_dir}/{replay_id}.zip&#34;
+
+        async with self._db.acquire() as conn:
+            replay_info = await self.game_service.get_replay_info(conn, replay_id)
+            if not replay_info.tada_available:
+                await self.game_service.set_game_tada_available(conn, replay_id, True)
+
+        if replay_info.tada_available:
+            await self.send({
+                &#34;command&#34;: &#34;notice&#34;,
+                &#34;style&#34;: &#34;error&#34;,
+                &#34;text&#34;: &#34;This replay has already been uploaded to TADA (or has been queued for upload)&#34;,
+                &#34;i18n_key&#34;: &#34;tada.server.upload.already&#34;
+            })
+            return
+
+        await self.send({
+            &#34;command&#34;: &#34;notice&#34;,
+            &#34;style&#34;: &#34;info&#34;,
+            &#34;text&#34;: &#34;Thank you, replay has been queued for upload to TADA&#34;,
+            &#34;i18n_key&#34;: &#34;tada.server.upload.confirm&#34;
+        })
+        await self.tada_service.upload(replay_id, replay_info.replay_meta, archive_path, 2)
 
     async def command_ping(self, msg):
         if &#34;afk_seconds&#34; in msg and self.player is not None:
@@ -3493,6 +3552,43 @@ async def command_kick_player_from_party(self, message):
         player_attr.remove(subject_id)</code></pre>
 </details>
 </dd>
+<dt id="server.lobbyconnection.LobbyConnection.command_upload_replay_to_tada"><code class="name flex">
+<span>async def <span class="ident">command_upload_replay_to_tada</span></span>(<span>self, msg)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">async def command_upload_replay_to_tada(self, msg):
+    replay_id = msg[&#34;replay_id&#34;]
+    archive_dir = self.game_service.get_archive_dir_for_game_id(replay_id)
+    archive_path = f&#34;{archive_dir}/{replay_id}.zip&#34;
+
+    async with self._db.acquire() as conn:
+        replay_info = await self.game_service.get_replay_info(conn, replay_id)
+        if not replay_info.tada_available:
+            await self.game_service.set_game_tada_available(conn, replay_id, True)
+
+    if replay_info.tada_available:
+        await self.send({
+            &#34;command&#34;: &#34;notice&#34;,
+            &#34;style&#34;: &#34;error&#34;,
+            &#34;text&#34;: &#34;This replay has already been uploaded to TADA (or has been queued for upload)&#34;,
+            &#34;i18n_key&#34;: &#34;tada.server.upload.already&#34;
+        })
+        return
+
+    await self.send({
+        &#34;command&#34;: &#34;notice&#34;,
+        &#34;style&#34;: &#34;info&#34;,
+        &#34;text&#34;: &#34;Thank you, replay has been queued for upload to TADA&#34;,
+        &#34;i18n_key&#34;: &#34;tada.server.upload.confirm&#34;
+    })
+    await self.tada_service.upload(replay_id, replay_info.replay_meta, archive_path, 2)</code></pre>
+</details>
+</dd>
 <dt id="server.lobbyconnection.LobbyConnection.ensure_authenticated"><code class="name flex">
 <span>async def <span class="ident">ensure_authenticated</span></span>(<span>self, cmd)</span>
 </code></dt>
@@ -3917,6 +4013,7 @@ and not attempt to reconnect.
 <li><code><a title="server.lobbyconnection.LobbyConnection.command_set_player_alias" href="#server.lobbyconnection.LobbyConnection.command_set_player_alias">command_set_player_alias</a></code></li>
 <li><code><a title="server.lobbyconnection.LobbyConnection.command_social_add" href="#server.lobbyconnection.LobbyConnection.command_social_add">command_social_add</a></code></li>
 <li><code><a title="server.lobbyconnection.LobbyConnection.command_social_remove" href="#server.lobbyconnection.LobbyConnection.command_social_remove">command_social_remove</a></code></li>
+<li><code><a title="server.lobbyconnection.LobbyConnection.command_upload_replay_to_tada" href="#server.lobbyconnection.LobbyConnection.command_upload_replay_to_tada">command_upload_replay_to_tada</a></code></li>
 <li><code><a title="server.lobbyconnection.LobbyConnection.ensure_authenticated" href="#server.lobbyconnection.LobbyConnection.ensure_authenticated">ensure_authenticated</a></code></li>
 <li><code><a title="server.lobbyconnection.LobbyConnection.get_user_identifier" href="#server.lobbyconnection.LobbyConnection.get_user_identifier">get_user_identifier</a></code></li>
 <li><code><a title="server.lobbyconnection.LobbyConnection.ice_only" href="#server.lobbyconnection.LobbyConnection.ice_only">ice_only</a></code></li>

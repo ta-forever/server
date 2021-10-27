@@ -37,7 +37,7 @@ from server.rating import RatingType
 
 from .game import Game, GameType
 from .game_results import ArmyOutcome, GameOutcome
-from .typedefs import FeaturedModType
+from .typedefs import FeaturedModType, ValidityState
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +87,11 @@ class LadderGame(Game):
         if player.alias == player.login:
             return player.login
         else:
-            return &#34;{}/{}&#34;.format(player.alias, player.login)</code></pre>
+            return &#34;{}/{}&#34;.format(player.alias, player.login)
+
+    async def _run_pre_rate_validity_checks(self):
+        if not self.is_pooled_map(self.map_id):
+            await self.mark_invalid(ValidityState.BAD_MAP)</code></pre>
 </details>
 </section>
 <section>
@@ -154,7 +158,11 @@ class LadderGame(Game):
         if player.alias == player.login:
             return player.login
         else:
-            return &#34;{}/{}&#34;.format(player.alias, player.login)</code></pre>
+            return &#34;{}/{}&#34;.format(player.alias, player.login)
+
+    async def _run_pre_rate_validity_checks(self):
+        if not self.is_pooled_map(self.map_id):
+            await self.mark_invalid(ValidityState.BAD_MAP)</code></pre>
 </details>
 <h3>Ancestors</h3>
 <ul class="hlist">
@@ -231,6 +239,7 @@ as 1 for win and 0 for anything else.</p></div>
 <li><code><a title="server.games.game.Game.get_player_option" href="game.html#server.games.game.Game.get_player_option">get_player_option</a></code></li>
 <li><code><a title="server.games.game.Game.get_team_sets" href="game.html#server.games.game.Game.get_team_sets">get_team_sets</a></code></li>
 <li><code><a title="server.games.game.Game.is_even" href="game.html#server.games.game.Game.is_even">is_even</a></code></li>
+<li><code><a title="server.games.game.Game.is_pooled_map" href="game.html#server.games.game.Game.is_pooled_map">is_pooled_map</a></code></li>
 <li><code><a title="server.games.game.Game.load_results" href="game.html#server.games.game.Game.load_results">load_results</a></code></li>
 <li><code><a title="server.games.game.Game.on_live" href="game.html#server.games.game.Game.on_live">on_live</a></code></li>
 <li><code><a title="server.games.game.Game.persist_game_stats" href="game.html#server.games.game.Game.persist_game_stats">persist_game_stats</a></code></li>

@@ -26,12 +26,14 @@
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">from enum import Enum, unique
+<pre><code class="python">from collections import namedtuple
+from enum import Enum, unique
 from typing import Any, Dict, List, NamedTuple, Optional, Set
 
 from server.games.game_results import GameOutcome
 from server.players import Player
 
+ReplayInfo = namedtuple(&#39;ReplayInfo&#39;, [&#39;tada_available&#39;, &#39;replay_meta&#39;])
 
 @unique
 class GameState(Enum):
@@ -746,6 +748,28 @@ def from_string(value: str) -&gt; Optional[&#34;GameType&#34;]:
 </dd>
 </dl>
 </dd>
+<dt id="server.games.typedefs.ReplayInfo"><code class="flex name class">
+<span>class <span class="ident">ReplayInfo</span></span>
+<span>(</span><span>tada_available, replay_meta)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>ReplayInfo(tada_available, replay_meta)</p></div>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>builtins.tuple</li>
+</ul>
+<h3>Instance variables</h3>
+<dl>
+<dt id="server.games.typedefs.ReplayInfo.replay_meta"><code class="name">var <span class="ident">replay_meta</span></code></dt>
+<dd>
+<div class="desc"><p>Alias for field number 1</p></div>
+</dd>
+<dt id="server.games.typedefs.ReplayInfo.tada_available"><code class="name">var <span class="ident">tada_available</span></code></dt>
+<dd>
+<div class="desc"><p>Alias for field number 0</p></div>
+</dd>
+</dl>
+</dd>
 <dt id="server.games.typedefs.TeamRatingSummary"><code class="flex name class">
 <span>class <span class="ident">TeamRatingSummary</span></span>
 <span>(</span><span>outcome: <a title="server.games.game_results.GameOutcome" href="game_results.html#server.games.game_results.GameOutcome">GameOutcome</a>, player_ids: Set[int])</span>
@@ -1069,6 +1093,13 @@ def from_string(value: str) -&gt; Optional[&#34;GameType&#34;]:
 <li><code><a title="server.games.typedefs.GameType.MATCHMAKER" href="#server.games.typedefs.GameType.MATCHMAKER">MATCHMAKER</a></code></li>
 <li><code><a title="server.games.typedefs.GameType.from_string" href="#server.games.typedefs.GameType.from_string">from_string</a></code></li>
 <li><code><a title="server.games.typedefs.GameType.to_string" href="#server.games.typedefs.GameType.to_string">to_string</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="server.games.typedefs.ReplayInfo" href="#server.games.typedefs.ReplayInfo">ReplayInfo</a></code></h4>
+<ul class="">
+<li><code><a title="server.games.typedefs.ReplayInfo.replay_meta" href="#server.games.typedefs.ReplayInfo.replay_meta">replay_meta</a></code></li>
+<li><code><a title="server.games.typedefs.ReplayInfo.tada_available" href="#server.games.typedefs.ReplayInfo.tada_available">tada_available</a></code></li>
 </ul>
 </li>
 <li>

@@ -427,7 +427,8 @@ class LadderService(Service):
                 name=&#34;Matchmaker Game&#34;,
                 matchmaker_queue_id=queue.id,
                 rating_type=queue.rating_type,
-                max_players=len(all_players)
+                max_players=len(all_players),
+                map_pool_map_ids=pool.get_map_ids()
             )
             game.init_mode = InitMode.AUTO_LOBBY
             game.set_map(map_id, map_path, True)
@@ -1012,7 +1013,8 @@ statistics, and launches the games.</p></div>
                 name=&#34;Matchmaker Game&#34;,
                 matchmaker_queue_id=queue.id,
                 rating_type=queue.rating_type,
-                max_players=len(all_players)
+                max_players=len(all_players),
+                map_pool_map_ids=pool.get_map_ids()
             )
             game.init_mode = InitMode.AUTO_LOBBY
             game.set_map(map_id, map_path, True)
@@ -1422,7 +1424,8 @@ so it should only perform fast operations.</p></div>
             name=&#34;Matchmaker Game&#34;,
             matchmaker_queue_id=queue.id,
             rating_type=queue.rating_type,
-            max_players=len(all_players)
+            max_players=len(all_players),
+            map_pool_map_ids=pool.get_map_ids()
         )
         game.init_mode = InitMode.AUTO_LOBBY
         game.set_map(map_id, map_path, True)
