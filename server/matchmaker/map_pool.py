@@ -19,6 +19,9 @@ class MapPool(object):
         self.maps = None
         self.set_maps(maps)
 
+    def get_map_ids(self):
+        return self.maps.keys()
+
     def set_maps(self, maps: Iterable[Union[Map, NeroxisGeneratedMap]]) -> None:
         self.maps = {map_.id: map_ for map_ in maps}
 

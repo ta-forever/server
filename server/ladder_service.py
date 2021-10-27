@@ -399,7 +399,8 @@ class LadderService(Service):
                 name="Matchmaker Game",
                 matchmaker_queue_id=queue.id,
                 rating_type=queue.rating_type,
-                max_players=len(all_players)
+                max_players=len(all_players),
+                map_pool_map_ids=pool.get_map_ids()
             )
             game.init_mode = InitMode.AUTO_LOBBY
             game.set_map(map_id, map_path, True)

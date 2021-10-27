@@ -3,7 +3,7 @@ import json
 import logging
 import time
 from collections import defaultdict
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple, Iterable
 
 import pymysql
 from sqlalchemy import and_, bindparam
@@ -71,7 +71,8 @@ class Game():
         displayed_rating_range: Optional[InclusiveRange] = None,
         enforce_rating_range: bool = False,
         max_players: int = 10,
-        replay_delay_seconds: int = 300     # or negative to disable
+        replay_delay_seconds: int = 300,     # or negative to disable
+        map_pool_map_ids: Iterable[int] = None
     ):
         self._db = database
         self._results = GameResultReports(id_)
@@ -93,6 +94,7 @@ class Game():
         self.map_id = None
         self.map_file_path = f"/{map_}/"
         self.map_ranked = False
+        self.map_pool_map_ids = set(id_ for id_ in map_pool_map_ids)
         self.password = None
         self._players = []
         self.AIs = {}
@@ -126,6 +128,12 @@ class Game():
         self._launch_fut = asyncio.Future()
 
         self._logger.debug("%s created", self)
+
+    def is_pooled_map(self, map_id):
+        """
+        :return: True if given map_id is a member of the game's map pool, or if game's map pool is None
+        """
+        return self.map_pool_map_ids is None or map_id in self.map_pool_map_ids
 
     async def timeout_hosted_staging(self, timeout: int = 30):
         await asyncio.sleep(timeout)

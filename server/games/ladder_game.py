@@ -9,7 +9,7 @@ from server.rating import RatingType
 
 from .game import Game, GameType
 from .game_results import ArmyOutcome, GameOutcome
-from .typedefs import FeaturedModType
+from .typedefs import FeaturedModType, ValidityState
 
 logger = logging.getLogger(__name__)
 
@@ -60,3 +60,7 @@ class LadderGame(Game):
             return player.login
         else:
             return "{}/{}".format(player.alias, player.login)
+
+    async def _run_pre_rate_validity_checks(self):
+        if not self.is_pooled_map(self.map_id):
+            await self.mark_invalid(ValidityState.BAD_MAP)
