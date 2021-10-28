@@ -94,7 +94,6 @@ class Game():
         self.map_id = None
         self.map_file_path = f"/{map_}/"
         self.map_ranked = False
-        self.map_pool_map_ids = set(id_ for id_ in map_pool_map_ids)
         self.password = None
         self._players = []
         self.AIs = {}
@@ -121,6 +120,10 @@ class Game():
             "RestrictedCategories": 0
         }
         self.mods = {}
+
+        self.map_pool_map_ids = None
+        if map_pool_map_ids is not None:
+            self.map_pool_map_ids = set(id_ for id_ in map_pool_map_ids)
 
         # @todo maintenance hazard. consider storing GameState itself in the future instead of boolean?
         self._is_hosted_staging = asyncio.Future()
