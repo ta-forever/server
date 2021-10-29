@@ -75,7 +75,11 @@ class TadaService(Service):
             tad_file_path = zip_or_tad_file_path
 
         try:
-            #await self._do_upload(tad_file_path)
+            if config.TADA_UPLOAD_ENABLE:
+                await self._do_upload(tad_file_path)
+            else:
+                self._logger.info("skipping actual upload to TADA because config.TADA_UPLOAD_ENABLE not set")
+
             upload_time = datetime.datetime.utcnow()
 
             tada_game_info, map_name, players = None, None, None
@@ -111,10 +115,6 @@ class TadaService(Service):
                     (players is None or players == tada_players):
                 self._logger.info("uploaded game found")
                 return game
-
-        self._logger.info("uploaded game NOT found.  just returning a random.")
-        for game in tada_games:
-            return game
 
     async def _do_upload(self, tad_file_path: str) -> str:
         async with aiohttp.ClientSession() as session:

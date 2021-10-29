@@ -98,6 +98,7 @@ class ConfigurationStore:
 
         self.CASE_SENSITIVE_MAP_NAMES = False
         self.TADA_API_URL = 'https://z151e60yl7.execute-api.us-east-2.amazonaws.com'
+        self.TADA_UPLOAD_ENABLE = True
 
         self._defaults = {
             key: value for key, value in vars(self).items() if key.isupper()
