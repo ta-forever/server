@@ -123,7 +123,8 @@ class TadaService(Service):
                 if r.status != 200:
                     raise ValueError("Unable to get signed url")
 
-                signed_url = await r.json()["signedUrl"]
+                signed_url = await r.json()
+                signed_url = signed_url["signedUrl"]
 
             self._logger.info(f"uploading file={tad_file_path} to signed_url={signed_url}")
             with open(tad_file_path, "rb") as f:
