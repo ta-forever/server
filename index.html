@@ -6251,7 +6251,8 @@ state, i.e. the same players, games, etc.</p></div>
                 if r.status != 200:
                     raise ValueError(&#34;Unable to get signed url&#34;)
 
-                signed_url = await r.json()[&#34;signedUrl&#34;]
+                signed_url = await r.json()
+                signed_url = signed_url[&#34;signedUrl&#34;]
 
             self._logger.info(f&#34;uploading file={tad_file_path} to signed_url={signed_url}&#34;)
             with open(tad_file_path, &#34;rb&#34;) as f:
