@@ -218,6 +218,7 @@ class RatingService(Service):
             lost_games=0,
             drawn_games=0,
             streak=0,
+            best_streak=0,
             recent_scores="",
             leaderboard_id=self._rating_type_ids[RatingType.TMM_2V2],
         )
@@ -263,6 +264,7 @@ class RatingService(Service):
             lost_games=row["numGames"] - won_games,
             drawn_games=0,
             streak=0,
+            best_streak=0,
             recent_scores="",
             leaderboard_id=self._rating_type_ids[rating_type],
         )
@@ -286,6 +288,7 @@ class RatingService(Service):
             lost_games=0,
             drawn_games=0,
             streak=0,
+            best_streak=0,
             recent_scores="",
             leaderboard_id=rating_type_id,
         )
@@ -386,6 +389,7 @@ class RatingService(Service):
                         drawn_games=leaderboard_rating.c.drawn_games + draw_increment,
                         lost_games=leaderboard_rating.c.lost_games + defeat_increment,
                         streak=case([(leaderboard_rating.c.streak * score >= 0, leaderboard_rating.c.streak + score)], else_ = score),
+                        best_streak=case([(leaderboard_rating.c.streak > leaderboard_rating.c.best_streak, leaderboard_rating.c.streak)], else_=leaderboard_rating.c.best_streak),
                         recent_scores=func.substr(func.concat(str(score+1), leaderboard_rating.c.recent_scores), 1, 10),
                         recent_mod=featured_mod
                     )
