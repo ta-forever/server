@@ -241,6 +241,7 @@ leaderboard_rating = Table(
     Column(&#34;lost_games&#34;,        Integer,    nullable=False),
     Column(&#34;drawn_games&#34;,       Integer,    nullable=False),
     Column(&#34;streak&#34;,            Integer,    nullable=False),
+    Column(&#34;best_streak&#34;,       Integer),
     Column(&#34;recent_scores&#34;,     String,     nullable=False),
     Column(&#34;recent_mod&#34;,        String),
     Column(&#34;leaderboard_id&#34;,    Integer,    ForeignKey(&#34;leaderboard.id&#34;)),
