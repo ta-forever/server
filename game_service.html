@@ -34,6 +34,7 @@ import glob
 import json
 import os
 import shutil
+import sqlalchemy.sql
 
 from server.config import config
 
@@ -160,8 +161,9 @@ class GameService(Service):
             os.remove(file_path)
 
             async with self._db.acquire() as conn:
-                await conn.execute(
-                    f&#34;UPDATE `game_stats` SET `game_stats`.`replay_available` = 1 WHERE `game_stats`.`id` = {game_id}&#34;)
+                await conn.execute(sqlalchemy.sql.text(
+                    &#34;UPDATE `game_stats` SET `game_stats`.`replay_available` = 1 WHERE `game_stats`.`id` = :game_id&#34;),
+                    game_id=game_id)
 
     async def process_replay_metadata(self):
         &#34;&#34;&#34;
@@ -184,7 +186,8 @@ class GameService(Service):
             map_hash = data.get(&#34;taMapHash&#34;)
 
             async with self._db.acquire() as conn:
-                result = await conn.execute(f&#34;SELECT `gameMod`, `mapId` from `game_stats` WHERE id = {game_id}&#34;)
+                result = await conn.execute(sqlalchemy.sql.text(
+                    &#34;SELECT `gameMod`, `mapId` from `game_stats` WHERE id = :game_id&#34;), game_id=game_id)
                 row = await result.fetchone()
                 if row is None:
                     if game_id not in self._games:
@@ -196,7 +199,9 @@ class GameService(Service):
                         # try again later
                         continue
 
-                await conn.execute(f&#34;UPDATE `game_stats` SET replay_meta=&#39;{file_content}&#39; WHERE id = {game_id}&#34;)
+                await conn.execute(sqlalchemy.sql.text(
+                    &#34;UPDATE `game_stats` SET replay_meta = :replay_meta WHERE id = :game_id&#34;),
+                    replay_meta=file_content, game_id=game_id)
 
                 if row[1] is None:
                     os.rename(file_path, file_path + &#34;.unknown_map&#34;)
@@ -211,18 +216,19 @@ class GameService(Service):
                 self._logger.info(
                     f&#34;[process_replay_metadata] game_id={game_id}, ta_version={ta_version}, units_hash={units_hash}, map_hash={map_hash}, featured_mod_id={featured_mod_id}, map_version_id={map_version_id}&#34;)
 
-                sql = f&#34;&#34;&#34;
+                sql = sqlalchemy.sql.text(&#34;&#34;&#34;
                     INSERT INTO `game_featuredMods_version` (`game_featuredMods_id`, `version`, `ta_hash`, `observation_count`)
-                    VALUES ({featured_mod_id}, &#39;{ta_version}&#39;, &#39;{units_hash}&#39;, 1)
-                    ON DUPLICATE KEY UPDATE observation_count = observation_count+1;
-                    &#34;&#34;&#34;
-                await conn.execute(sql)
+                    VALUES (:featured_mod_id, :ta_version, :units_hash, 1)
+                    ON DUPLICATE KEY UPDATE observation_count = observation_count+1
+                    &#34;&#34;&#34;)
+                await conn.execute(sql, featured_mod_id=featured_mod_id, ta_version=ta_version, units_hash=units_hash)
 
-                sql = f&#34;UPDATE `map_version` SET ta_hash = &#39;{map_hash}&#39; WHERE id = {map_version_id};&#34;
-                await conn.execute(sql)
+                sql = sqlalchemy.sql.text(&#34;UPDATE `map_version` SET ta_hash = :map_hash WHERE id = :map_version_id&#34;)
+                await conn.execute(sql, map_hash=map_hash, map_version_id=map_version_id)
 
     async def get_replay_info(self, db_connection, game_id: int):
-        result = await db_connection.execute(f&#34;SELECT replay_meta, tada_available FROM `game_stats` WHERE id = {game_id}&#34;)
+        result = await db_connection.execute(sqlalchemy.sql.text(
+            &#34;SELECT replay_meta, tada_available FROM `game_stats` WHERE id = :game_id&#34;), game_id=game_id)
         row = await result.fetchone()
         if row is None:
             raise ValueError(f&#34;Unable to find any information about replay id={game_id}&#34;)
@@ -231,7 +237,8 @@ class GameService(Service):
 
     async def set_game_tada_available(self, db_connection, game_id: int, available: bool):
         available = 1 if available else 0
-        await db_connection.execute(f&#34;UPDATE `game_stats` SET `tada_available`={available} WHERE id={game_id}&#34;)
+        await db_connection.execute(sqlalchemy.sql.text(
+            &#34;UPDATE `game_stats` SET `tada_available`= :available WHERE id = :game_id&#34;), available=available, game_id=game_id)
 
     @property
     def dirty_games(self):
@@ -490,8 +497,9 @@ class GameService(Service):
             os.remove(file_path)
 
             async with self._db.acquire() as conn:
-                await conn.execute(
-                    f&#34;UPDATE `game_stats` SET `game_stats`.`replay_available` = 1 WHERE `game_stats`.`id` = {game_id}&#34;)
+                await conn.execute(sqlalchemy.sql.text(
+                    &#34;UPDATE `game_stats` SET `game_stats`.`replay_available` = 1 WHERE `game_stats`.`id` = :game_id&#34;),
+                    game_id=game_id)
 
     async def process_replay_metadata(self):
         &#34;&#34;&#34;
@@ -514,7 +522,8 @@ class GameService(Service):
             map_hash = data.get(&#34;taMapHash&#34;)
 
             async with self._db.acquire() as conn:
-                result = await conn.execute(f&#34;SELECT `gameMod`, `mapId` from `game_stats` WHERE id = {game_id}&#34;)
+                result = await conn.execute(sqlalchemy.sql.text(
+                    &#34;SELECT `gameMod`, `mapId` from `game_stats` WHERE id = :game_id&#34;), game_id=game_id)
                 row = await result.fetchone()
                 if row is None:
                     if game_id not in self._games:
@@ -526,7 +535,9 @@ class GameService(Service):
                         # try again later
                         continue
 
-                await conn.execute(f&#34;UPDATE `game_stats` SET replay_meta=&#39;{file_content}&#39; WHERE id = {game_id}&#34;)
+                await conn.execute(sqlalchemy.sql.text(
+                    &#34;UPDATE `game_stats` SET replay_meta = :replay_meta WHERE id = :game_id&#34;),
+                    replay_meta=file_content, game_id=game_id)
 
                 if row[1] is None:
                     os.rename(file_path, file_path + &#34;.unknown_map&#34;)
@@ -541,18 +552,19 @@ class GameService(Service):
                 self._logger.info(
                     f&#34;[process_replay_metadata] game_id={game_id}, ta_version={ta_version}, units_hash={units_hash}, map_hash={map_hash}, featured_mod_id={featured_mod_id}, map_version_id={map_version_id}&#34;)
 
-                sql = f&#34;&#34;&#34;
+                sql = sqlalchemy.sql.text(&#34;&#34;&#34;
                     INSERT INTO `game_featuredMods_version` (`game_featuredMods_id`, `version`, `ta_hash`, `observation_count`)
-                    VALUES ({featured_mod_id}, &#39;{ta_version}&#39;, &#39;{units_hash}&#39;, 1)
-                    ON DUPLICATE KEY UPDATE observation_count = observation_count+1;
-                    &#34;&#34;&#34;
-                await conn.execute(sql)
+                    VALUES (:featured_mod_id, :ta_version, :units_hash, 1)
+                    ON DUPLICATE KEY UPDATE observation_count = observation_count+1
+                    &#34;&#34;&#34;)
+                await conn.execute(sql, featured_mod_id=featured_mod_id, ta_version=ta_version, units_hash=units_hash)
 
-                sql = f&#34;UPDATE `map_version` SET ta_hash = &#39;{map_hash}&#39; WHERE id = {map_version_id};&#34;
-                await conn.execute(sql)
+                sql = sqlalchemy.sql.text(&#34;UPDATE `map_version` SET ta_hash = :map_hash WHERE id = :map_version_id&#34;)
+                await conn.execute(sql, map_hash=map_hash, map_version_id=map_version_id)
 
     async def get_replay_info(self, db_connection, game_id: int):
-        result = await db_connection.execute(f&#34;SELECT replay_meta, tada_available FROM `game_stats` WHERE id = {game_id}&#34;)
+        result = await db_connection.execute(sqlalchemy.sql.text(
+            &#34;SELECT replay_meta, tada_available FROM `game_stats` WHERE id = :game_id&#34;), game_id=game_id)
         row = await result.fetchone()
         if row is None:
             raise ValueError(f&#34;Unable to find any information about replay id={game_id}&#34;)
@@ -561,7 +573,8 @@ class GameService(Service):
 
     async def set_game_tada_available(self, db_connection, game_id: int, available: bool):
         available = 1 if available else 0
-        await db_connection.execute(f&#34;UPDATE `game_stats` SET `tada_available`={available} WHERE id={game_id}&#34;)
+        await db_connection.execute(sqlalchemy.sql.text(
+            &#34;UPDATE `game_stats` SET `tada_available`= :available WHERE id = :game_id&#34;), available=available, game_id=game_id)
 
     @property
     def dirty_games(self):
@@ -821,8 +834,9 @@ def pending_games(self) -&gt; List[Game]:
         os.remove(file_path)
 
         async with self._db.acquire() as conn:
-            await conn.execute(
-                f&#34;UPDATE `game_stats` SET `game_stats`.`replay_available` = 1 WHERE `game_stats`.`id` = {game_id}&#34;)</code></pre>
+            await conn.execute(sqlalchemy.sql.text(
+                &#34;UPDATE `game_stats` SET `game_stats`.`replay_available` = 1 WHERE `game_stats`.`id` = :game_id&#34;),
+                game_id=game_id)</code></pre>
 </details>
 </dd>
 <dt id="server.game_service.GameService.clear_dirty"><code class="name flex">
@@ -941,7 +955,8 @@ def pending_games(self) -&gt; List[Game]:
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">async def get_replay_info(self, db_connection, game_id: int):
-    result = await db_connection.execute(f&#34;SELECT replay_meta, tada_available FROM `game_stats` WHERE id = {game_id}&#34;)
+    result = await db_connection.execute(sqlalchemy.sql.text(
+        &#34;SELECT replay_meta, tada_available FROM `game_stats` WHERE id = :game_id&#34;), game_id=game_id)
     row = await result.fetchone()
     if row is None:
         raise ValueError(f&#34;Unable to find any information about replay id={game_id}&#34;)
@@ -1025,7 +1040,8 @@ when users later want to watch replays
         map_hash = data.get(&#34;taMapHash&#34;)
 
         async with self._db.acquire() as conn:
-            result = await conn.execute(f&#34;SELECT `gameMod`, `mapId` from `game_stats` WHERE id = {game_id}&#34;)
+            result = await conn.execute(sqlalchemy.sql.text(
+                &#34;SELECT `gameMod`, `mapId` from `game_stats` WHERE id = :game_id&#34;), game_id=game_id)
             row = await result.fetchone()
             if row is None:
                 if game_id not in self._games:
@@ -1037,7 +1053,9 @@ when users later want to watch replays
                     # try again later
                     continue
 
-            await conn.execute(f&#34;UPDATE `game_stats` SET replay_meta=&#39;{file_content}&#39; WHERE id = {game_id}&#34;)
+            await conn.execute(sqlalchemy.sql.text(
+                &#34;UPDATE `game_stats` SET replay_meta = :replay_meta WHERE id = :game_id&#34;),
+                replay_meta=file_content, game_id=game_id)
 
             if row[1] is None:
                 os.rename(file_path, file_path + &#34;.unknown_map&#34;)
@@ -1052,15 +1070,15 @@ when users later want to watch replays
             self._logger.info(
                 f&#34;[process_replay_metadata] game_id={game_id}, ta_version={ta_version}, units_hash={units_hash}, map_hash={map_hash}, featured_mod_id={featured_mod_id}, map_version_id={map_version_id}&#34;)
 
-            sql = f&#34;&#34;&#34;
+            sql = sqlalchemy.sql.text(&#34;&#34;&#34;
                 INSERT INTO `game_featuredMods_version` (`game_featuredMods_id`, `version`, `ta_hash`, `observation_count`)
-                VALUES ({featured_mod_id}, &#39;{ta_version}&#39;, &#39;{units_hash}&#39;, 1)
-                ON DUPLICATE KEY UPDATE observation_count = observation_count+1;
-                &#34;&#34;&#34;
-            await conn.execute(sql)
+                VALUES (:featured_mod_id, :ta_version, :units_hash, 1)
+                ON DUPLICATE KEY UPDATE observation_count = observation_count+1
+                &#34;&#34;&#34;)
+            await conn.execute(sql, featured_mod_id=featured_mod_id, ta_version=ta_version, units_hash=units_hash)
 
-            sql = f&#34;UPDATE `map_version` SET ta_hash = &#39;{map_hash}&#39; WHERE id = {map_version_id};&#34;
-            await conn.execute(sql)</code></pre>
+            sql = sqlalchemy.sql.text(&#34;UPDATE `map_version` SET ta_hash = :map_hash WHERE id = :map_version_id&#34;)
+            await conn.execute(sql, map_hash=map_hash, map_version_id=map_version_id)</code></pre>
 </details>
 </dd>
 <dt id="server.game_service.GameService.publish_game_results"><code class="name flex">
@@ -1113,7 +1131,8 @@ when users later want to watch replays
 </summary>
 <pre><code class="python">async def set_game_tada_available(self, db_connection, game_id: int, available: bool):
     available = 1 if available else 0
-    await db_connection.execute(f&#34;UPDATE `game_stats` SET `tada_available`={available} WHERE id={game_id}&#34;)</code></pre>
+    await db_connection.execute(sqlalchemy.sql.text(
+        &#34;UPDATE `game_stats` SET `tada_available`= :available WHERE id = :game_id&#34;), available=available, game_id=game_id)</code></pre>
 </details>
 </dd>
 <dt id="server.game_service.GameService.update_active_game_metrics"><code class="name flex">
