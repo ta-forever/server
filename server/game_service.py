@@ -6,6 +6,7 @@ import glob
 import json
 import os
 import shutil
+import sqlalchemy.sql
 
 from server.config import config
 
@@ -132,8 +133,9 @@ class GameService(Service):
             os.remove(file_path)
 
             async with self._db.acquire() as conn:
-                await conn.execute(
-                    f"UPDATE `game_stats` SET `game_stats`.`replay_available` = 1 WHERE `game_stats`.`id` = {game_id}")
+                await conn.execute(sqlalchemy.sql.text(
+                    "UPDATE `game_stats` SET `game_stats`.`replay_available` = 1 WHERE `game_stats`.`id` = :game_id"),
+                    game_id=game_id)
 
     async def process_replay_metadata(self):
         """
@@ -156,7 +158,8 @@ class GameService(Service):
             map_hash = data.get("taMapHash")
 
             async with self._db.acquire() as conn:
-                result = await conn.execute(f"SELECT `gameMod`, `mapId` from `game_stats` WHERE id = {game_id}")
+                result = await conn.execute(sqlalchemy.sql.text(
+                    "SELECT `gameMod`, `mapId` from `game_stats` WHERE id = :game_id"), game_id=game_id)
                 row = await result.fetchone()
                 if row is None:
                     if game_id not in self._games:
@@ -168,7 +171,9 @@ class GameService(Service):
                         # try again later
                         continue
 
-                await conn.execute(f"UPDATE `game_stats` SET replay_meta='{file_content}' WHERE id = {game_id}")
+                await conn.execute(sqlalchemy.sql.text(
+                    "UPDATE `game_stats` SET replay_meta = :replay_meta WHERE id = :game_id"),
+                    replay_meta=file_content, game_id=game_id)
 
                 if row[1] is None:
                     os.rename(file_path, file_path + ".unknown_map")
@@ -183,18 +188,19 @@ class GameService(Service):
                 self._logger.info(
                     f"[process_replay_metadata] game_id={game_id}, ta_version={ta_version}, units_hash={units_hash}, map_hash={map_hash}, featured_mod_id={featured_mod_id}, map_version_id={map_version_id}")
 
-                sql = f"""
+                sql = sqlalchemy.sql.text("""
                     INSERT INTO `game_featuredMods_version` (`game_featuredMods_id`, `version`, `ta_hash`, `observation_count`)
-                    VALUES ({featured_mod_id}, '{ta_version}', '{units_hash}', 1)
-                    ON DUPLICATE KEY UPDATE observation_count = observation_count+1;
-                    """
-                await conn.execute(sql)
+                    VALUES (:featured_mod_id, :ta_version, :units_hash, 1)
+                    ON DUPLICATE KEY UPDATE observation_count = observation_count+1
+                    """)
+                await conn.execute(sql, featured_mod_id=featured_mod_id, ta_version=ta_version, units_hash=units_hash)
 
-                sql = f"UPDATE `map_version` SET ta_hash = '{map_hash}' WHERE id = {map_version_id};"
-                await conn.execute(sql)
+                sql = sqlalchemy.sql.text("UPDATE `map_version` SET ta_hash = :map_hash WHERE id = :map_version_id")
+                await conn.execute(sql, map_hash=map_hash, map_version_id=map_version_id)
 
     async def get_replay_info(self, db_connection, game_id: int):
-        result = await db_connection.execute(f"SELECT replay_meta, tada_available FROM `game_stats` WHERE id = {game_id}")
+        result = await db_connection.execute(sqlalchemy.sql.text(
+            "SELECT replay_meta, tada_available FROM `game_stats` WHERE id = :game_id"), game_id=game_id)
         row = await result.fetchone()
         if row is None:
             raise ValueError(f"Unable to find any information about replay id={game_id}")
@@ -203,7 +209,8 @@ class GameService(Service):
 
     async def set_game_tada_available(self, db_connection, game_id: int, available: bool):
         available = 1 if available else 0
-        await db_connection.execute(f"UPDATE `game_stats` SET `tada_available`={available} WHERE id={game_id}")
+        await db_connection.execute(sqlalchemy.sql.text(
+            "UPDATE `game_stats` SET `tada_available`= :available WHERE id = :game_id"), available=available, game_id=game_id)
 
     @property
     def dirty_games(self):

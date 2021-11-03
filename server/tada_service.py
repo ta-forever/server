@@ -6,6 +6,7 @@ import aiohttp
 import datetime
 import os
 import shutil
+import sqlalchemy.sql
 
 from server.decorators import with_logger
 from .config import config
@@ -53,7 +54,9 @@ class TadaService(Service):
                 self._logger.exception(e)
                 self._logger.info("giving up. restoring game_stats.tada_available=0")
                 async with self._db.acquire() as conn:
-                    await conn.execute(f"UPDATE `game_stats` SET `tada_available`=0 WHERE id={taf_replay_id}")
+                    await conn.execute(sqlalchemy.sql.text(
+                        "UPDATE `game_stats` SET `tada_available`=0 WHERE id = :taf_replay_id"),
+                        taf_replay_id=taf_replay_id)
 
             else:
                 self._logger.info(f"Exception uploading replay:{str(e)}. retry_count:{retry_count}")
@@ -86,8 +89,8 @@ class TadaService(Service):
             if replay_meta is not None:
                 map_name = replay_meta["mapName"]
                 players = set(p["name"] for p in replay_meta["players"])
-            for n in range(5):
-                await asyncio.sleep(3)
+            for n in range(3):
+                await asyncio.sleep(5)
                 latest_games = await self._get_latest_games()
                 tada_game_info = self._find_tada_game(latest_games, upload_time, map_name, players)
                 if tada_game_info is not None:
@@ -109,7 +112,6 @@ class TadaService(Service):
             tada_upload_time = datetime.datetime.strptime(tada_upload_time, "%Y-%m-%dT%H:%M:%SZ")
             tada_map = game["mapName"]
             tada_players = set(p["name"] for p in game["players"])
-            self._logger.info(f"tada_upload_time={tada_upload_time}, tada_map={tada_map}, tada_players={tada_players}")
             if abs(upload_time-tada_upload_time) < datetime.timedelta(seconds=10) and \
                     (map_name is None or map_name == tada_map) and \
                     (players is None or players == tada_players):
