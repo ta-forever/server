@@ -82,6 +82,7 @@ class GameService(Service):
         self._rating_service = rating_service
         self._message_queue_service = message_queue_service
         self.game_id_counter = 0
+        self._available_matchmaker_queues: Dict[str,MatchmakerQueue] = {} # updated by ladder_service
 
         # Populated below in really_update_static_ish_data.
         self.featured_mods = dict()
@@ -239,6 +240,12 @@ class GameService(Service):
         available = 1 if available else 0
         await db_connection.execute(sqlalchemy.sql.text(
             &#34;UPDATE `game_stats` SET `tada_available`= :available WHERE id = :game_id&#34;), available=available, game_id=game_id)
+
+    def set_available_matchmaker_queues(self, queues: Dict[str,MatchmakerQueue]):
+        self._available_matchmaker_queues = queues
+
+    def get_available_matchmaker_queues(self) -&gt; Dict[str,MatchmakerQueue]:
+        return self._available_matchmaker_queues
 
     @property
     def dirty_games(self):
@@ -418,6 +425,7 @@ class GameService(Service):
         self._rating_service = rating_service
         self._message_queue_service = message_queue_service
         self.game_id_counter = 0
+        self._available_matchmaker_queues: Dict[str,MatchmakerQueue] = {} # updated by ladder_service
 
         # Populated below in really_update_static_ish_data.
         self.featured_mods = dict()
@@ -575,6 +583,12 @@ class GameService(Service):
         available = 1 if available else 0
         await db_connection.execute(sqlalchemy.sql.text(
             &#34;UPDATE `game_stats` SET `tada_available`= :available WHERE id = :game_id&#34;), available=available, game_id=game_id)
+
+    def set_available_matchmaker_queues(self, queues: Dict[str,MatchmakerQueue]):
+        self._available_matchmaker_queues = queues
+
+    def get_available_matchmaker_queues(self) -&gt; Dict[str,MatchmakerQueue]:
+        return self._available_matchmaker_queues
 
     @property
     def dirty_games(self):
@@ -945,6 +959,19 @@ def pending_games(self) -&gt; List[Game]:
     return f&#34;{replays_path}/{mm}/{nn}/{oo}/{pp}&#34;</code></pre>
 </details>
 </dd>
+<dt id="server.game_service.GameService.get_available_matchmaker_queues"><code class="name flex">
+<span>def <span class="ident">get_available_matchmaker_queues</span></span>(<span>self) ‑> Dict[str, <a title="server.matchmaker.matchmaker_queue.MatchmakerQueue" href="matchmaker/matchmaker_queue.html#server.matchmaker.matchmaker_queue.MatchmakerQueue">MatchmakerQueue</a>]</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_available_matchmaker_queues(self) -&gt; Dict[str,MatchmakerQueue]:
+    return self._available_matchmaker_queues</code></pre>
+</details>
+</dd>
 <dt id="server.game_service.GameService.get_replay_info"><code class="name flex">
 <span>async def <span class="ident">get_replay_info</span></span>(<span>self, db_connection, game_id: int)</span>
 </code></dt>
@@ -1120,6 +1147,19 @@ when users later want to watch replays
         del self._games[game.id]</code></pre>
 </details>
 </dd>
+<dt id="server.game_service.GameService.set_available_matchmaker_queues"><code class="name flex">
+<span>def <span class="ident">set_available_matchmaker_queues</span></span>(<span>self, queues: Dict[str, <a title="server.matchmaker.matchmaker_queue.MatchmakerQueue" href="matchmaker/matchmaker_queue.html#server.matchmaker.matchmaker_queue.MatchmakerQueue">MatchmakerQueue</a>])</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def set_available_matchmaker_queues(self, queues: Dict[str,MatchmakerQueue]):
+    self._available_matchmaker_queues = queues</code></pre>
+</details>
+</dd>
 <dt id="server.game_service.GameService.set_game_tada_available"><code class="name flex">
 <span>async def <span class="ident">set_game_tada_available</span></span>(<span>self, db_connection, game_id: int, available: bool)</span>
 </code></dt>
@@ -1232,6 +1272,7 @@ time we need, but which can in principle change over time.</p></div>
 <li><code><a title="server.game_service.GameService.dirty_games" href="#server.game_service.GameService.dirty_games">dirty_games</a></code></li>
 <li><code><a title="server.game_service.GameService.dirty_queues" href="#server.game_service.GameService.dirty_queues">dirty_queues</a></code></li>
 <li><code><a title="server.game_service.GameService.get_archive_dir_for_game_id" href="#server.game_service.GameService.get_archive_dir_for_game_id">get_archive_dir_for_game_id</a></code></li>
+<li><code><a title="server.game_service.GameService.get_available_matchmaker_queues" href="#server.game_service.GameService.get_available_matchmaker_queues">get_available_matchmaker_queues</a></code></li>
 <li><code><a title="server.game_service.GameService.get_replay_info" href="#server.game_service.GameService.get_replay_info">get_replay_info</a></code></li>
 <li><code><a title="server.game_service.GameService.initialise_game_counter" href="#server.game_service.GameService.initialise_game_counter">initialise_game_counter</a></code></li>
 <li><code><a title="server.game_service.GameService.live_games" href="#server.game_service.GameService.live_games">live_games</a></code></li>
@@ -1242,6 +1283,7 @@ time we need, but which can in principle change over time.</p></div>
 <li><code><a title="server.game_service.GameService.publish_game_results" href="#server.game_service.GameService.publish_game_results">publish_game_results</a></code></li>
 <li><code><a title="server.game_service.GameService.remove_game" href="#server.game_service.GameService.remove_game">remove_game</a></code></li>
 <li><code><a title="server.game_service.GameService.services" href="#server.game_service.GameService.services">services</a></code></li>
+<li><code><a title="server.game_service.GameService.set_available_matchmaker_queues" href="#server.game_service.GameService.set_available_matchmaker_queues">set_available_matchmaker_queues</a></code></li>
 <li><code><a title="server.game_service.GameService.set_game_tada_available" href="#server.game_service.GameService.set_game_tada_available">set_game_tada_available</a></code></li>
 <li><code><a title="server.game_service.GameService.update_active_game_metrics" href="#server.game_service.GameService.update_active_game_metrics">update_active_game_metrics</a></code></li>
 <li><code><a title="server.game_service.GameService.update_data" href="#server.game_service.GameService.update_data">update_data</a></code></li>

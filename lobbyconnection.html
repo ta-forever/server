@@ -964,6 +964,7 @@ class LobbyConnection:
         game_mode = mod.lower()
         rating_min = message.get(&#34;rating_min&#34;)
         rating_max = message.get(&#34;rating_max&#34;)
+        rating_type = message.get(&#34;rating_type&#34;, RatingType.GLOBAL)
         enforce_rating_range = bool(message.get(&#34;enforce_rating_range&#34;, False))
         replay_delay_seconds = int(message.get(&#34;replay_delay_seconds&#34;, 300))
         if rating_min is not None:
@@ -979,7 +980,7 @@ class LobbyConnection:
             name=title,
             mapname=mapname,
             password=password,
-            rating_type=RatingType.GLOBAL,
+            rating_type=rating_type,
             displayed_rating_range=InclusiveRange(rating_min, rating_max),
             enforce_rating_range=enforce_rating_range,
             replay_delay_seconds=replay_delay_seconds
@@ -2143,6 +2144,7 @@ class LobbyConnection:
         game_mode = mod.lower()
         rating_min = message.get(&#34;rating_min&#34;)
         rating_max = message.get(&#34;rating_max&#34;)
+        rating_type = message.get(&#34;rating_type&#34;, RatingType.GLOBAL)
         enforce_rating_range = bool(message.get(&#34;enforce_rating_range&#34;, False))
         replay_delay_seconds = int(message.get(&#34;replay_delay_seconds&#34;, 300))
         if rating_min is not None:
@@ -2158,7 +2160,7 @@ class LobbyConnection:
             name=title,
             mapname=mapname,
             password=password,
-            rating_type=RatingType.GLOBAL,
+            rating_type=rating_type,
             displayed_rating_range=InclusiveRange(rating_min, rating_max),
             enforce_rating_range=enforce_rating_range,
             replay_delay_seconds=replay_delay_seconds
@@ -2909,6 +2911,7 @@ async def command_game_host(self, message):
     game_mode = mod.lower()
     rating_min = message.get(&#34;rating_min&#34;)
     rating_max = message.get(&#34;rating_max&#34;)
+    rating_type = message.get(&#34;rating_type&#34;, RatingType.GLOBAL)
     enforce_rating_range = bool(message.get(&#34;enforce_rating_range&#34;, False))
     replay_delay_seconds = int(message.get(&#34;replay_delay_seconds&#34;, 300))
     if rating_min is not None:
@@ -2924,7 +2927,7 @@ async def command_game_host(self, message):
         name=title,
         mapname=mapname,
         password=password,
-        rating_type=RatingType.GLOBAL,
+        rating_type=rating_type,
         displayed_rating_range=InclusiveRange(rating_min, rating_max),
         enforce_rating_range=enforce_rating_range,
         replay_delay_seconds=replay_delay_seconds

@@ -235,6 +235,60 @@ class GameResolutionError(Exception):
 
 def resolve_game(team_outcomes: List[Set[ArmyOutcome]]) -&gt; List[GameOutcome]:
     &#34;&#34;&#34;
+    Takes a list containing sets of ArmyOutcome
+    for individual players on a team
+    and converts a list of GameOutcomes.
+    Throws GameResolutionError if outcomes are inconsistent or ambiguous.
+    :param team_outcomes: list of GameOutcomes
+    :return: list of ranks as to be used with trueskill
+    &#34;&#34;&#34;
+    if len(team_outcomes) == 2:
+        return resolve_game_two_teams(team_outcomes)
+
+    else:
+        return resolve_game_ffa_teams(team_outcomes)
+
+
+def resolve_game_ffa_teams(team_outcomes: List[Set[ArmyOutcome]]) -&gt; List[GameOutcome]:
+
+    claims_victory = [ArmyOutcome.VICTORY in outcomes for outcomes in team_outcomes]
+    claims_draw = [ArmyOutcome.DRAW in outcomes for outcomes in team_outcomes]
+    claims_unknown = [ArmyOutcome.UNKNOWN in outcomes for outcomes in team_outcomes]
+    claims_conflicting = [ArmyOutcome.CONFLICTING in outcomes for outcomes in team_outcomes]
+
+    if sum(claims_victory) &gt; 1:
+        raise GameResolutionError(&#34;Cannot resolve game in which more than one team claimed victory. &#34;
+                                  f&#34; Team outcomes: {team_outcomes}&#34;)
+
+    elif sum(claims_victory) == 1:
+        # NB this isn&#39;t ideal because losers effectively draw with each other.
+        # Then user can jack up their rating by joining ffa with higher rated players
+        # and just ctrl-d straight away
+        return [GameOutcome.VICTORY
+                if ArmyOutcome.VICTORY in outcomes
+                else GameOutcome.DEFEAT
+                for outcomes in team_outcomes]
+
+    elif sum(claims_draw) &gt; 1:
+        return [GameOutcome.DRAW
+                if ArmyOutcome.DRAW in outcomes
+                else GameOutcome.DEFEAT
+                for outcomes in team_outcomes]
+
+    elif sum(claims_draw) == 1:
+        raise GameResolutionError(&#34;Cannot resolve game with non-unanimous draw. &#34;
+                                  f&#34;Team outcomes: {team_outcomes}&#34;)
+
+    elif sum(claims_unknown) &gt; 0 or sum(claims_conflicting) &gt; 0:
+        raise GameResolutionError(&#34;Cannot resolve game with ambiguous outcome. &#34;
+                                  f&#34;Team outcomes: {team_outcomes}&#34;)
+
+    else:
+        return len(team_outcomes) * [GameOutcome.DRAW]
+
+
+def resolve_game_two_teams(team_outcomes: List[Set[ArmyOutcome]]) -&gt; List[GameOutcome]:
+    &#34;&#34;&#34;
     Takes a list of length two containing sets of ArmyOutcome
     for individual players on a team
     and converts a list of two GameOutcomes,
@@ -305,6 +359,83 @@ def resolve_game(team_outcomes: List[Set[ArmyOutcome]]) -&gt; List[GameOutcome]:
 <span>def <span class="ident">resolve_game</span></span>(<span>team_outcomes: List[Set[<a title="server.games.game_results.ArmyOutcome" href="#server.games.game_results.ArmyOutcome">ArmyOutcome</a>]]) ‑> List[<a title="server.games.game_results.GameOutcome" href="#server.games.game_results.GameOutcome">GameOutcome</a>]</span>
 </code></dt>
 <dd>
+<div class="desc"><p>Takes a list containing sets of ArmyOutcome
+for individual players on a team
+and converts a list of GameOutcomes.
+Throws GameResolutionError if outcomes are inconsistent or ambiguous.
+:param team_outcomes: list of GameOutcomes
+:return: list of ranks as to be used with trueskill</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def resolve_game(team_outcomes: List[Set[ArmyOutcome]]) -&gt; List[GameOutcome]:
+    &#34;&#34;&#34;
+    Takes a list containing sets of ArmyOutcome
+    for individual players on a team
+    and converts a list of GameOutcomes.
+    Throws GameResolutionError if outcomes are inconsistent or ambiguous.
+    :param team_outcomes: list of GameOutcomes
+    :return: list of ranks as to be used with trueskill
+    &#34;&#34;&#34;
+    if len(team_outcomes) == 2:
+        return resolve_game_two_teams(team_outcomes)
+
+    else:
+        return resolve_game_ffa_teams(team_outcomes)</code></pre>
+</details>
+</dd>
+<dt id="server.games.game_results.resolve_game_ffa_teams"><code class="name flex">
+<span>def <span class="ident">resolve_game_ffa_teams</span></span>(<span>team_outcomes: List[Set[<a title="server.games.game_results.ArmyOutcome" href="#server.games.game_results.ArmyOutcome">ArmyOutcome</a>]]) ‑> List[<a title="server.games.game_results.GameOutcome" href="#server.games.game_results.GameOutcome">GameOutcome</a>]</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def resolve_game_ffa_teams(team_outcomes: List[Set[ArmyOutcome]]) -&gt; List[GameOutcome]:
+
+    claims_victory = [ArmyOutcome.VICTORY in outcomes for outcomes in team_outcomes]
+    claims_draw = [ArmyOutcome.DRAW in outcomes for outcomes in team_outcomes]
+    claims_unknown = [ArmyOutcome.UNKNOWN in outcomes for outcomes in team_outcomes]
+    claims_conflicting = [ArmyOutcome.CONFLICTING in outcomes for outcomes in team_outcomes]
+
+    if sum(claims_victory) &gt; 1:
+        raise GameResolutionError(&#34;Cannot resolve game in which more than one team claimed victory. &#34;
+                                  f&#34; Team outcomes: {team_outcomes}&#34;)
+
+    elif sum(claims_victory) == 1:
+        # NB this isn&#39;t ideal because losers effectively draw with each other.
+        # Then user can jack up their rating by joining ffa with higher rated players
+        # and just ctrl-d straight away
+        return [GameOutcome.VICTORY
+                if ArmyOutcome.VICTORY in outcomes
+                else GameOutcome.DEFEAT
+                for outcomes in team_outcomes]
+
+    elif sum(claims_draw) &gt; 1:
+        return [GameOutcome.DRAW
+                if ArmyOutcome.DRAW in outcomes
+                else GameOutcome.DEFEAT
+                for outcomes in team_outcomes]
+
+    elif sum(claims_draw) == 1:
+        raise GameResolutionError(&#34;Cannot resolve game with non-unanimous draw. &#34;
+                                  f&#34;Team outcomes: {team_outcomes}&#34;)
+
+    elif sum(claims_unknown) &gt; 0 or sum(claims_conflicting) &gt; 0:
+        raise GameResolutionError(&#34;Cannot resolve game with ambiguous outcome. &#34;
+                                  f&#34;Team outcomes: {team_outcomes}&#34;)
+
+    else:
+        return len(team_outcomes) * [GameOutcome.DRAW]</code></pre>
+</details>
+</dd>
+<dt id="server.games.game_results.resolve_game_two_teams"><code class="name flex">
+<span>def <span class="ident">resolve_game_two_teams</span></span>(<span>team_outcomes: List[Set[<a title="server.games.game_results.ArmyOutcome" href="#server.games.game_results.ArmyOutcome">ArmyOutcome</a>]]) ‑> List[<a title="server.games.game_results.GameOutcome" href="#server.games.game_results.GameOutcome">GameOutcome</a>]</span>
+</code></dt>
+<dd>
 <div class="desc"><p>Takes a list of length two containing sets of ArmyOutcome
 for individual players on a team
 and converts a list of two GameOutcomes,
@@ -316,7 +447,7 @@ Throws GameResolutionError if outcomes are inconsistent or ambiguous.
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def resolve_game(team_outcomes: List[Set[ArmyOutcome]]) -&gt; List[GameOutcome]:
+<pre><code class="python">def resolve_game_two_teams(team_outcomes: List[Set[ArmyOutcome]]) -&gt; List[GameOutcome]:
     &#34;&#34;&#34;
     Takes a list of length two containing sets of ArmyOutcome
     for individual players on a team
@@ -947,6 +1078,8 @@ no results for a given army.</p></div>
 <li><h3><a href="#header-functions">Functions</a></h3>
 <ul class="">
 <li><code><a title="server.games.game_results.resolve_game" href="#server.games.game_results.resolve_game">resolve_game</a></code></li>
+<li><code><a title="server.games.game_results.resolve_game_ffa_teams" href="#server.games.game_results.resolve_game_ffa_teams">resolve_game_ffa_teams</a></code></li>
+<li><code><a title="server.games.game_results.resolve_game_two_teams" href="#server.games.game_results.resolve_game_two_teams">resolve_game_two_teams</a></code></li>
 </ul>
 </li>
 <li><h3><a href="#header-classes">Classes</a></h3>

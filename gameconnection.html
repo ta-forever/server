@@ -288,9 +288,13 @@ class GameConnection(GpgNetServerProtocol):
 
         if key == &#34;Slots&#34;:
             self.game.max_players = int(value)
+
         elif key == &#34;MapDetails&#34;:
             map_name, hpi_archive, crc = value.split(chr(0x1f))[0:3]
             await self.game.fetch_map_file_path(hpi_archive,map_name,crc)
+
+        elif key == &#34;RatingType&#34;:
+            self.game.rating_type = value
 
         elif key == &#34;Title&#34;:
             with contextlib.suppress(ValueError):
@@ -897,9 +901,13 @@ COMMAND_HANDLERS = {
 
         if key == &#34;Slots&#34;:
             self.game.max_players = int(value)
+
         elif key == &#34;MapDetails&#34;:
             map_name, hpi_archive, crc = value.split(chr(0x1f))[0:3]
             await self.game.fetch_map_file_path(hpi_archive,map_name,crc)
+
+        elif key == &#34;RatingType&#34;:
+            self.game.rating_type = value
 
         elif key == &#34;Title&#34;:
             with contextlib.suppress(ValueError):
@@ -1658,9 +1666,13 @@ included for documentation purposes.</p></div>
 
     if key == &#34;Slots&#34;:
         self.game.max_players = int(value)
+
     elif key == &#34;MapDetails&#34;:
         map_name, hpi_archive, crc = value.split(chr(0x1f))[0:3]
         await self.game.fetch_map_file_path(hpi_archive,map_name,crc)
+
+    elif key == &#34;RatingType&#34;:
+        self.game.rating_type = value
 
     elif key == &#34;Title&#34;:
         with contextlib.suppress(ValueError):
