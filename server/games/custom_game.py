@@ -27,5 +27,8 @@ class CustomGame(Game):
         if not self.enforce_rating and time.time() - self.launched_at < limit:
             await self.mark_invalid(ValidityState.TOO_SHORT)
 
+        if not self.is_pooled_map(self.map_id):
+            await self.mark_invalid(ValidityState.BAD_MAP)
+
     def get_player_alias(self, player: Player) -> str:
         return player.login

@@ -54,6 +54,7 @@ class GameService(Service):
         self._rating_service = rating_service
         self._message_queue_service = message_queue_service
         self.game_id_counter = 0
+        self._available_matchmaker_queues: Dict[str,MatchmakerQueue] = {} # updated by ladder_service
 
         # Populated below in really_update_static_ish_data.
         self.featured_mods = dict()
@@ -211,6 +212,12 @@ class GameService(Service):
         available = 1 if available else 0
         await db_connection.execute(sqlalchemy.sql.text(
             "UPDATE `game_stats` SET `tada_available`= :available WHERE id = :game_id"), available=available, game_id=game_id)
+
+    def set_available_matchmaker_queues(self, queues: Dict[str,MatchmakerQueue]):
+        self._available_matchmaker_queues = queues
+
+    def get_available_matchmaker_queues(self) -> Dict[str,MatchmakerQueue]:
+        return self._available_matchmaker_queues
 
     @property
     def dirty_games(self):

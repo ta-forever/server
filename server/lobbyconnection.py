@@ -936,6 +936,7 @@ class LobbyConnection:
         game_mode = mod.lower()
         rating_min = message.get("rating_min")
         rating_max = message.get("rating_max")
+        rating_type = message.get("rating_type", RatingType.GLOBAL)
         enforce_rating_range = bool(message.get("enforce_rating_range", False))
         replay_delay_seconds = int(message.get("replay_delay_seconds", 300))
         if rating_min is not None:
@@ -951,7 +952,7 @@ class LobbyConnection:
             name=title,
             mapname=mapname,
             password=password,
-            rating_type=RatingType.GLOBAL,
+            rating_type=rating_type,
             displayed_rating_range=InclusiveRange(rating_min, rating_max),
             enforce_rating_range=enforce_rating_range,
             replay_delay_seconds=replay_delay_seconds

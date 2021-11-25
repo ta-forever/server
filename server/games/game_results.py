@@ -207,6 +207,60 @@ class GameResolutionError(Exception):
 
 def resolve_game(team_outcomes: List[Set[ArmyOutcome]]) -> List[GameOutcome]:
     """
+    Takes a list containing sets of ArmyOutcome
+    for individual players on a team
+    and converts a list of GameOutcomes.
+    Throws GameResolutionError if outcomes are inconsistent or ambiguous.
+    :param team_outcomes: list of GameOutcomes
+    :return: list of ranks as to be used with trueskill
+    """
+    if len(team_outcomes) == 2:
+        return resolve_game_two_teams(team_outcomes)
+
+    else:
+        return resolve_game_ffa_teams(team_outcomes)
+
+
+def resolve_game_ffa_teams(team_outcomes: List[Set[ArmyOutcome]]) -> List[GameOutcome]:
+
+    claims_victory = [ArmyOutcome.VICTORY in outcomes for outcomes in team_outcomes]
+    claims_draw = [ArmyOutcome.DRAW in outcomes for outcomes in team_outcomes]
+    claims_unknown = [ArmyOutcome.UNKNOWN in outcomes for outcomes in team_outcomes]
+    claims_conflicting = [ArmyOutcome.CONFLICTING in outcomes for outcomes in team_outcomes]
+
+    if sum(claims_victory) > 1:
+        raise GameResolutionError("Cannot resolve game in which more than one team claimed victory. "
+                                  f" Team outcomes: {team_outcomes}")
+
+    elif sum(claims_victory) == 1:
+        # NB this isn't ideal because losers effectively draw with each other.
+        # Then user can jack up their rating by joining ffa with higher rated players
+        # and just ctrl-d straight away
+        return [GameOutcome.VICTORY
+                if ArmyOutcome.VICTORY in outcomes
+                else GameOutcome.DEFEAT
+                for outcomes in team_outcomes]
+
+    elif sum(claims_draw) > 1:
+        return [GameOutcome.DRAW
+                if ArmyOutcome.DRAW in outcomes
+                else GameOutcome.DEFEAT
+                for outcomes in team_outcomes]
+
+    elif sum(claims_draw) == 1:
+        raise GameResolutionError("Cannot resolve game with non-unanimous draw. "
+                                  f"Team outcomes: {team_outcomes}")
+
+    elif sum(claims_unknown) > 0 or sum(claims_conflicting) > 0:
+        raise GameResolutionError("Cannot resolve game with ambiguous outcome. "
+                                  f"Team outcomes: {team_outcomes}")
+
+    else:
+        return len(team_outcomes) * [GameOutcome.DRAW]
+
+
+def resolve_game_two_teams(team_outcomes: List[Set[ArmyOutcome]]) -> List[GameOutcome]:
+    """
     Takes a list of length two containing sets of ArmyOutcome
     for individual players on a team
     and converts a list of two GameOutcomes,

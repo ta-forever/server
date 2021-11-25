@@ -32,8 +32,8 @@ class GameRatingSummary(NamedTuple):
 
     @classmethod
     def from_game_info_dict(cls, game_info: Dict) -> "GameRatingSummary":
-        if len(game_info["teams"]) != 2:
-            raise ValueError("Detected other than two teams.")
+        if len(game_info["teams"]) < 2:
+            raise ValueError("Detected fewer than two teams.")
 
         return cls(
             game_info["game_id"],

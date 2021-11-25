@@ -19,7 +19,10 @@ class GameRater:
     def compute_rating(cls, rating_data: GameRatingData) -> Dict[PlayerID, Rating]:
         rating_groups = [team.ratings for team in rating_data]
         team_outcomes = [team.outcome for team in rating_data]
-        ranks = cls._ranks_from_team_outcomes(team_outcomes)
+        if len(team_outcomes) == 2:
+            ranks = cls._ranks_from_two_team_outcomes(team_outcomes)
+        else:
+            raise GameRatingError("Sorry multiteam/ffa not implemented")
 
         cls._logger.debug("Rating groups: %s", rating_groups)
         cls._logger.debug("Ranks: %s", ranks)
@@ -35,7 +38,7 @@ class GameRater:
         return player_rating_map
 
     @staticmethod
-    def _ranks_from_team_outcomes(outcomes: List[GameOutcome]) -> List[int]:
+    def _ranks_from_two_team_outcomes(outcomes: List[GameOutcome]) -> List[int]:
         if outcomes == [GameOutcome.DRAW, GameOutcome.DRAW]:
             return [0, 0]
         elif outcomes == [GameOutcome.VICTORY, GameOutcome.DEFEAT]:

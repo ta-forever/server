@@ -100,7 +100,8 @@ class Game():
         self.desyncs = 0
         self.validity = ValidityState.VALID
         self.game_mode = game_mode
-        self.rating_type = rating_type or RatingType.GLOBAL
+        self.rating_type = rating_type or RatingType.GLOBAL     # NB potentially overriden to GLOBAL on game going live
+        self.rating_type_preferred = self.rating_type
         self.displayed_rating_range = displayed_rating_range or InclusiveRange()
         self.enforce_rating_range = enforce_rating_range
         self.matchmaker_queue_id = matchmaker_queue_id
@@ -131,12 +132,6 @@ class Game():
         self._launch_fut = asyncio.Future()
 
         self._logger.debug("%s created", self)
-
-    def is_pooled_map(self, map_id):
-        """
-        :return: True if given map_id is a member of the game's map pool, or if game's map pool is None
-        """
-        return self.map_pool_map_ids is None or map_id in self.map_pool_map_ids
 
     async def timeout_hosted_staging(self, timeout: int = 30):
         await asyncio.sleep(timeout)
@@ -183,10 +178,6 @@ class Game():
         )
 
     @property
-    def is_mutually_agreed_draw(self) -> bool:
-        return self._results.is_mutually_agreed_draw(self.armies)
-
-    @property
     def players(self):
         """
         Players in the game
@@ -226,6 +217,16 @@ class Game():
         teams = [ self.get_player_option(player.id, "Team")
                   for player in self.players ]
         return frozenset(team for team in teams if team is not None and team>=0)
+
+    def is_pooled_map(self, map_id):
+        """
+        :return: True if given map_id is a member of the game's map pool, or if game's map pool is None
+        """
+        return self.map_pool_map_ids is None or map_id in self.map_pool_map_ids
+
+    @property
+    def is_mutually_agreed_draw(self) -> bool:
+        return self._results.is_mutually_agreed_draw(self.armies)
 
     @property
     def is_ffa(self) -> bool:
@@ -726,6 +727,7 @@ class Game():
         self.state = GameState.LIVE
         self._logger.info("Game LIVE")
 
+        await self.finalise_rating_type()
         await self.persist_game_stats()
         await self.persist_game_player_stats()
         await self.persist_mod_stats()
@@ -733,6 +735,66 @@ class Game():
 
         self._launch_fut.set_result(None)
         self._logger.info("Game launched")
+
+    def find_suitable_rating_queue(self, strict_team_size: bool):
+        if strict_team_size:
+            teams = self.get_team_sets()
+            if len(teams) != 2:
+                self._logger.info(f"[find_suitable_rating_queue] Game {self.id}: no suitable queue because len(teams)={len(teams)}!=2")
+                return None
+
+            team_size = [len(players) for players in teams]
+            if team_size[0] != team_size[1]:
+                self._logger.info(f"[find_suitable_rating_queue] Game {self.id}: no suitable queue because team_sizes {team_size} are not equal")
+                return None
+            team_size = team_size[0]
+
+        else:
+            player_count = sum([len(players) for players in self.get_team_sets()])
+            team_size = (1+player_count)//2
+
+        # largest queue by team size such that queue_size <= team_size
+        best_queue = None
+        for queue in self.game_service.get_available_matchmaker_queues().values():
+            if queue.featured_mod == self.game_mode and queue.team_size <= team_size:
+                pool = queue.get_map_pool_for_rating(1500)
+                if pool and self.map_id not in pool.get_map_ids():
+                    self._logger.info(f"[find_suitable_rating_queue] Game {self.id}: rejecting queue {queue.name} because game's map {self.map_id} is not in the queue's map pool")
+                    continue
+
+                if best_queue is None or best_queue.team_size < queue.team_size:
+                    best_queue, best_queue_pool = queue, pool
+
+        return best_queue
+
+    def find_suitable_rating_type(self, strict_team_size: bool):
+        queue = self.find_suitable_rating_queue(strict_team_size)
+        return queue.rating_type if queue is not None else RatingType.GLOBAL
+
+    async def finalise_rating_type(self):
+        if self.rating_type_preferred == RatingType.GLOBAL:
+            self._logger.info(f"[finalise_rating_type] Game {self.id}: ensuring rating_type global because preferred")
+            self.rating_type = RatingType.GLOBAL
+            self.matchmaker_queue_id = None
+            self.map_pool_map_ids = None
+            return
+
+        if self.matchmaker_queue_id is not None:
+            self._logger.info(f"[finalise_rating_type] Game {self.id}: respecting rating_type_preferred {self.rating_type_preferred} because a queue is already set")
+            self.rating_type = self.rating_type_preferred
+            return
+
+        queue = self.find_suitable_rating_queue(strict_team_size=True)
+        if queue is None:
+            self._logger.info(f"[finalise_rating_type] Game {self.id}: no suitable queues found. setting to global")
+            self.rating_type = RatingType.GLOBAL
+
+        if queue is not None:
+            self._logger.info(f"[finalise_rating_type] Game {self.id}: selecting rating_type from queue {queue.name}")
+            self.matchmaker_queue_id = queue.id
+            self.rating_type = queue.rating_type
+            pool = queue.get_map_pool_for_rating(1500)
+            self.map_pool_map_ids = None if pool is None else set(id_ for id_ in pool.get_map_ids())
 
     async def persist_mod_stats(self):
         if len(self.mods.keys()) > 0:

@@ -260,9 +260,13 @@ class GameConnection(GpgNetServerProtocol):
 
         if key == "Slots":
             self.game.max_players = int(value)
+
         elif key == "MapDetails":
             map_name, hpi_archive, crc = value.split(chr(0x1f))[0:3]
             await self.game.fetch_map_file_path(hpi_archive,map_name,crc)
+
+        elif key == "RatingType":
+            self.game.rating_type = value
 
         elif key == "Title":
             with contextlib.suppress(ValueError):

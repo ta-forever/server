@@ -104,6 +104,8 @@ class LadderService(Service):
                 self.queues[queue_name].shutdown()
                 del self.queues[queue_name]
 
+        self.game_service.set_available_matchmaker_queues(self.queues)
+
     async def fetch_map_pools(self, conn) -> Dict[int, Tuple[str, List[Map]]]:
         result = await conn.execute(
             select([
