@@ -979,6 +979,9 @@ class Game():
         if self.host is None:
             return False
 
+        if self.state in (GameState.LAUNCHING, GameState.LIVE, GameState.ENDED):
+            return True
+
         if player == self.host or player in self._connections:
             return True
 
@@ -1985,6 +1988,9 @@ class Game():
         if self.host is None:
             return False
 
+        if self.state in (GameState.LAUNCHING, GameState.LIVE, GameState.ENDED):
+            return True
+
         if player == self.host or player in self._connections:
             return True
 
@@ -2677,6 +2683,9 @@ Note that FFA players will be separated into individual teams.</p></div>
 <pre><code class="python">def is_visible_to_player(self, player: Player) -&gt; bool:
     if self.host is None:
         return False
+
+    if self.state in (GameState.LAUNCHING, GameState.LIVE, GameState.ENDED):
+        return True
 
     if player == self.host or player in self._connections:
         return True
