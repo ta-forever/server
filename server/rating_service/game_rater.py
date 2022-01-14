@@ -35,6 +35,24 @@ class GameRater:
             for player_id, new_rating in team.items()
         }
 
+        player_rating_map = {
+            player_id: (team.outcome, old_rating, player_rating_map[player_id])
+            for team in rating_data
+            for player_id, old_rating in team.ratings.items()
+        }
+
+        def penis_points(rating: Rating):
+            return rating.mu - 3. * rating.sigma
+
+        cls._logger.info("rating changes: %s", player_rating_map)
+
+        player_rating_map = {
+            player_id: old_rating if outcome == GameOutcome.VICTORY and
+                                     penis_points(new_rating) < penis_points(old_rating) else new_rating
+            for player_id, (outcome, old_rating, new_rating) in player_rating_map.items()
+        }
+
+        cls._logger.info("settled ratings: %s", player_rating_map)
         return player_rating_map
 
     @staticmethod
