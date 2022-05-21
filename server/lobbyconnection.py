@@ -931,6 +931,7 @@ class LobbyConnection:
             raise ClientError("Title must contain only ascii characters.")
 
         mod = message.get("mod") or FeaturedModType.FAF
+        mod_version = message.get("mod_version")
         mapname = message.get("mapname") or "scmp_007"
         password = message.get("password")
         game_mode = mod.lower()
@@ -948,6 +949,7 @@ class LobbyConnection:
             visibility=visibility,
             game_class=CustomGame,
             game_mode=game_mode,
+            mod_version = mod_version,
             host=self.player,
             name=title,
             mapname=mapname,

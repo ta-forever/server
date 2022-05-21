@@ -245,6 +245,7 @@ class GameService(Service):
     def create_game(
             self,
             game_mode: str,
+            mod_version: str,
             game_class: Type[Game] = None,
             visibility=VisibilityState.PUBLIC,
             host: Optional[Player] = None,
@@ -265,6 +266,7 @@ class GameService(Service):
             "name": name,
             "map_": mapname,
             "game_mode": game_mode,
+            "mod_version": mod_version,
             "game_service": self,
             "game_stats_service": self.game_stats_service,
             "matchmaker_queue_id": matchmaker_queue_id

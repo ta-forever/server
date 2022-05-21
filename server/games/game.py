@@ -66,6 +66,7 @@ class Game():
         name: str = "None",
         map_: str = "SHERWOOD",
         game_mode: str = FeaturedModType.FAF,
+        mod_version: str = None,
         matchmaker_queue_id: Optional[int] = None,
         rating_type: Optional[str] = None,
         displayed_rating_range: Optional[InclusiveRange] = None,
@@ -100,6 +101,7 @@ class Game():
         self.desyncs = 0
         self.validity = ValidityState.VALID
         self.game_mode = game_mode
+        self.mod_version = mod_version
         self.rating_type = rating_type or RatingType.GLOBAL     # NB potentially overriden to GLOBAL on game going live
         self.rating_type_preferred = self.rating_type
         self.displayed_rating_range = displayed_rating_range or InclusiveRange()
@@ -989,6 +991,7 @@ class Game():
             "replay_delay_seconds": self.replay_delay_seconds,
             "game_type": GameType.to_string(self.game_type),
             "featured_mod": self.game_mode,
+            "featured_mod_version": self.mod_version,
             "sim_mods": self.mods,
             "map_name": self.map_name,
             "map_file_path": self.map_file_path,    # "archive.ufo/Map Name/deadbeef"
