@@ -273,6 +273,7 @@ class GameService(Service):
     def create_game(
             self,
             game_mode: str,
+            mod_version: str,
             game_class: Type[Game] = None,
             visibility=VisibilityState.PUBLIC,
             host: Optional[Player] = None,
@@ -293,6 +294,7 @@ class GameService(Service):
             &#34;name&#34;: name,
             &#34;map_&#34;: mapname,
             &#34;game_mode&#34;: game_mode,
+            &#34;mod_version&#34;: mod_version,
             &#34;game_service&#34;: self,
             &#34;game_stats_service&#34;: self.game_stats_service,
             &#34;matchmaker_queue_id&#34;: matchmaker_queue_id
@@ -616,6 +618,7 @@ class GameService(Service):
     def create_game(
             self,
             game_mode: str,
+            mod_version: str,
             game_class: Type[Game] = None,
             visibility=VisibilityState.PUBLIC,
             host: Optional[Player] = None,
@@ -636,6 +639,7 @@ class GameService(Service):
             &#34;name&#34;: name,
             &#34;map_&#34;: mapname,
             &#34;game_mode&#34;: game_mode,
+            &#34;mod_version&#34;: mod_version,
             &#34;game_service&#34;: self,
             &#34;game_stats_service&#34;: self.game_stats_service,
             &#34;matchmaker_queue_id&#34;: matchmaker_queue_id
@@ -868,7 +872,7 @@ def pending_games(self) -&gt; List[Game]:
 </details>
 </dd>
 <dt id="server.game_service.GameService.create_game"><code class="name flex">
-<span>def <span class="ident">create_game</span></span>(<span>self, game_mode: str, game_class: Type[<a title="server.games.game.Game" href="games/game.html#server.games.game.Game">Game</a>] = None, visibility=VisibilityState.PUBLIC, host: Optional[<a title="server.players.Player" href="players.html#server.players.Player">Player</a>] = None, name: Optional[str] = None, mapname: Optional[str] = None, password: Optional[str] = None, matchmaker_queue_id: Optional[int] = None, **kwargs)</span>
+<span>def <span class="ident">create_game</span></span>(<span>self, game_mode: str, mod_version: str, game_class: Type[<a title="server.games.game.Game" href="games/game.html#server.games.game.Game">Game</a>] = None, visibility=VisibilityState.PUBLIC, host: Optional[<a title="server.players.Player" href="players.html#server.players.Player">Player</a>] = None, name: Optional[str] = None, mapname: Optional[str] = None, password: Optional[str] = None, matchmaker_queue_id: Optional[int] = None, **kwargs)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Main entrypoint for creating new games</p></div>
@@ -879,6 +883,7 @@ def pending_games(self) -&gt; List[Game]:
 <pre><code class="python">def create_game(
         self,
         game_mode: str,
+        mod_version: str,
         game_class: Type[Game] = None,
         visibility=VisibilityState.PUBLIC,
         host: Optional[Player] = None,
@@ -899,6 +904,7 @@ def pending_games(self) -&gt; List[Game]:
         &#34;name&#34;: name,
         &#34;map_&#34;: mapname,
         &#34;game_mode&#34;: game_mode,
+        &#34;mod_version&#34;: mod_version,
         &#34;game_service&#34;: self,
         &#34;game_stats_service&#34;: self.game_stats_service,
         &#34;matchmaker_queue_id&#34;: matchmaker_queue_id

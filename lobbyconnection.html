@@ -959,6 +959,7 @@ class LobbyConnection:
             raise ClientError(&#34;Title must contain only ascii characters.&#34;)
 
         mod = message.get(&#34;mod&#34;) or FeaturedModType.FAF
+        mod_version = message.get(&#34;mod_version&#34;)
         mapname = message.get(&#34;mapname&#34;) or &#34;scmp_007&#34;
         password = message.get(&#34;password&#34;)
         game_mode = mod.lower()
@@ -976,6 +977,7 @@ class LobbyConnection:
             visibility=visibility,
             game_class=CustomGame,
             game_mode=game_mode,
+            mod_version = mod_version,
             host=self.player,
             name=title,
             mapname=mapname,
@@ -2139,6 +2141,7 @@ class LobbyConnection:
             raise ClientError(&#34;Title must contain only ascii characters.&#34;)
 
         mod = message.get(&#34;mod&#34;) or FeaturedModType.FAF
+        mod_version = message.get(&#34;mod_version&#34;)
         mapname = message.get(&#34;mapname&#34;) or &#34;scmp_007&#34;
         password = message.get(&#34;password&#34;)
         game_mode = mod.lower()
@@ -2156,6 +2159,7 @@ class LobbyConnection:
             visibility=visibility,
             game_class=CustomGame,
             game_mode=game_mode,
+            mod_version = mod_version,
             host=self.player,
             name=title,
             mapname=mapname,
@@ -2906,6 +2910,7 @@ async def command_game_host(self, message):
         raise ClientError(&#34;Title must contain only ascii characters.&#34;)
 
     mod = message.get(&#34;mod&#34;) or FeaturedModType.FAF
+    mod_version = message.get(&#34;mod_version&#34;)
     mapname = message.get(&#34;mapname&#34;) or &#34;scmp_007&#34;
     password = message.get(&#34;password&#34;)
     game_mode = mod.lower()
@@ -2923,6 +2928,7 @@ async def command_game_host(self, message):
         visibility=visibility,
         game_class=CustomGame,
         game_mode=game_mode,
+        mod_version = mod_version,
         host=self.player,
         name=title,
         mapname=mapname,
