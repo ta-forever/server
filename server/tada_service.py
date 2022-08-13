@@ -1,9 +1,10 @@
 import asyncio
-from typing import Set
+from typing import Set, Dict, Union, List, Any
 
 import aiocron
 import aiohttp
 import datetime
+import lxml.html
 import os
 import shutil
 import sqlalchemy.sql
@@ -17,12 +18,12 @@ from .db import FAFDatabase
 class TadaService(Service):
     def __init__(self, database: FAFDatabase):
         """
-        :param tada_endpoint: eg  'https://z151e60yl7.execute-api.us-east-2.amazonaws.com'
+        :param tada_endpoint: eg  'https://tademos.xyz'
         """
         self._db = database
         tada_api_url = config.TADA_API_URL
-        self._upload_endpoint = f'{tada_api_url}/staging/upload'
-        self._games_endpoint = f'{tada_api_url}/staging/games'
+        self._upload_endpoint = f'{tada_api_url}/demos'
+        self._games_endpoint = f'{tada_api_url}/demos'
         self._dirty_uploads = []
         self._upload_queue = []
 
@@ -33,8 +34,8 @@ class TadaService(Service):
     def clear_dirty(self):
         self._dirty_uploads = []
 
-    def mark_dirty(self, taf_id: int, tada_id: str):
-        self._dirty_uploads.append((taf_id, tada_id))
+    def mark_dirty(self, taf_id: int, tada_game_info: Dict[str, Union[List[Dict[str, Any]], Any]]):
+        self._dirty_uploads.append((taf_id, tada_game_info))
 
     async def initialize(self) -> None:
         self._upload_cron = aiocron.crontab("* * * * *", func=self._service_queue)
@@ -68,6 +69,7 @@ class TadaService(Service):
             await self.upload(*args)
 
     async def _upload(self, taf_replay_id: int, replay_meta: dict, zip_or_tad_file_path: str):
+
         if zip_or_tad_file_path.endswith(".zip"):
             tad_file_path = os.path.splitext(zip_or_tad_file_path)[0] + ".tad"
             def cleanup(): os.remove(tad_file_path)
@@ -78,24 +80,39 @@ class TadaService(Service):
             tad_file_path = zip_or_tad_file_path
 
         try:
+            datestamp = datetime.date.fromtimestamp(os.path.getctime(zip_or_tad_file_path)).isoformat()
+            if replay_meta is None:
+                canonical_file_name = "{datestamp} - TAF-{replay_id}.tad".format(
+                    datestamp=datestamp,
+                    replay_id=taf_replay_id)
+            else:
+                canonical_file_name = "{datestamp} - {map_name} - {player_list}.{extension}".format(
+                    datestamp=replay_meta["datestamp"],
+                    map_name=replay_meta["mapName"],
+                    player_list=", ".join([p["name"] for p in replay_meta["players"]]),
+                    extension=replay_meta["file_extension"])
+            self._logger.info(f"[_upload] canonical_file_name={canonical_file_name}")
+
+            recent_tada_games = await self._get_latest_games()
+            recent_tada_id, _ = recent_tada_games[-1] if len(recent_tada_games) > 0 else 0
+
             if config.TADA_UPLOAD_ENABLE:
-                await self._do_upload(tad_file_path)
+                await self._do_upload(tad_file_path, canonical_file_name)
             else:
                 self._logger.info("skipping actual upload to TADA because config.TADA_UPLOAD_ENABLE not set")
-
-            upload_time = datetime.datetime.utcnow()
 
             tada_game_info, map_name, players = None, None, None
             if replay_meta is not None:
                 map_name = replay_meta["mapName"]
-                players = set(p["name"] for p in replay_meta["players"])
+                players = set(p["name"] for p in replay_meta["players"] if p["side"] < 2)
+
             for n in range(3):
                 await asyncio.sleep(5)
                 latest_games = await self._get_latest_games()
-                tada_game_info = self._find_tada_game(latest_games, upload_time, map_name, players)
+                tada_game_info = self._find_tada_game(latest_games, 1+recent_tada_id, datestamp, map_name, players)
                 if tada_game_info is not None:
-                    tada_game_id = tada_game_info["party"]
-                    self._logger.info(f"game successfully uploaded. id={tada_game_id}")
+                    tada_id, tada_game_info = tada_game_info
+                    self._logger.info(f"game successfully uploaded. id={tada_id}")
                     self.mark_dirty(taf_replay_id, tada_game_info)
                     break
 
@@ -105,43 +122,90 @@ class TadaService(Service):
         finally:
             cleanup()
 
-    def _find_tada_game(self, tada_games, upload_time: datetime.datetime, map_name: str, players: Set[str]):
-        self._logger.info(f"_find_tada_game: upload_time={upload_time}, map_name={map_name}, players={players}")
-        for game in tada_games:
-            tada_upload_time = game["uploaded"].split(".")[0]+"Z"
-            tada_upload_time = datetime.datetime.strptime(tada_upload_time, "%Y-%m-%dT%H:%M:%SZ")
-            tada_map = game["mapName"]
-            tada_players = set(p["name"] for p in game["players"])
-            if abs(upload_time-tada_upload_time) < datetime.timedelta(seconds=10) and \
-                    (map_name is None or map_name == tada_map) and \
-                    (players is None or players == tada_players):
-                self._logger.info("uploaded game found")
-                return game
+    def _find_tada_game(self, tada_games, min_id: int, datestamp: str, map_name: str, players: Set[str]):
 
-    async def _do_upload(self, tad_file_path: str) -> str:
-        async with aiohttp.ClientSession() as session:
-            self._logger.info(f"retrieving signed url for upload to TADA")
-            async with session.get(self._upload_endpoint, verify_ssl=False) as r:
-                if r.status != 200:
-                    raise ValueError("Unable to get signed url")
+        def match(game_name: str, map_name: str, players: Set[str]):
+            if map_name is not None and map_name not in game_name:
+                return False
+            if players is not None:
+                for player in players:
+                    if player not in game_name:
+                        return False
+            return True
 
-                signed_url = await r.json()
-                signed_url = signed_url["signedUrl"]
+        self._logger.info(f"_find_tada_game: min_id={min_id}, map_name={map_name}, players={players}")
+        for id, name in tada_games:
+            if id >= min_id and match(name, map_name, players) or not config.TADA_UPLOAD_ENABLE:
+                tada_game_info = name.split(" - ")
+                if len(tada_game_info) == 3:
+                    tada_game_info = {
+                        "party": id,
+                        "mapName": tada_game_info[1],
+                        "date": tada_game_info[0],
+                        "players": [{"name": p, "side": "ARM"} for p in tada_game_info[2].split(", ")]
+                    }
+                else:
+                    tada_game_info = {
+                        "party": id,
+                        "mapName": map_name,
+                        "date": datestamp,
+                        "players": [{"name": p, "side": "ARM"} for p in players]
+                    }
+                return id, tada_game_info
 
-            self._logger.info(f"uploading file={tad_file_path} to signed_url={signed_url}")
-            with open(tad_file_path, "rb") as f:
-                async with session.put(signed_url, data=f) as r:
+    async def _do_upload(self, tad_file_path: str, upload_name: str) -> str:
+        with open(tad_file_path, "rb") as f:
+            async with aiohttp.ClientSession(headers={"User-Agent": "Total Annihilation Forever"}) as session:
+                self._logger.info(f"uploading file={tad_file_path} to endpoint={self._upload_endpoint}")
+                data = aiohttp.FormData()
+                data.add_field("demo[recording]", f, filename=upload_name, content_type='multipart/form-data')
+                async with session.post(self._upload_endpoint, data=data, verify_ssl=False) as r:
                     if r.status != 200:
                         raise ValueError("Unable to upload replay to TADA")
 
-        self._logger.info(f"upload completed")
-
     async def _get_latest_games(self):
+        """
+        :return: list of most recent (id, name) sorted ascending by id
+        """
+        class AccumulateGames(object):
+
+            def __init__(self):
+                self.id = None
+                self.games_list = []
+
+            def get(self):
+                return self.games_list
+
+            def start(self, tag, attrib):
+                self.id = None
+                if tag == 'a' and attrib['href'].startswith('/demos/'):
+                    try:
+                        self.id = int(attrib['href'].split('/')[2])
+                    except ValueError:
+                        pass
+
+            def end(self, tag):
+                pass
+
+            def data(self, data):
+                if self.id is not None:
+                    self.games_list += [[self.id, data]]
+
+            def comment(self, text):
+                pass
+
+            def close(self):
+                self.games_list.sort(key=lambda x: x[0])
+                return "closed!"
+
         async with aiohttp.ClientSession() as session:
-            self._logger.info(f"retrieving latest games")
-            async with session.get(f"{self._games_endpoint}?order=Uploaded", verify_ssl=False) as r:
+            async with session.get(self._games_endpoint, verify_ssl=False) as r:
                 if r.status != 200:
-                    raise ValueError(f"Got {r.status} from TADA endpoign!")
-                games = await r.json()
-        return games['games']
+                    raise ValueError(f"Got {r.status} from TADA endpoint!")
+                games = await r.text()
+
+        games_accumulator = AccumulateGames()
+        parser = lxml.html.HTMLParser(target = games_accumulator)
+        lxml.html.fromstring(games, None, parser)
+        return games_accumulator.get()
 

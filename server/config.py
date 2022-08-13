@@ -97,7 +97,7 @@ class ConfigurationStore:
         self.QUEUE_POP_TIME_MOVING_AVG_SIZE = 5
 
         self.CASE_SENSITIVE_MAP_NAMES = False
-        self.TADA_API_URL = 'https://z151e60yl7.execute-api.us-east-2.amazonaws.com'
+        self.TADA_API_URL = 'https://tademos.xyz'
         self.TADA_UPLOAD_ENABLE = True
 
         self._defaults = {

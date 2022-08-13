@@ -200,12 +200,18 @@ class GameService(Service):
                 await conn.execute(sql, map_hash=map_hash, map_version_id=map_version_id)
 
     async def get_replay_info(self, db_connection, game_id: int):
-        result = await db_connection.execute(sqlalchemy.sql.text(
-            "SELECT replay_meta, tada_available FROM `game_stats` WHERE id = :game_id"), game_id=game_id)
+        result = await db_connection.execute(sqlalchemy.sql.text("""
+            SELECT replay_meta, tada_available, startTime, game_featuredMods.file_extension
+            FROM `game_stats`
+            JOIN `game_featuredMods` on game_featuredMods.id = game_stats.gameMod
+            WHERE game_stats.id = :game_id
+            """), game_id=game_id)
         row = await result.fetchone()
         if row is None:
             raise ValueError(f"Unable to find any information about replay id={game_id}")
         replay_meta = json.loads(row[0]) if row[0] is not None else None
+        replay_meta["datestamp"] = row[2].date().isoformat()
+        replay_meta["file_extension"] = row[3]
         return ReplayInfo(replay_meta=replay_meta, tada_available=row[1])
 
     async def set_game_tada_available(self, db_connection, game_id: int, available: bool):
