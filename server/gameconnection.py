@@ -267,6 +267,7 @@ class GameConnection(GpgNetServerProtocol):
 
         elif key == "RatingType":
             self.game.rating_type = value
+            self.game.rating_type_preferred = value
 
         elif key == "Title":
             with contextlib.suppress(ValueError):
