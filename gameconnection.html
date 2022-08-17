@@ -295,6 +295,7 @@ class GameConnection(GpgNetServerProtocol):
 
         elif key == &#34;RatingType&#34;:
             self.game.rating_type = value
+            self.game.rating_type_preferred = value
 
         elif key == &#34;Title&#34;:
             with contextlib.suppress(ValueError):
@@ -908,6 +909,7 @@ COMMAND_HANDLERS = {
 
         elif key == &#34;RatingType&#34;:
             self.game.rating_type = value
+            self.game.rating_type_preferred = value
 
         elif key == &#34;Title&#34;:
             with contextlib.suppress(ValueError):
@@ -1673,6 +1675,7 @@ included for documentation purposes.</p></div>
 
     elif key == &#34;RatingType&#34;:
         self.game.rating_type = value
+        self.game.rating_type_preferred = value
 
     elif key == &#34;Title&#34;:
         with contextlib.suppress(ValueError):
