@@ -830,7 +830,7 @@ class LobbyConnection:
         except KeyError:
             await self.send({
                 "command": "notice",
-                "style": "info",
+                "style": "game_join_fail",
                 "text": "The host has left the game."
             })
             return
@@ -839,7 +839,7 @@ class LobbyConnection:
             self._logger.debug("Game %s not visible to player %s", game, self.player)
             await self.send({
                 "command": "notice",
-                "style": "info",
+                "style": "game_join_fail",
                 "text": "Sincerest of apologies, but due to a personality conflict you cannot join this game. Please do feel free to create your own, much better, game. Or just join a different one."
             })
             return
@@ -848,7 +848,7 @@ class LobbyConnection:
             self._logger.debug("Game not joinable: %s state %s", game, game.state)
             await self.send({
                 "command": "notice",
-                "style": "info",
+                "style": "game_join_fail",
                 "text": "The game you are trying to join is not joinable."
             })
             return
@@ -859,7 +859,7 @@ class LobbyConnection:
         if game.password != password:
             await self.send({
                 "command": "notice",
-                "style": "info",
+                "style": "game_join_fail",
                 "text": "Bad password (it's case sensitive)."
             })
             return
