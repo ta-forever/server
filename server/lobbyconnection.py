@@ -44,7 +44,7 @@ from .players import Player, PlayerState
 from .protocol import DisconnectedError, Protocol
 from .rating import InclusiveRange, RatingType
 from .types import Address, GameLaunchOptions
-
+from .tada_service import TadaFileTooLargeException
 
 @with_logger
 class LobbyConnection:
@@ -201,7 +201,17 @@ class LobbyConnection:
             "text": "Thank you, replay has been queued for upload to TADA",
             "i18n_key": "tada.server.upload.confirm"
         })
-        await self.tada_service.upload(replay_id, replay_info.replay_meta, archive_path, 2)
+
+        try:
+            await self.tada_service.upload(replay_id, replay_info.replay_meta, archive_path, 2)
+
+        except TadaFileTooLargeException:
+            await self.send({
+                "command": "notice",
+                "style": "info",
+                "text": "Replay exceeds maximum size permitted by TADA",
+                "i18n_key": "tada.server.upload.too_large"
+            })
 
     async def command_ping(self, msg):
         if "afk_seconds" in msg and self.player is not None:

@@ -187,7 +187,12 @@ class ServerInstance(object):
                 )
 
             def get_game_datetime(iso_date_string):
-                return datetime.datetime.strptime(iso_date_string, "%Y-%m-%d")
+                for fmt in ["%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y"]:
+                    try:
+                        return datetime.datetime.strptime(iso_date_string, fmt)
+                    except ValueError:
+                        pass
+                return datetime.datetime.today()
 
             for taf_replay_id, tada_game_info in dirty_replay_uploads:
                 self.write_broadcast(

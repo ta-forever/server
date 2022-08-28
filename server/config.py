@@ -99,6 +99,7 @@ class ConfigurationStore:
         self.CASE_SENSITIVE_MAP_NAMES = False
         self.TADA_API_URL = 'https://tademos.xyz'
         self.TADA_UPLOAD_ENABLE = True
+        self.TADA_UPLOAD_MAX_SIZE_MB = 164
 
         self._defaults = {
             key: value for key, value in vars(self).items() if key.isupper()
