@@ -219,7 +219,12 @@ class ServerInstance(object):
                 )
 
             def get_game_datetime(iso_date_string):
-                return datetime.datetime.strptime(iso_date_string, &#34;%Y-%m-%d&#34;)
+                for fmt in [&#34;%Y-%m-%d&#34;, &#34;%d/%m/%Y&#34;, &#34;%m/%d/%Y&#34;]:
+                    try:
+                        return datetime.datetime.strptime(iso_date_string, fmt)
+                    except ValueError:
+                        pass
+                return datetime.datetime.today()
 
             for taf_replay_id, tada_game_info in dirty_replay_uploads:
                 self.write_broadcast(
@@ -4790,7 +4795,7 @@ and providing an interface to publish messages.</p></div>
 <h3>Methods</h3>
 <dl>
 <dt id="server.MessageQueueService.declare_exchange"><code class="name flex">
-<span>async def <span class="ident">declare_exchange</span></span>(<span>self, exchange_name: str, exchange_type: aio_pika.exchange.ExchangeType = ExchangeType.TOPIC) ‑> None</span>
+<span>async def <span class="ident">declare_exchange</span></span>(<span>self, exchange_name: str, exchange_type: aio_pika.abc.ExchangeType = ExchangeType.TOPIC) ‑> None</span>
 </code></dt>
 <dd>
 <div class="desc"></div>
@@ -4812,7 +4817,7 @@ and providing an interface to publish messages.</p></div>
 </details>
 </dd>
 <dt id="server.MessageQueueService.publish"><code class="name flex">
-<span>async def <span class="ident">publish</span></span>(<span>self, exchange_name: str, routing: str, payload: Dict[~KT, ~VT], delivery_mode: aio_pika.message.DeliveryMode = DeliveryMode.PERSISTENT) ‑> None</span>
+<span>async def <span class="ident">publish</span></span>(<span>self, exchange_name: str, routing: str, payload: Dict[~KT, ~VT], delivery_mode: aio_pika.abc.DeliveryMode = DeliveryMode.PERSISTENT) ‑> None</span>
 </code></dt>
 <dd>
 <div class="desc"></div>
@@ -6051,7 +6056,12 @@ state, i.e. the same players, games, etc.</p></div>
                 )
 
             def get_game_datetime(iso_date_string):
-                return datetime.datetime.strptime(iso_date_string, &#34;%Y-%m-%d&#34;)
+                for fmt in [&#34;%Y-%m-%d&#34;, &#34;%d/%m/%Y&#34;, &#34;%m/%d/%Y&#34;]:
+                    try:
+                        return datetime.datetime.strptime(iso_date_string, fmt)
+                    except ValueError:
+                        pass
+                return datetime.datetime.today()
 
             for taf_replay_id, tada_game_info in dirty_replay_uploads:
                 self.write_broadcast(
@@ -6254,16 +6264,17 @@ state, i.e. the same players, games, etc.</p></div>
             await self._upload(taf_replay_id, replay_meta, zip_or_tad_file_path)
 
         except Exception as e:
-            if retry_count &lt;= 0:
+            if retry_count &lt;= 0 or isinstance(e, TadaFileTooLargeException):
                 self._logger.exception(e)
-                self._logger.info(&#34;giving up. restoring game_stats.tada_available=0&#34;)
+                self._logger.info(&#34;[upload] giving up. restoring game_stats.tada_available=0&#34;)
                 async with self._db.acquire() as conn:
                     await conn.execute(sqlalchemy.sql.text(
                         &#34;UPDATE `game_stats` SET `tada_available`=0 WHERE id = :taf_replay_id&#34;),
                         taf_replay_id=taf_replay_id)
+                raise e
 
             else:
-                self._logger.info(f&#34;Exception uploading replay:{str(e)}. retry_count:{retry_count}&#34;)
+                self._logger.info(f&#34;[upload] Exception uploading replay:{str(e)}. retry_count:{retry_count}&#34;)
                 self._upload_queue.append((taf_replay_id, replay_meta, zip_or_tad_file_path, retry_count-1))
 
     async def _service_queue(self):
@@ -6299,10 +6310,17 @@ state, i.e. the same players, games, etc.</p></div>
             recent_tada_games = await self._get_latest_games()
             recent_tada_id, _ = recent_tada_games[-1] if len(recent_tada_games) &gt; 0 else 0
 
-            if config.TADA_UPLOAD_ENABLE:
-                await self._do_upload(tad_file_path, canonical_file_name)
+            tad_file_size_mb = os.path.getsize(tad_file_path) // 1024 // 1024
+            if tad_file_size_mb &gt;= config.TADA_UPLOAD_MAX_SIZE_MB:
+                self._logger.info(&#34;[_upload] skipping actual upload to TADA because file size {}MB exceed maximum {}MB&#34;.format(
+                    tad_file_size_mb, config.TADA_UPLOAD_MAX_SIZE_MB))
+                raise TadaFileTooLargeException(tad_file_size_mb, config.TADA_UPLOAD_MAX_SIZE_MB)
+
+            elif not config.TADA_UPLOAD_ENABLE:
+                self._logger.info(&#34;[_upload] skipping actual upload to TADA because config.TADA_UPLOAD_ENABLE not set&#34;)
+
             else:
-                self._logger.info(&#34;skipping actual upload to TADA because config.TADA_UPLOAD_ENABLE not set&#34;)
+                await self._do_upload(tad_file_path, canonical_file_name)
 
             tada_game_info, map_name, players = None, None, None
             if replay_meta is not None:
@@ -6364,7 +6382,7 @@ state, i.e. the same players, games, etc.</p></div>
                 data.add_field(&#34;demo[recording]&#34;, f, filename=upload_name, content_type=&#39;multipart/form-data&#39;)
                 async with session.post(self._upload_endpoint, data=data, verify_ssl=False) as r:
                     if r.status != 200:
-                        raise ValueError(&#34;Unable to upload replay to TADA&#34;)
+                        raise TadaUploadFailException(r.reason)
 
     async def _get_latest_games(self):
         &#34;&#34;&#34;
@@ -6480,16 +6498,17 @@ def dirty_uploads(self):
         await self._upload(taf_replay_id, replay_meta, zip_or_tad_file_path)
 
     except Exception as e:
-        if retry_count &lt;= 0:
+        if retry_count &lt;= 0 or isinstance(e, TadaFileTooLargeException):
             self._logger.exception(e)
-            self._logger.info(&#34;giving up. restoring game_stats.tada_available=0&#34;)
+            self._logger.info(&#34;[upload] giving up. restoring game_stats.tada_available=0&#34;)
             async with self._db.acquire() as conn:
                 await conn.execute(sqlalchemy.sql.text(
                     &#34;UPDATE `game_stats` SET `tada_available`=0 WHERE id = :taf_replay_id&#34;),
                     taf_replay_id=taf_replay_id)
+            raise e
 
         else:
-            self._logger.info(f&#34;Exception uploading replay:{str(e)}. retry_count:{retry_count}&#34;)
+            self._logger.info(f&#34;[upload] Exception uploading replay:{str(e)}. retry_count:{retry_count}&#34;)
             self._upload_queue.append((taf_replay_id, replay_meta, zip_or_tad_file_path, retry_count-1))</code></pre>
 </details>
 </dd>

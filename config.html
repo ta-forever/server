@@ -127,6 +127,7 @@ class ConfigurationStore:
         self.CASE_SENSITIVE_MAP_NAMES = False
         self.TADA_API_URL = &#39;https://tademos.xyz&#39;
         self.TADA_UPLOAD_ENABLE = True
+        self.TADA_UPLOAD_MAX_SIZE_MB = 164
 
         self._defaults = {
             key: value for key, value in vars(self).items() if key.isupper()
@@ -299,6 +300,7 @@ config.register_callback(&#34;LOG_LEVEL&#34;, set_log_level)</code></pre>
         self.CASE_SENSITIVE_MAP_NAMES = False
         self.TADA_API_URL = &#39;https://tademos.xyz&#39;
         self.TADA_UPLOAD_ENABLE = True
+        self.TADA_UPLOAD_MAX_SIZE_MB = 164
 
         self._defaults = {
             key: value for key, value in vars(self).items() if key.isupper()

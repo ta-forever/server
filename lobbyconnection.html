@@ -72,7 +72,7 @@ from .players import Player, PlayerState
 from .protocol import DisconnectedError, Protocol
 from .rating import InclusiveRange, RatingType
 from .types import Address, GameLaunchOptions
-
+from .tada_service import TadaFileTooLargeException
 
 @with_logger
 class LobbyConnection:
@@ -229,7 +229,17 @@ class LobbyConnection:
             &#34;text&#34;: &#34;Thank you, replay has been queued for upload to TADA&#34;,
             &#34;i18n_key&#34;: &#34;tada.server.upload.confirm&#34;
         })
-        await self.tada_service.upload(replay_id, replay_info.replay_meta, archive_path, 2)
+
+        try:
+            await self.tada_service.upload(replay_id, replay_info.replay_meta, archive_path, 2)
+
+        except TadaFileTooLargeException:
+            await self.send({
+                &#34;command&#34;: &#34;notice&#34;,
+                &#34;style&#34;: &#34;info&#34;,
+                &#34;text&#34;: &#34;Replay exceeds maximum size permitted by TADA&#34;,
+                &#34;i18n_key&#34;: &#34;tada.server.upload.too_large&#34;
+            })
 
     async def command_ping(self, msg):
         if &#34;afk_seconds&#34; in msg and self.player is not None:
@@ -858,7 +868,7 @@ class LobbyConnection:
         except KeyError:
             await self.send({
                 &#34;command&#34;: &#34;notice&#34;,
-                &#34;style&#34;: &#34;info&#34;,
+                &#34;style&#34;: &#34;game_join_fail&#34;,
                 &#34;text&#34;: &#34;The host has left the game.&#34;
             })
             return
@@ -867,7 +877,7 @@ class LobbyConnection:
             self._logger.debug(&#34;Game %s not visible to player %s&#34;, game, self.player)
             await self.send({
                 &#34;command&#34;: &#34;notice&#34;,
-                &#34;style&#34;: &#34;info&#34;,
+                &#34;style&#34;: &#34;game_join_fail&#34;,
                 &#34;text&#34;: &#34;Sincerest of apologies, but due to a personality conflict you cannot join this game. Please do feel free to create your own, much better, game. Or just join a different one.&#34;
             })
             return
@@ -876,7 +886,7 @@ class LobbyConnection:
             self._logger.debug(&#34;Game not joinable: %s state %s&#34;, game, game.state)
             await self.send({
                 &#34;command&#34;: &#34;notice&#34;,
-                &#34;style&#34;: &#34;info&#34;,
+                &#34;style&#34;: &#34;game_join_fail&#34;,
                 &#34;text&#34;: &#34;The game you are trying to join is not joinable.&#34;
             })
             return
@@ -887,7 +897,7 @@ class LobbyConnection:
         if game.password != password:
             await self.send({
                 &#34;command&#34;: &#34;notice&#34;,
-                &#34;style&#34;: &#34;info&#34;,
+                &#34;style&#34;: &#34;game_join_fail&#34;,
                 &#34;text&#34;: &#34;Bad password (it&#39;s case sensitive).&#34;
             })
             return
@@ -1411,7 +1421,17 @@ class LobbyConnection:
             &#34;text&#34;: &#34;Thank you, replay has been queued for upload to TADA&#34;,
             &#34;i18n_key&#34;: &#34;tada.server.upload.confirm&#34;
         })
-        await self.tada_service.upload(replay_id, replay_info.replay_meta, archive_path, 2)
+
+        try:
+            await self.tada_service.upload(replay_id, replay_info.replay_meta, archive_path, 2)
+
+        except TadaFileTooLargeException:
+            await self.send({
+                &#34;command&#34;: &#34;notice&#34;,
+                &#34;style&#34;: &#34;info&#34;,
+                &#34;text&#34;: &#34;Replay exceeds maximum size permitted by TADA&#34;,
+                &#34;i18n_key&#34;: &#34;tada.server.upload.too_large&#34;
+            })
 
     async def command_ping(self, msg):
         if &#34;afk_seconds&#34; in msg and self.player is not None:
@@ -2040,7 +2060,7 @@ class LobbyConnection:
         except KeyError:
             await self.send({
                 &#34;command&#34;: &#34;notice&#34;,
-                &#34;style&#34;: &#34;info&#34;,
+                &#34;style&#34;: &#34;game_join_fail&#34;,
                 &#34;text&#34;: &#34;The host has left the game.&#34;
             })
             return
@@ -2049,7 +2069,7 @@ class LobbyConnection:
             self._logger.debug(&#34;Game %s not visible to player %s&#34;, game, self.player)
             await self.send({
                 &#34;command&#34;: &#34;notice&#34;,
-                &#34;style&#34;: &#34;info&#34;,
+                &#34;style&#34;: &#34;game_join_fail&#34;,
                 &#34;text&#34;: &#34;Sincerest of apologies, but due to a personality conflict you cannot join this game. Please do feel free to create your own, much better, game. Or just join a different one.&#34;
             })
             return
@@ -2058,7 +2078,7 @@ class LobbyConnection:
             self._logger.debug(&#34;Game not joinable: %s state %s&#34;, game, game.state)
             await self.send({
                 &#34;command&#34;: &#34;notice&#34;,
-                &#34;style&#34;: &#34;info&#34;,
+                &#34;style&#34;: &#34;game_join_fail&#34;,
                 &#34;text&#34;: &#34;The game you are trying to join is not joinable.&#34;
             })
             return
@@ -2069,7 +2089,7 @@ class LobbyConnection:
         if game.password != password:
             await self.send({
                 &#34;command&#34;: &#34;notice&#34;,
-                &#34;style&#34;: &#34;info&#34;,
+                &#34;style&#34;: &#34;game_join_fail&#34;,
                 &#34;text&#34;: &#34;Bad password (it&#39;s case sensitive).&#34;
             })
             return
@@ -2969,7 +2989,7 @@ async def command_game_join(self, message):
     except KeyError:
         await self.send({
             &#34;command&#34;: &#34;notice&#34;,
-            &#34;style&#34;: &#34;info&#34;,
+            &#34;style&#34;: &#34;game_join_fail&#34;,
             &#34;text&#34;: &#34;The host has left the game.&#34;
         })
         return
@@ -2978,7 +2998,7 @@ async def command_game_join(self, message):
         self._logger.debug(&#34;Game %s not visible to player %s&#34;, game, self.player)
         await self.send({
             &#34;command&#34;: &#34;notice&#34;,
-            &#34;style&#34;: &#34;info&#34;,
+            &#34;style&#34;: &#34;game_join_fail&#34;,
             &#34;text&#34;: &#34;Sincerest of apologies, but due to a personality conflict you cannot join this game. Please do feel free to create your own, much better, game. Or just join a different one.&#34;
         })
         return
@@ -2987,7 +3007,7 @@ async def command_game_join(self, message):
         self._logger.debug(&#34;Game not joinable: %s state %s&#34;, game, game.state)
         await self.send({
             &#34;command&#34;: &#34;notice&#34;,
-            &#34;style&#34;: &#34;info&#34;,
+            &#34;style&#34;: &#34;game_join_fail&#34;,
             &#34;text&#34;: &#34;The game you are trying to join is not joinable.&#34;
         })
         return
@@ -2998,7 +3018,7 @@ async def command_game_join(self, message):
     if game.password != password:
         await self.send({
             &#34;command&#34;: &#34;notice&#34;,
-            &#34;style&#34;: &#34;info&#34;,
+            &#34;style&#34;: &#34;game_join_fail&#34;,
             &#34;text&#34;: &#34;Bad password (it&#39;s case sensitive).&#34;
         })
         return
@@ -3595,7 +3615,17 @@ async def command_kick_player_from_party(self, message):
         &#34;text&#34;: &#34;Thank you, replay has been queued for upload to TADA&#34;,
         &#34;i18n_key&#34;: &#34;tada.server.upload.confirm&#34;
     })
-    await self.tada_service.upload(replay_id, replay_info.replay_meta, archive_path, 2)</code></pre>
+
+    try:
+        await self.tada_service.upload(replay_id, replay_info.replay_meta, archive_path, 2)
+
+    except TadaFileTooLargeException:
+        await self.send({
+            &#34;command&#34;: &#34;notice&#34;,
+            &#34;style&#34;: &#34;info&#34;,
+            &#34;text&#34;: &#34;Replay exceeds maximum size permitted by TADA&#34;,
+            &#34;i18n_key&#34;: &#34;tada.server.upload.too_large&#34;
+        })</code></pre>
 </details>
 </dd>
 <dt id="server.lobbyconnection.LobbyConnection.ensure_authenticated"><code class="name flex">

@@ -42,6 +42,20 @@ from .config import config
 from .core import Service
 from .db import FAFDatabase
 
+
+class TadaFileTooLargeException(ValueError):
+
+    def __init__(self, file_size_mb, max_size_mb):
+        self.file_size_mb = file_size_mb
+        self.max_size_mb = max_size_mb
+
+
+class TadaUploadFailException(ValueError):
+
+    def __init__(self, reason):
+        self.reason = reason
+
+
 @with_logger
 class TadaService(Service):
     def __init__(self, database: FAFDatabase):
@@ -79,16 +93,17 @@ class TadaService(Service):
             await self._upload(taf_replay_id, replay_meta, zip_or_tad_file_path)
 
         except Exception as e:
-            if retry_count &lt;= 0:
+            if retry_count &lt;= 0 or isinstance(e, TadaFileTooLargeException):
                 self._logger.exception(e)
-                self._logger.info(&#34;giving up. restoring game_stats.tada_available=0&#34;)
+                self._logger.info(&#34;[upload] giving up. restoring game_stats.tada_available=0&#34;)
                 async with self._db.acquire() as conn:
                     await conn.execute(sqlalchemy.sql.text(
                         &#34;UPDATE `game_stats` SET `tada_available`=0 WHERE id = :taf_replay_id&#34;),
                         taf_replay_id=taf_replay_id)
+                raise e
 
             else:
-                self._logger.info(f&#34;Exception uploading replay:{str(e)}. retry_count:{retry_count}&#34;)
+                self._logger.info(f&#34;[upload] Exception uploading replay:{str(e)}. retry_count:{retry_count}&#34;)
                 self._upload_queue.append((taf_replay_id, replay_meta, zip_or_tad_file_path, retry_count-1))
 
     async def _service_queue(self):
@@ -124,10 +139,17 @@ class TadaService(Service):
             recent_tada_games = await self._get_latest_games()
             recent_tada_id, _ = recent_tada_games[-1] if len(recent_tada_games) &gt; 0 else 0
 
-            if config.TADA_UPLOAD_ENABLE:
-                await self._do_upload(tad_file_path, canonical_file_name)
+            tad_file_size_mb = os.path.getsize(tad_file_path) // 1024 // 1024
+            if tad_file_size_mb &gt;= config.TADA_UPLOAD_MAX_SIZE_MB:
+                self._logger.info(&#34;[_upload] skipping actual upload to TADA because file size {}MB exceed maximum {}MB&#34;.format(
+                    tad_file_size_mb, config.TADA_UPLOAD_MAX_SIZE_MB))
+                raise TadaFileTooLargeException(tad_file_size_mb, config.TADA_UPLOAD_MAX_SIZE_MB)
+
+            elif not config.TADA_UPLOAD_ENABLE:
+                self._logger.info(&#34;[_upload] skipping actual upload to TADA because config.TADA_UPLOAD_ENABLE not set&#34;)
+
             else:
-                self._logger.info(&#34;skipping actual upload to TADA because config.TADA_UPLOAD_ENABLE not set&#34;)
+                await self._do_upload(tad_file_path, canonical_file_name)
 
             tada_game_info, map_name, players = None, None, None
             if replay_meta is not None:
@@ -189,7 +211,7 @@ class TadaService(Service):
                 data.add_field(&#34;demo[recording]&#34;, f, filename=upload_name, content_type=&#39;multipart/form-data&#39;)
                 async with session.post(self._upload_endpoint, data=data, verify_ssl=False) as r:
                     if r.status != 200:
-                        raise ValueError(&#34;Unable to upload replay to TADA&#34;)
+                        raise TadaUploadFailException(r.reason)
 
     async def _get_latest_games(self):
         &#34;&#34;&#34;
@@ -247,6 +269,29 @@ class TadaService(Service):
 <section>
 <h2 class="section-title" id="header-classes">Classes</h2>
 <dl>
+<dt id="server.tada_service.TadaFileTooLargeException"><code class="flex name class">
+<span>class <span class="ident">TadaFileTooLargeException</span></span>
+<span>(</span><span>file_size_mb, max_size_mb)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Inappropriate argument value (of correct type).</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TadaFileTooLargeException(ValueError):
+
+    def __init__(self, file_size_mb, max_size_mb):
+        self.file_size_mb = file_size_mb
+        self.max_size_mb = max_size_mb</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>builtins.ValueError</li>
+<li>builtins.Exception</li>
+<li>builtins.BaseException</li>
+</ul>
+</dd>
 <dt id="server.tada_service.TadaService"><code class="flex name class">
 <span>class <span class="ident">TadaService</span></span>
 <span>(</span><span>database: <a title="server.db.FAFDatabase" href="db/index.html#server.db.FAFDatabase">FAFDatabase</a>)</span>
@@ -296,16 +341,17 @@ class TadaService(Service):
             await self._upload(taf_replay_id, replay_meta, zip_or_tad_file_path)
 
         except Exception as e:
-            if retry_count &lt;= 0:
+            if retry_count &lt;= 0 or isinstance(e, TadaFileTooLargeException):
                 self._logger.exception(e)
-                self._logger.info(&#34;giving up. restoring game_stats.tada_available=0&#34;)
+                self._logger.info(&#34;[upload] giving up. restoring game_stats.tada_available=0&#34;)
                 async with self._db.acquire() as conn:
                     await conn.execute(sqlalchemy.sql.text(
                         &#34;UPDATE `game_stats` SET `tada_available`=0 WHERE id = :taf_replay_id&#34;),
                         taf_replay_id=taf_replay_id)
+                raise e
 
             else:
-                self._logger.info(f&#34;Exception uploading replay:{str(e)}. retry_count:{retry_count}&#34;)
+                self._logger.info(f&#34;[upload] Exception uploading replay:{str(e)}. retry_count:{retry_count}&#34;)
                 self._upload_queue.append((taf_replay_id, replay_meta, zip_or_tad_file_path, retry_count-1))
 
     async def _service_queue(self):
@@ -341,10 +387,17 @@ class TadaService(Service):
             recent_tada_games = await self._get_latest_games()
             recent_tada_id, _ = recent_tada_games[-1] if len(recent_tada_games) &gt; 0 else 0
 
-            if config.TADA_UPLOAD_ENABLE:
-                await self._do_upload(tad_file_path, canonical_file_name)
+            tad_file_size_mb = os.path.getsize(tad_file_path) // 1024 // 1024
+            if tad_file_size_mb &gt;= config.TADA_UPLOAD_MAX_SIZE_MB:
+                self._logger.info(&#34;[_upload] skipping actual upload to TADA because file size {}MB exceed maximum {}MB&#34;.format(
+                    tad_file_size_mb, config.TADA_UPLOAD_MAX_SIZE_MB))
+                raise TadaFileTooLargeException(tad_file_size_mb, config.TADA_UPLOAD_MAX_SIZE_MB)
+
+            elif not config.TADA_UPLOAD_ENABLE:
+                self._logger.info(&#34;[_upload] skipping actual upload to TADA because config.TADA_UPLOAD_ENABLE not set&#34;)
+
             else:
-                self._logger.info(&#34;skipping actual upload to TADA because config.TADA_UPLOAD_ENABLE not set&#34;)
+                await self._do_upload(tad_file_path, canonical_file_name)
 
             tada_game_info, map_name, players = None, None, None
             if replay_meta is not None:
@@ -406,7 +459,7 @@ class TadaService(Service):
                 data.add_field(&#34;demo[recording]&#34;, f, filename=upload_name, content_type=&#39;multipart/form-data&#39;)
                 async with session.post(self._upload_endpoint, data=data, verify_ssl=False) as r:
                     if r.status != 200:
-                        raise ValueError(&#34;Unable to upload replay to TADA&#34;)
+                        raise TadaUploadFailException(r.reason)
 
     async def _get_latest_games(self):
         &#34;&#34;&#34;
@@ -522,16 +575,17 @@ def dirty_uploads(self):
         await self._upload(taf_replay_id, replay_meta, zip_or_tad_file_path)
 
     except Exception as e:
-        if retry_count &lt;= 0:
+        if retry_count &lt;= 0 or isinstance(e, TadaFileTooLargeException):
             self._logger.exception(e)
-            self._logger.info(&#34;giving up. restoring game_stats.tada_available=0&#34;)
+            self._logger.info(&#34;[upload] giving up. restoring game_stats.tada_available=0&#34;)
             async with self._db.acquire() as conn:
                 await conn.execute(sqlalchemy.sql.text(
                     &#34;UPDATE `game_stats` SET `tada_available`=0 WHERE id = :taf_replay_id&#34;),
                     taf_replay_id=taf_replay_id)
+            raise e
 
         else:
-            self._logger.info(f&#34;Exception uploading replay:{str(e)}. retry_count:{retry_count}&#34;)
+            self._logger.info(f&#34;[upload] Exception uploading replay:{str(e)}. retry_count:{retry_count}&#34;)
             self._upload_queue.append((taf_replay_id, replay_meta, zip_or_tad_file_path, retry_count-1))</code></pre>
 </details>
 </dd>
@@ -545,6 +599,28 @@ def dirty_uploads(self):
 <li><code><a title="server.core.service.Service.shutdown" href="core/service.html#server.core.service.Service.shutdown">shutdown</a></code></li>
 </ul>
 </li>
+</ul>
+</dd>
+<dt id="server.tada_service.TadaUploadFailException"><code class="flex name class">
+<span>class <span class="ident">TadaUploadFailException</span></span>
+<span>(</span><span>reason)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Inappropriate argument value (of correct type).</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class TadaUploadFailException(ValueError):
+
+    def __init__(self, reason):
+        self.reason = reason</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>builtins.ValueError</li>
+<li>builtins.Exception</li>
+<li>builtins.BaseException</li>
 </ul>
 </dd>
 </dl>
@@ -564,6 +640,9 @@ def dirty_uploads(self):
 <li><h3><a href="#header-classes">Classes</a></h3>
 <ul>
 <li>
+<h4><code><a title="server.tada_service.TadaFileTooLargeException" href="#server.tada_service.TadaFileTooLargeException">TadaFileTooLargeException</a></code></h4>
+</li>
+<li>
 <h4><code><a title="server.tada_service.TadaService" href="#server.tada_service.TadaService">TadaService</a></code></h4>
 <ul class="">
 <li><code><a title="server.tada_service.TadaService.clear_dirty" href="#server.tada_service.TadaService.clear_dirty">clear_dirty</a></code></li>
@@ -572,6 +651,9 @@ def dirty_uploads(self):
 <li><code><a title="server.tada_service.TadaService.services" href="#server.tada_service.TadaService.services">services</a></code></li>
 <li><code><a title="server.tada_service.TadaService.upload" href="#server.tada_service.TadaService.upload">upload</a></code></li>
 </ul>
+</li>
+<li>
+<h4><code><a title="server.tada_service.TadaUploadFailException" href="#server.tada_service.TadaUploadFailException">TadaUploadFailException</a></code></h4>
 </li>
 </ul>
 </li>
