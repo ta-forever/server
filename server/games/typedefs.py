@@ -2,6 +2,7 @@ from collections import namedtuple
 from enum import Enum, unique
 from typing import Any, Dict, List, NamedTuple, Optional, Set
 
+from server.factions import Faction
 from server.games.game_results import GameOutcome
 from server.players import Player
 
@@ -40,7 +41,7 @@ class GameType(Enum):
         return {
             "coop": GameType.COOP,
             "custom": GameType.CUSTOM,
-            "matchmaker": GameType.MATCHMAKER,
+            "matchmaker": GameType.MATCHMAKER
         }.get(value)
 
     def to_string(self) -> Optional[str]:
@@ -108,20 +109,34 @@ class BasicGameInfo(NamedTuple):
      - game_id: id of the game
      - rating_type: str (e.g. "ladder1v1")
      - map_id: id of the map used
+     - map_name: name of the map used
      - game_mode: name of the featured mod
+     - galactic_war_planet_name: name of the GW planet this game was played on. or None
     """
 
     game_id: int
     rating_type: Optional[str]
     map_id: int
+    map_name: str
     game_mode: str
+    galactic_war_planet_name: str
     mods: List[int]
     teams: List[Set[Player]]
 
 
-class TeamRatingSummary(NamedTuple):
+class EndedGamePlayerSummary(NamedTuple):
+    player_id: int
+    team_id: int
+    faction: Faction
     outcome: GameOutcome
-    player_ids: Set[int]
+
+    def to_dict(self):
+        return {
+            "player_id": self.player_id,
+            "team_id": self.team_id,
+            "faction": self.faction.name,
+            "outcome": self.outcome.name
+        }
 
 
 class EndedGameInfo(NamedTuple):
@@ -140,11 +155,13 @@ class EndedGameInfo(NamedTuple):
     game_id: int
     rating_type: Optional[str]
     map_id: int
+    map_name: str
     game_mode: str
+    galactic_war_planet_name: str
     mods: List[int]
     commander_kills: Dict[str, int]
     validity: ValidityState
-    team_summaries: List[TeamRatingSummary]
+    endedGamePlayerSummary: List[EndedGamePlayerSummary]
 
     @classmethod
     def from_basic(
@@ -160,18 +177,23 @@ class EndedGameInfo(NamedTuple):
                 "same number of teams in the same order."
             )
 
+        [EndedGamePlayerSummary(player.id, team_number, player.faction, outcome)
+         for team_number, (outcome, team) in enumerate(zip(team_outcomes, basic_info.teams))
+         for player in team]
+
         return cls(
             basic_info.game_id,
             basic_info.rating_type,
             basic_info.map_id,
+            basic_info.map_name,
             basic_info.game_mode,
+            basic_info.galactic_war_planet_name,
             basic_info.mods,
             commander_kills,
             validity,
-            [
-                TeamRatingSummary(outcome, set(player.id for player in team))
-                for outcome, team in zip(team_outcomes, basic_info.teams)
-            ],
+            [EndedGamePlayerSummary(player.id, team_number, player.faction, outcome)
+             for team_number, (outcome, team) in enumerate(zip(team_outcomes, basic_info.teams))
+             for player in team]
         )
 
     def to_dict(self):
@@ -182,16 +204,12 @@ class EndedGameInfo(NamedTuple):
             else "None",
             "map_id": self.map_id,
             "featured_mod": self.game_mode,
+            "galactic_war_planet_name": self.galactic_war_planet_name,
             "sim_mod_ids": self.mods,
             "commander_kills": self.commander_kills,
             "validity": self.validity.name,
-            "teams": [
-                {
-                    "outcome": team_summary.outcome.name,
-                    "player_ids": list(team_summary.player_ids),
-                }
-                for team_summary in self.team_summaries
-            ],
+            "endedGamePlayerSummary": [player_data.to_dict()
+                                       for player_data in self.endedGamePlayerSummary]
         }
 
 

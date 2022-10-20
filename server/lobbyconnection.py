@@ -950,6 +950,7 @@ class LobbyConnection:
         rating_type = message.get("rating_type", RatingType.GLOBAL)
         enforce_rating_range = bool(message.get("enforce_rating_range", False))
         replay_delay_seconds = int(message.get("replay_delay_seconds", 300))
+        galactic_war_planet_name = message.get("galactic_war_planet_name") or None
         if rating_min is not None:
             rating_min = float(rating_min)
         if rating_max is not None:
@@ -967,7 +968,8 @@ class LobbyConnection:
             rating_type=rating_type,
             displayed_rating_range=InclusiveRange(rating_min, rating_max),
             enforce_rating_range=enforce_rating_range,
-            replay_delay_seconds=replay_delay_seconds
+            replay_delay_seconds=replay_delay_seconds,
+            galactic_war_planet_name=galactic_war_planet_name
         )
         await self.launch_game(game, is_host=True)
 

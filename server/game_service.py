@@ -30,6 +30,7 @@ from .matchmaker import MatchmakerQueue
 from .message_queue_service import MessageQueueService
 from .players import Player
 from .rating_service import RatingService
+from .galactic_war_service import GalacticWarService
 
 
 @with_logger
@@ -44,13 +45,15 @@ class GameService(Service):
             player_service,
             game_stats_service,
             rating_service: RatingService,
-            message_queue_service: MessageQueueService
+            message_queue_service: MessageQueueService,
+            galactic_war_service: GalacticWarService
     ):
         self._db = database
         self._dirty_games = set()
         self._dirty_queues = set()
         self.player_service = player_service
         self.game_stats_service = game_stats_service
+        self.galactic_war_service = galactic_war_service
         self._rating_service = rating_service
         self._message_queue_service = message_queue_service
         self.game_id_counter = 0
@@ -78,7 +81,7 @@ class GameService(Service):
         await self.update_data()
         self._update_cron = aiocron.crontab("*/10 * * * *", func=self.update_data)
         self._archive_replays_cron = aiocron.crontab("* * * * *", func=self.archive_new_replays)
-        self._archive_replays_cron = aiocron.crontab("* * * * *", func=self.process_replay_metadata)
+        self._process_replay_metadata = aiocron.crontab("* * * * *", func=self.process_replay_metadata)
         await self._message_queue_service.declare_exchange(config.MQ_EXCHANGE_NAME)
 
     async def initialise_game_counter(self):
@@ -358,8 +361,5 @@ class GameService(Service):
         )
 
         # TODO: Remove when rating service starts listening to message queue
-        if (
-                game_results.validity is ValidityState.VALID
-                and game_results.rating_type is not None
-        ):
-            await self._rating_service.enqueue(result_dict)
+        if game_results.validity is ValidityState.VALID and game_results.rating_type is not None:
+            await self._rating_service.enqueue(game_results)

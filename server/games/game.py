@@ -73,7 +73,8 @@ class Game():
         enforce_rating_range: bool = False,
         max_players: int = 10,
         replay_delay_seconds: int = 300,     # or negative to disable
-        map_pool_map_ids: Iterable[int] = None
+        map_pool_map_ids: Iterable[int] = None,
+        galactic_war_planet_name: str = None
     ):
         self._db = database
         self._results = GameResultReports(id_)
@@ -109,6 +110,7 @@ class Game():
         self.matchmaker_queue_id = matchmaker_queue_id
         self.state = GameState.INITIALIZING
         self.replay_delay_seconds = replay_delay_seconds
+        self.galactic_war_planet_name = galactic_war_planet_name
         self._connections = {}
         self.enforce_rating = False
         self.gameOptions = {
@@ -135,14 +137,14 @@ class Game():
 
         self._logger.debug("%s created", self)
 
-    async def timeout_hosted_staging(self, timeout: int = 30):
+    async def timeout_hosted_staging(self, timeout: int = 60):
         await asyncio.sleep(timeout)
         if self.state in [GameState.INITIALIZING]:
             self._is_hosted_staging.set_exception(asyncio.TimeoutError("Timeout waiting for hosted/staging"))
             self._logger.debug("Game setup timed out waiting for hosted/staging ... Cancelling game")
             await self.on_game_end()
 
-    async def timeout_hosted_battleroom(self, timeout: int = 30):
+    async def timeout_hosted_battleroom(self, timeout: int = 60):
         await asyncio.sleep(timeout)
         if self.state in [GameState.INITIALIZING, GameState.STAGING]:
             self._is_hosted_battleroom.set_exception(asyncio.TimeoutError("Timeout waiting for hosted/battleroom"))
@@ -588,7 +590,9 @@ class Game():
             self.id,
             self.rating_type,
             self.map_id,
+            self.map_name,
             self.game_mode,
+            self.galactic_war_planet_name,
             list(self.mods.keys()),
             self.get_team_sets(),
         )
@@ -602,6 +606,11 @@ class Game():
         :param value: option value
         """
         self._player_options[player_id][key] = value
+        if key == 'Faction':
+            player = [p for p in self.players if p.id == player_id]
+            if len(player) == 1:
+                self._logger.info(f"[set_player_option] player_id={player_id}, key={key}, value={value}")
+                player.faction = int(value)
 
     def get_player_option(self, player_id: int, key: str) -> Optional[Any]:
         """
@@ -1003,6 +1012,7 @@ class Game():
             "rating_min": self.displayed_rating_range.lo,
             "rating_max": self.displayed_rating_range.hi,
             "enforce_rating_range": self.enforce_rating_range,
+            "galactic_war_planet_name": self.galactic_war_planet_name,
             "teams": {
                 k:v for k,v in {
                     team: [

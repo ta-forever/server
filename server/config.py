@@ -101,6 +101,11 @@ class ConfigurationStore:
         self.TADA_UPLOAD_ENABLE = True
         self.TADA_UPLOAD_MAX_SIZE_MB = 164
 
+        self.GALACTIC_WAR_STATE_FILE = "/content/galactic_war/galactic_war.gml"
+        self.GALACTIC_WAR_SCENARIO_PATH = "/content/galactic_war/scenarios"
+        self.GALACTIC_WAR_INITIAL_SCENARIO = "scenario_0.gml"
+        self.GALACTIC_WAR_REQUIRED_DOMINANCE_RATIO = 3.0
+
         self._defaults = {
             key: value for key, value in vars(self).items() if key.isupper()
         }

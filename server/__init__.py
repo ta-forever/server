@@ -37,6 +37,7 @@ from .rating_service.rating_service import RatingService
 from .servercontext import ServerContext
 from .stats.game_stats_service import GameStatsService
 from .tada_service import TadaService
+from .galactic_war_service import GalacticWarService
 from .timing import at_interval
 
 __author__ = "Askaholic, Chris Kitching, Dragonfire, Gael Honorez, Jeroen De Dauw, Crotalus, Michael Søndergaard, Michel Jung"
@@ -61,7 +62,8 @@ __all__ = (
     "game_service",
     "protocol",
     "run_control_server",
-    "TadaService"
+    "TadaService",
+    "GalacticWarService"
 )
 
 DIRTY_REPORT_INTERVAL = 1  # Seconds
@@ -142,6 +144,7 @@ class ServerInstance(object):
         game_service: GameService = self.services["game_service"]
         player_service: PlayerService = self.services["player_service"]
         tada_service: TadaService = self.services["tada_service"]
+        galactic_war_service: GalacticWarService = self.services["galactic_war_service"]
 
         @at_interval(DIRTY_REPORT_INTERVAL, loop=self.loop)
         def do_report_dirties():
@@ -150,9 +153,16 @@ class ServerInstance(object):
             dirty_queues = game_service.dirty_queues
             dirty_players = player_service.dirty_players
             dirty_replay_uploads = tada_service.dirty_uploads
+            dirty_galactic_war = galactic_war_service.get_dirty()
             game_service.clear_dirty()
             player_service.clear_dirty()
             tada_service.clear_dirty()
+            galactic_war_service.set_dirty(False)
+
+            if dirty_galactic_war:
+                self.write_broadcast({
+                    "command": "galactic_war_update"
+                })
 
             if dirty_queues:
                 self.write_broadcast({

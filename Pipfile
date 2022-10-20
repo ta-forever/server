@@ -26,6 +26,9 @@ aiomysql = {editable = true, git = "https://github.com/aio-libs/aiomysql"}
 pyyaml = "*"
 aio_pika = "*"
 lxml = "*"
+networkx = "*"
+pygmlparser = "*"
+pathlib = "*"
 
 [dev-packages]
 pytest = "*"

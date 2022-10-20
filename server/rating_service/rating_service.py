@@ -1,6 +1,6 @@
 import asyncio
 from contextlib import asynccontextmanager
-from typing import Dict
+from typing import Dict, Callable
 
 import aiocron
 from sqlalchemy import and_, case, func, select
@@ -25,12 +25,10 @@ from server.rating import RatingType, RatingTypeMap
 
 from .game_rater import GameRater, GameRatingError
 from .typedefs import (
-    GameRatingData,
-    GameRatingSummary,
     PlayerID,
     ServiceNotReadyError,
-    TeamRatingData
 )
+from ..games.typedefs import EndedGameInfo
 
 
 @asynccontextmanager
@@ -52,11 +50,18 @@ class RatingService(Service):
 
     def __init__(self, database: FAFDatabase, player_service: PlayerService):
         self._db = database
-        self._player_service_callback = player_service.signal_player_rating_change
+        self._player_service = player_service
         self._accept_input = False
         self._queue = asyncio.Queue()
         self._task = None
         self._rating_type_ids = None
+        self._game_rating_callbacks = []
+
+    def add_game_rating_callback(self, callback: Callable[[EndedGameInfo,
+                                                           Dict[PlayerID, Rating],  # old_ratings
+                                                           Dict[PlayerID, Rating],  # new_ratings
+                                                           ], None]) -> None:
+        self._game_rating_callbacks += [callback]
 
     async def initialize(self) -> None:
         if self._task is not None:
@@ -80,31 +85,30 @@ class RatingService(Service):
             ((row["technical_name"], row["id"]) for row in rows)
         )
 
-    async def enqueue(self, game_info: Dict) -> None:
+    async def enqueue(self, game_info: EndedGameInfo) -> None:
         if not self._accept_input:
             self._logger.warning("Dropped rating request %s", game_info)
             raise ServiceNotReadyError(
                 "RatingService not yet initialized or shutting down."
             )
 
-        summary = GameRatingSummary.from_game_info_dict(game_info)
-        self._logger.debug("Queued up rating request %s", summary)
-        await self._queue.put(summary)
+        self._logger.debug("Queued up rating request %s", game_info)
+        await self._queue.put(game_info)
         rating_service_backlog.set(self._queue.qsize())
 
     async def _handle_rating_queue(self) -> None:
         self._logger.debug("RatingService started!")
         try:
             while self._accept_input or not self._queue.empty():
-                summary = await self._queue.get()
-                self._logger.debug("Now rating request %s", summary)
+                game_info = await self._queue.get()
+                self._logger.debug("Now rating request %s", game_info)
 
                 try:
-                    await self._rate(summary)
+                    await self._rate(game_info)
                 except GameRatingError:
-                    self._logger.warning("Error rating game %s", summary)
+                    self._logger.warning("Error rating game %s", game_info)
                 except Exception:  # pragma: no cover
-                    self._logger.exception("Failed rating request %s", summary)
+                    self._logger.exception("Failed rating request %s", game_info)
                 else:
                     self._logger.debug("Done rating request.")
 
@@ -120,40 +124,21 @@ class RatingService(Service):
 
         self._logger.debug("RatingService stopped.")
 
-    async def _rate(self, summary: GameRatingSummary) -> None:
-        rating_data = await self._get_rating_data(summary)
-        new_ratings = GameRater.compute_rating(rating_data)
+    async def _rate(self, game_info: EndedGameInfo) -> None:
+        old_ratings: Dict[PlayerID, Rating] = await self._get_rating_data(game_info)
+        new_ratings: Dict[PlayerID, Rating] = GameRater.compute_rating(game_info.endedGamePlayerSummary, old_ratings)
 
-        outcome_map = {
-            player_id: team.outcome
-            for team in summary.teams
-            for player_id in team.player_ids
-        }
+        for f in self._game_rating_callbacks:
+            f(game_info, old_ratings, new_ratings)
 
-        old_ratings = {
-            player_id: rating
-            for team in rating_data
-            for player_id, rating in team.ratings.items()
-        }
-        await self._persist_rating_changes(
-            summary.game_id, summary.rating_type, summary.featured_mod, old_ratings, new_ratings, outcome_map
-        )
+        await self._persist_rating_changes(game_info, old_ratings, new_ratings)
 
-    async def _get_rating_data(self, summary: GameRatingSummary) -> GameRatingData:
+    async def _get_rating_data(self, game_info: EndedGameInfo) -> Dict[PlayerID, Rating]:
         ratings = {}
-        for team in summary.teams:
-            for player_id in team.player_ids:
-                ratings[player_id] = await self._get_player_rating(
-                    player_id, summary.rating_type
-                )
-
-        return [
-            TeamRatingData(
-                team.outcome,
-                {player_id: ratings[player_id] for player_id in team.player_ids},
-            )
-            for team in summary.teams
-        ]
+        for p in game_info.endedGamePlayerSummary:
+            ratings[p.player_id] = await self._get_player_rating(
+                p.player_id, game_info.rating_type)
+        return ratings
 
     async def _get_player_rating(
         self, player_id: int, rating_type: str, conn=None
@@ -298,25 +283,23 @@ class RatingService(Service):
 
     async def _persist_rating_changes(
         self,
-        game_id: int,
-        rating_type: str,
-        featured_mod: str,
+        game_info: EndedGameInfo,
         old_ratings: Dict[PlayerID, Rating],
-        new_ratings: Dict[PlayerID, Rating],
-        outcomes: Dict[PlayerID, GameOutcome],
+        new_ratings: Dict[PlayerID, Rating]
     ) -> None:
         """
         Persist computed ratings to the respective players' selected rating
         """
-        self._logger.debug("Saving rating change stats for game %i", game_id)
+        self._logger.debug("Saving rating change stats for game %i", game_info.game_id)
 
         async with self._db.acquire() as conn:
-            for player_id, new_rating in new_ratings.items():
-                old_rating = old_ratings[player_id]
+            for player_info in game_info.endedGamePlayerSummary:
+                old_rating = old_ratings[player_info.player_id]
+                new_rating = new_ratings[player_info.player_id]
                 self._logger.debug(
                     "New %s rating for player with id %s: %s -> %s",
-                    rating_type,
-                    player_id,
+                    game_info.rating_type,
+                    player_info.player_id,
                     old_rating,
                     new_rating,
                 )
@@ -325,8 +308,8 @@ class RatingService(Service):
                     game_player_stats.update()
                     .where(
                         and_(
-                            game_player_stats.c.playerId == player_id,
-                            game_player_stats.c.gameId == game_id,
+                            game_player_stats.c.playerId == player_info.player_id,
+                            game_player_stats.c.gameId == game_info.game_id,
                         )
                     )
                     .values(
@@ -340,10 +323,10 @@ class RatingService(Service):
                 result = await conn.execute(gps_update_sql)
 
                 if not result.rowcount:
-                    self._logger.warning("gps_update_sql resultset is empty for game_id %i", game_id)
+                    self._logger.warning("gps_update_sql resultset is empty for game_id %i", game_info.game_id)
                     return
 
-                rating_type_id = self._rating_type_ids[rating_type]
+                rating_type_id = self._rating_type_ids[game_info.rating_type]
 
                 journal_insert_sql = leaderboard_rating_journal.insert().values(
                     leaderboard_id=rating_type_id,
@@ -353,31 +336,31 @@ class RatingService(Service):
                     rating_deviation_after=new_rating.sigma,
                     game_player_stats_id=select([game_player_stats.c.id]).where(
                         and_(
-                            game_player_stats.c.playerId == player_id,
-                            game_player_stats.c.gameId == game_id,
+                            game_player_stats.c.playerId == player_info.player_id,
+                            game_player_stats.c.gameId == game_info.game_id,
                         )
                     ),
                 )
                 await conn.execute(journal_insert_sql)
 
                 victory_increment = (
-                    1 if outcomes[player_id] is GameOutcome.VICTORY else 0
+                    1 if player_info.outcome is GameOutcome.VICTORY else 0
                 )
                 draw_increment = (
-                    1 if outcomes[player_id] is GameOutcome.DRAW else 0
+                    1 if player_info.outcome is GameOutcome.DRAW else 0
                 )
                 defeat_increment = (
-                    1 if outcomes[player_id] is GameOutcome.DEFEAT else 0
+                    1 if player_info.outcome is GameOutcome.DEFEAT else 0
                 )
                 score = (
-                    1 if outcomes[player_id] is GameOutcome.VICTORY else
-                    0 if outcomes[player_id] is GameOutcome.DRAW else
+                    1 if player_info.outcome is GameOutcome.VICTORY else
+                    0 if player_info.outcome is GameOutcome.DRAW else
                     -1)
                 rating_update_sql = (
                     leaderboard_rating.update()
                     .where(
                         and_(
-                            leaderboard_rating.c.login_id == player_id,
+                            leaderboard_rating.c.login_id == player_info.player_id,
                             leaderboard_rating.c.leaderboard_id == rating_type_id,
                         )
                     )
@@ -391,34 +374,22 @@ class RatingService(Service):
                         streak=case([(leaderboard_rating.c.streak * score >= 0, leaderboard_rating.c.streak + score)], else_ = score),
                         best_streak=case([(leaderboard_rating.c.streak > leaderboard_rating.c.best_streak, leaderboard_rating.c.streak)], else_=leaderboard_rating.c.best_streak),
                         recent_scores=func.substr(func.concat(str(score+1), leaderboard_rating.c.recent_scores), 1, 10),
-                        recent_mod=featured_mod
+                        recent_mod=game_info.game_mode
                     )
                 )
                 await conn.execute(rating_update_sql)
 
-                self._update_player_object(player_id, rating_type, new_rating)
+                # we have to do this here to keep player service synchronised with DB as much as possible?
+                self.player_service.on_player_rating_change(
+                    player_info.player_id, game_info.rating_type, new_ratings[player_info.player_id])
 
-    def _update_player_object(
-        self, player_id: PlayerID, rating_type: RatingType, new_rating: Rating
-    ) -> None:
-        if self._player_service_callback is None:
-            self._logger.warning(
-                "Tried to send rating change to player service, "
-                "but no service was registered."
-            )
-            return
-
-        self._logger.debug(
-            "Sending player rating update for player with id %i", player_id
-        )
-        self._player_service_callback(player_id, rating_type, new_rating)
 
     async def _join_rating_queue(self) -> None:
-        """
-        Offers a call that is blocking until the rating queue has been emptied.
-        Mostly for testing purposes.
-        """
-        await self._queue.join()
+            """
+            Offers a call that is blocking until the rating queue has been emptied.
+            Mostly for testing purposes.
+            """
+            await self._queue.join()
 
     async def shutdown(self) -> None:
         """

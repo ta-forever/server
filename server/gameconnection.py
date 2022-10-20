@@ -304,7 +304,7 @@ class GameConnection(GpgNetServerProtocol):
         # (gpgnet4ta can't work out for the host who's joined until game actually starts)
         # if not self.is_host():
         #     return
-
+        self._logger.info("[handle_player_option] player_id={}, command={}, value={}", player_id, command, value)
         self.game.set_player_option(int(player_id), command, value)
         self._mark_dirty()
 

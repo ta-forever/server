@@ -3,7 +3,7 @@ from typing import Dict, List, NamedTuple
 from trueskill import Rating
 
 from server.games.game_results import GameOutcome
-from server.games.typedefs import TeamRatingSummary
+from server.games.typedefs import EndedGamePlayerSummary
 
 PlayerID = int
 
@@ -28,7 +28,7 @@ class GameRatingSummary(NamedTuple):
     game_id: int
     rating_type: str
     featured_mod: str
-    teams: List[TeamRatingSummary]
+    player_data: List[EndedGamePlayerSummary]
 
     @classmethod
     def from_game_info_dict(cls, game_info: Dict) -> "GameRatingSummary":
@@ -40,7 +40,7 @@ class GameRatingSummary(NamedTuple):
             game_info["rating_type"],
             game_info["featured_mod"],
             [
-                TeamRatingSummary(
+                EndedGamePlayerSummary(
                     getattr(GameOutcome, summary["outcome"]), set(summary["player_ids"])
                 )
                 for summary in game_info["teams"]

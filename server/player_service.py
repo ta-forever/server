@@ -237,7 +237,7 @@ class PlayerService(Service):
     def get_player(self, player_id: int) -> Optional[Player]:
         return self._players.get(player_id)
 
-    def signal_player_rating_change(
+    def on_player_rating_change(
         self, player_id: int, rating_type: str, new_rating: Rating
     ) -> None:
         player = self.get_player(player_id)
