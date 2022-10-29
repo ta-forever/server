@@ -42,7 +42,7 @@ async def queue_players_for_matchmaking(lobby_server):
         proto.send_message({
             "command": "game_matchmaking",
             "state": "start",
-            "faction": "uef",
+            "faction": "core",
             "queue_name": "tmm2v2"
         })
         for proto in protos
@@ -67,7 +67,7 @@ async def test_info_message(lobby_server):
     await proto.send_message({
         "command": "game_matchmaking",
         "state": "start",
-        "faction": "uef",
+        "faction": "core",
         "mod": "tmm2v2"
     })
 
@@ -112,7 +112,7 @@ async def test_game_matchmaking_multiqueue(lobby_server):
     await protos[0].send_message({
         "command": "game_matchmaking",
         "state": "start",
-        "faction": "uef",
+        "faction": "core",
         "queue_name": "ladder1v1"
     })
     await read_until_command(protos[0], "search_info", state="start")
@@ -120,7 +120,7 @@ async def test_game_matchmaking_multiqueue(lobby_server):
         proto.send_message({
             "command": "game_matchmaking",
             "state": "start",
-            "faction": "aeon",
+            "faction": "gok",
             "queue_name": "tmm2v2"
         })
         for proto in protos
@@ -176,19 +176,19 @@ async def test_game_matchmaking_with_parties(lobby_server):
 
     await proto1.send_message({
         "command": "set_party_factions",
-        "factions": ["seraphim"]
+        "factions": ["gok"]
     })
     await proto2.send_message({
         "command": "set_party_factions",
-        "factions": ["aeon"]
+        "factions": ["gok"]
     })
     await proto3.send_message({
         "command": "set_party_factions",
-        "factions": ["cybran"]
+        "factions": ["arm"]
     })
     await proto4.send_message({
         "command": "set_party_factions",
-        "factions": ["seraphim"]
+        "factions": ["gok"]
     })
     await read_until_command(proto1, "update_party")
     await read_until_command(proto3, "update_party")
@@ -202,7 +202,7 @@ async def test_game_matchmaking_with_parties(lobby_server):
     # Change faction selection after queueing
     await proto1.send_message({
         "command": "set_party_factions",
-        "factions": ["uef"]
+        "factions": ["core"]
     })
     await proto3.send_message({
         "command": "game_matchmaking",
@@ -300,7 +300,7 @@ async def test_game_matchmaking_multiqueue_timeout(lobby_server):
     await protos[0].send_message({
         "command": "game_matchmaking",
         "state": "start",
-        "faction": "cybran",
+        "faction": "arm",
         "queue_name": "ladder1v1"
     })
     await read_until_command(protos[0], "search_info", state="start")
@@ -308,7 +308,7 @@ async def test_game_matchmaking_multiqueue_timeout(lobby_server):
         proto.send_message({
             "command": "game_matchmaking",
             "state": "start",
-            "faction": "seraphim",
+            "faction": "gok",
             "queue_name": "tmm2v2"
         })
         for proto in protos
@@ -333,7 +333,7 @@ async def test_game_matchmaking_multiqueue_timeout(lobby_server):
     await protos[0].send_message({
         "command": "game_matchmaking",
         "state": "start",
-        "faction": "uef"
+        "faction": "core"
     })
     await read_until_command(
         protos[0],
@@ -347,7 +347,7 @@ async def test_game_matchmaking_multiqueue_timeout(lobby_server):
     await protos[1].send_message({
         "command": "game_matchmaking",
         "state": "start",
-        "faction": "uef"
+        "faction": "core"
     })
     with pytest.raises(asyncio.TimeoutError):
         await read_until_command(protos[1], "search_info", state="start", timeout=5)
@@ -373,7 +373,7 @@ async def test_game_matchmaking_multiqueue_multimatch(lobby_server):
         proto.send_message({
             "command": "game_matchmaking",
             "state": "start",
-            "faction": "uef",
+            "faction": "core",
             "queue_name": "ladder1v1"
         })
         for proto in protos[:2]
@@ -382,7 +382,7 @@ async def test_game_matchmaking_multiqueue_multimatch(lobby_server):
         proto.send_message({
             "command": "game_matchmaking",
             "state": "start",
-            "faction": "aeon",
+            "faction": "gok",
             "queue_name": "tmm2v2"
         })
         for proto in protos
@@ -436,7 +436,7 @@ async def test_game_matchmaking_timeout(lobby_server):
     await protos[0].send_message({
         "command": "game_matchmaking",
         "state": "start",
-        "faction": "uef"
+        "faction": "core"
     })
     await read_until_command(
         protos[0],
@@ -450,7 +450,7 @@ async def test_game_matchmaking_timeout(lobby_server):
     await protos[1].send_message({
         "command": "game_matchmaking",
         "state": "start",
-        "faction": "uef"
+        "faction": "core"
     })
     with pytest.raises(asyncio.TimeoutError):
         await read_until_command(protos[1], "search_info", state="start", timeout=5)
@@ -550,7 +550,7 @@ async def test_ratings_initialized_based_on_global(lobby_server):
     await proto.send_message({
         "command": "game_matchmaking",
         "state": "start",
-        "faction": "uef",
+        "faction": "core",
         "mod": "tmm2v2"
     })
 

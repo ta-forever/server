@@ -38,6 +38,7 @@ DELETE FROM game_review;
 DELETE FROM game_reviews_summary;
 DELETE FROM game_stats;
 DELETE FROM game_featuredMods;
+DELETE FROM game_featuredMods_version;
 DELETE FROM ladder_division_score;
 DELETE FROM ladder_division;
 DELETE FROM lobby_admin;
@@ -63,9 +64,9 @@ SET FOREIGN_KEY_CHECKS=1;
 -- age check.
 insert into login (id, login, email, password, steamid, create_time) values
   (1, 'test', 'test@example.com', SHA2('test_password', 256),    null, '2000-01-01 00:00:00'),
-  (2, 'Dostya', 'dostya@cybran.example.com', SHA2('vodka', 256), null, '2000-01-01 00:00:00'),
-  (3, 'Rhiza', 'rhiza@aeon.example.com', SHA2('puff_the_magic_dragon', 256), null, '2000-01-01 00:00:00'),
-  (4, 'No_UID', 'uid@uef.example.com', SHA2('his_pw', 256), null, '2000-01-01 00:00:00'),
+  (2, 'Dostya', 'dostya@arm.example.com', SHA2('vodka', 256), null, '2000-01-01 00:00:00'),
+  (3, 'Rhiza', 'rhiza@gok.example.com', SHA2('puff_the_magic_dragon', 256), null, '2000-01-01 00:00:00'),
+  (4, 'No_UID', 'uid@core.example.com', SHA2('his_pw', 256), null, '2000-01-01 00:00:00'),
   (5, 'postman', 'postman@postman.com', SHA2('postman', 256), null, '2000-01-01 00:00:00'),
   (7, 'test2', 'test2@example.com', SHA2('test2', 256), null, '2000-01-01 00:00:00'),
   (8, 'test3', 'test3@example.com', SHA2('test3', 256), null, '2000-01-01 00:00:00'),
@@ -104,18 +105,17 @@ insert into user_group (id, technical_name, public, name_key) values
 insert into group_permission_assignment (id, group_id, permission_id) values
   (1, (SELECT id from user_group WHERE technical_name = 'faf_server_administrators'), (SELECT id from group_permission WHERE technical_name = 'ADMIN_BROADCAST_MESSAGE')),
   (2, (SELECT id from user_group WHERE technical_name = 'faf_server_administrators'), (SELECT id from group_permission WHERE technical_name = 'ADMIN_KICK_SERVER')),
-  (3, (SELECT id from user_group WHERE technical_name = 'faf_server_administrators'), (SELECT id from group_permission WHERE technical_name = 'ADMIN_JOIN_CHANNEL')),
-  (4, (SELECT id from user_group WHERE technical_name = 'faf_moderators_global'), (SELECT id from group_permission WHERE technical_name = 'ADMIN_KICK_SERVER'));
+  (3, (SELECT id from user_group WHERE technical_name = 'faf_moderators_global'), (SELECT id from group_permission WHERE technical_name = 'ADMIN_KICK_SERVER'));
 
 insert into lobby_admin (user_id, `group`) values (1, 2);
 insert into user_group_assignment(user_id, group_id) values (1, (SELECT id from user_group WHERE technical_name = 'faf_server_administrators'));
 insert into user_group_assignment(user_id, group_id) values (2, (SELECT id from user_group WHERE technical_name = 'faf_moderators_global'));
 insert into user_group_assignment(user_id, group_id) values (20, (SELECT id from user_group WHERE technical_name = 'faf_moderators_global'));
 
-insert into leaderboard (id, technical_name, name_key, description_key) values
-  (1, "global", "leaderboard.global.name", "leaderboard.global.desc"),
-  (2, "ladder_1v1", "leaderboard.ladder_1v1.name", "leaderboard.ladder_1v1.desc"),
-  (3, "tmm_2v2", "leaderboard.tmm_2v2.name", "leaderboard.tmm_2v2.desc");
+INSERT INTO leaderboard (id,technical_name,name_key,description_key,create_time,update_time,initializer_id) VALUES
+	 (1,'global','leaderboard.global.name','leaderboard.global.desc','2020-11-07 00:15:06','2020-11-07 00:15:06',NULL),
+	 (2,'ladder1v1','leaderboard.ladder1v1_tacc.name','leaderboard.ladder1v1_tacc.desc','2020-11-07 00:15:06','2021-05-14 09:25:40',NULL),
+	 (3,'ladder1v1_tavmod','leaderboard.ladder1v1_tavmod.name','leaderboard.ladder1v1_tavmod.desc','2021-05-14 09:25:41','2021-05-14 09:25:41',NULL);
 
 
 insert into leaderboard_rating (login_id, mean, deviation, total_games, leaderboard_id) values
@@ -135,31 +135,6 @@ insert into leaderboard_rating (login_id, mean, deviation, total_games, leaderbo
   (102, 1500, 500, 0, 2),
   (105, 1400, 150, 20, 3),
   (106, 1500, 75, 20, 3)
-;
-
--- legacy table for global rating
-insert into global_rating (id, mean, deviation, numGames, is_active) values
-  (1, 2000, 125, 5, 1),
-  (2, 1500, 75, 2, 1),
-  (3, 1650, 62.52, 2, 1),
-  (50,  1201, 250, 42, 1),
-  (51,  1201, 250, 42, 1),
-  (52,  1201, 250, 42, 1),
-  (100, 1501, 500, 0, 1),
-  (101, 1501, 500, 0, 1),
-  (102, 1501, 500, 0, 1)
-;
-
--- legacy ladder rating
-insert into ladder1v1_rating (id, mean, deviation, numGames, is_active) values
-  (1, 2000, 125, 5, 1),
-  (2, 1500, 75, 2, 1),
-  (3, 1650, 62.52, 2, 1),
-  (50,  1301, 400, 12, 1),
-  (51,  1301, 400, 12, 1),
-  (100, 1501, 500, 0, 1),
-  (101, 1501, 500, 0, 1),
-  (102, 1501, 500, 0, 1)
 ;
 
 -- UniqueID_exempt
@@ -191,46 +166,88 @@ insert into map (id, display_name, map_type, battle_type, author) values
   (12, 'SCMP_012', 'FFA', 'skirmish', 3),
   (13, 'SCMP_013', 'FFA', 'skirmish', 3),
   (14, 'SCMP_014', 'FFA', 'skirmish', 3),
-  (15, 'SCMP_015', 'FFA', 'skirmish', 3),
-  (16, 'neroxis_map_generator_sneaky_map', 'FFA', 'skirmish', 1);
+  (15, 'SCMP_015', 'FFA', 'skirmish', 3);
 
 insert into map_version (id, description, max_players, width, height, version, filename, hidden, ranked, map_id) values
-  (1, 'SCMP 001', 8, 1024, 1024, 1, 'maps/scmp_001.zip', 0, 1, 1),
-  (2, 'SCMP 002', 8, 1024, 1024, 1, 'maps/scmp_002.zip', 0, 1, 2),
-  (3, 'SCMP 003', 8, 1024, 1024, 1, 'maps/scmp_003.zip', 0, 1, 3),
-  (4, 'SCMP 004', 8, 1024, 1024, 1, 'maps/scmp_004.zip', 0, 1, 4),
-  (5, 'SCMP 005', 8, 2048, 2048, 1, 'maps/scmp_005.zip', 0, 1, 5),
-  (6, 'SCMP 006', 8, 1024, 1024, 1, 'maps/scmp_006.zip', 0, 1, 6),
-  (7, 'SCMP 007', 8, 512, 512, 1, 'maps/scmp_007.zip', 0, 1, 7),
-  (8, 'SCMP 008', 8, 1024, 1024, 1, 'maps/scmp_008.zip', 0, 1, 8),
-  (9, 'SCMP 009', 8, 1024, 1024, 1, 'maps/scmp_009.zip', 0, 1, 9),
-  (10, 'SCMP 010', 8, 1024, 1024, 1, 'maps/scmp_010.zip', 0, 1, 10),
-  (11, 'SCMP 011', 8, 2048, 2048, 1, 'maps/scmp_011.zip', 0, 1, 11),
-  (12, 'SCMP 012', 8, 256, 256, 1, 'maps/scmp_012.zip', 0, 1, 12),
-  (13, 'SCMP 013', 8, 256, 256, 1, 'maps/scmp_013.zip', 0, 1, 13),
-  (14, 'SCMP 014', 8, 1024, 1024, 1, 'maps/scmp_014.zip', 0, 1, 14),
-  (15, 'SCMP 015', 8, 512, 512, 1, 'maps/scmp_015.zip', 0, 1, 15),
-  (16, 'SCMP 015', 8, 512, 512, 2, 'maps/scmp_015.v0002.zip', 0, 1, 15),
-  (17, 'SCMP 015', 8, 512, 512, 3, 'maps/scmp_015.v0003.zip', 0, 1, 15),
-  (18, 'Sneaky_Map', 8, 512, 512, 1, 'maps/neroxis_map_generator_sneaky_map.zip', 0, 0, 16);
+  (1, 'SCMP 001', 8, 1024, 1024, 1, 'maps.ufo/scmp_001/12345678', 0, 1, 1),
+  (2, 'SCMP 002', 8, 1024, 1024, 1, 'maps.ufo/scmp_002/abcdef0', 0, 1, 2),
+  (3, 'SCMP 003', 8, 1024, 1024, 1, 'maps.ufo/scmp_003/1234abcd', 0, 1, 3),
+  (4, 'SCMP 004', 8, 1024, 1024, 1, 'maps.ufo/scmp_004/abcd1234', 0, 1, 4),
+  (5, 'SCMP 005', 8, 2048, 2048, 1, 'maps.ufo/scmp_005/1a2b3c4d', 0, 1, 5),
+  (6, 'SCMP 006', 8, 1024, 1024, 1, 'maps.ufo/scmp_006/43214321', 0, 1, 6),
+  (7, 'SCMP 007', 8, 512, 512, 1, 'maps.ufo/scmp_007/aaaaaaaa', 0, 1, 7),
+  (8, 'SCMP 008', 8, 1024, 1024, 1, 'maps.ufo/scmp_008/bbbbbbbb', 0, 1, 8),
+  (9, 'SCMP 009', 8, 1024, 1024, 1, 'maps.ufo/scmp_009/cccccccc', 0, 1, 9),
+  (10, 'SCMP 010', 8, 1024, 1024, 1, 'maps.ufo/scmp_010/dddddddd', 0, 1, 10),
+  (11, 'SCMP 011', 8, 2048, 2048, 1, 'maps.ufo/scmp_011/eeeeeeee', 0, 1, 11),
+  (12, 'SCMP 012', 8, 256, 256, 1, 'maps.ufo/scmp_012/ffffffff', 0, 1, 12),
+  (13, 'SCMP 013', 8, 256, 256, 1, 'maps.ufo/scmp_013/11111111', 0, 1, 13),
+  (14, 'SCMP 014', 8, 1024, 1024, 1, 'maps.ufo/scmp_014/22222222', 0, 1, 14),
+  (15, 'SCMP 015', 8, 512, 512, 1, 'maps.ufo/scmp_015/33333333', 0, 1, 15),
+  (16, 'SCMP 015', 8, 512, 512, 2, 'maps.v0002.ufo/scmp_015/44444444', 0, 1, 15),
+  (17, 'SCMP 015', 8, 512, 512, 3, 'maps.v0003.ufo/scmp_015/55555555', 0, 1, 15);
 
 insert into ladder_map (id, idmap) values
   (1,1),
   (2,2);
 
 INSERT INTO `coop_map` (`type`, `name`, `description`, `version`, `filename`) VALUES
-  (0, 'FA Campaign map', 'A map from the FA campaign', 2, 'maps/scmp_coop_123.v0002.zip'),
-  (1, 'Aeon Campaign map', 'A map from the Aeon campaign', 0, 'maps/scmp_coop_124.v0000.zip'),
-  (2, 'Cybran Campaign map', 'A map from the Cybran campaign', 1, 'maps/scmp_coop_125.v0001.zip'),
-  (3, 'UEF Campaign map',   'A map from the UEF campaign', 99, 'maps/scmp_coop_126.v0099.zip'),
-  (4, 'Prothyon - 16', 'Prothyon - 16 is a secret UEF facility...', 5, 'maps/prothyon16.v0005.zip'),
+  (1, 'GoK Campaign map', 'A map from the GoK campaign', 0, 'maps/scmp_coop_124.v0000.zip'),
+  (2, 'Arm Campaign map', 'A map from the Arm campaign', 1, 'maps/scmp_coop_125.v0001.zip'),
+  (3, 'CORE Campaign map',   'A map from the CORE campaign', 99, 'maps/scmp_coop_126.v0099.zip'),
   (100, 'Corrupted Map', 'This is corrupted and you should never see it', 0, '$invalid &string*');
 
-insert into game_featuredMods (id, gamemod, name, description, publish, git_url, git_branch, file_extension, allow_override) values
-  (1, 'faf', 'FAF', 'Forged Alliance Forever', 1, 'https://github.com/FAForever/fa.git', 'deploy/faf', 'nx2', FALSE),
-  (6, 'ladder1v1', 'FAF', 'Ladder games', 1, 'https://github.com/FAForever/fa.git', 'deploy/faf', 'nx2', TRUE),
-  (25, 'coop', 'Coop', 'Multiplayer campaign games', 1, 'https://github.com/FAForever/fa-coop.git', 'master', 'cop', TRUE);
+INSERT INTO game_featuredMods (id,gamemod,description,name,publish,`order`,git_url,git_branch,file_extension,allow_override,deployment_webhook,install_package) VALUES
+	 (1,'tacc','Total Annihilation: Core Contingency','Core Contingency',1,1,'https://git.taforever.com/ta-forever/featured_mods.git','tacc','tad',0,NULL,'{"url": "https://www.tauniverse.com/forum/attachment.php?attachmentid=37173&d=1623362752"}'),
+	 (2,'ladder1v1','Total Annihilation: Core Contingency (Ladder 1v1)','ladder1v1',0,0,'https://git.taforever.com/ta-forever/featured_mods.git','tacc','tad',1,NULL,NULL),
+	 (3,'taesc','Total Annihilation: Escalation','Escalation',1,3,'https://git.taforever.com/ta-forever/featured_mods.git','taesc','tae',0,NULL,'{"url": "http://taesc.tauniverse.com/downloads/TAESC_GOLD_9_9_1.rar;http://taesc.tauniverse.com/downloads/TAESC_FIX_9_9_2.rar", "folders": [{"regex": "Step_2[^/]*/(.*)"}, {"regex": "Step_3.*/Windows 8 or 10/(.*)", "platforms": ["win8", "win10"]}, {"regex": "Step_3.*/Linux or Mac/(.*)", "platforms": ["linux", "mac"]}, {"regex": "(eplayx.dll)"}]}'),
+	 (4,'tazero','Total Annihilation: Zero','Zero',1,5,'https://git.taforever.com/ta-forever/featured_mods.git','tazero','tad',0,NULL,'{"url": "http://zero.tauniverse.com/downloads/TA_Zero_Base.zip;http://zero.tauniverse.com/downloads/TA_Zero_Alpha_4d.zip", "folders": [{"regex": "TA Zero/(.*)"}, {"regex": "([^/]+)"}, {"regex": "TA Zero Alpha 4d Fixes/Fix 10/(.*)", "platforms": ["win8", "win10"]}]}'),
+	 (5,'tamayhem','Total Annihilation: Mayhem','Mayhem',1,6,'https://git.taforever.com/ta-forever/featured_mods.git','tamayhem','tad',0,NULL,'{"url": "https://mayhem.tauniverse.com/totalm/TotalM824e.zip"}'),
+	 (6,'tavmod','Total Annihilation: ProTA','ProTA',1,2,'https://git.taforever.com/ta-forever/featured_mods.git','tavmod','pro',0,NULL,'{"url": "https://prota.tauniverse.com/ProTA4.4.zip"}'),
+	 (7,'tatw','Total Annihilation: Twilight','Twilight',1,4,'https://git.taforever.com/ta-forever/featured_mods.git','tatw','tad',0,NULL,'{"url": "https://www.tauniverse.com/forum/attachment.php?attachmentid=37173&d=1623362752;https://content.taforever.com/featured_mod_dropins/TAT-v2.0-Beta-56.zip"}'),
+	 (8,'tatalon','Total Annihilation: Talon','Talon',0,7,'https://git.taforever.com/ta-forever/featured_mods.git','','tad',NULL,NULL,NULL),
+	 (9,'taexcess','Total Annilathion: Excess','Excess',0,8,'https://git.taforever.com/ta-forever/featured_mods.git','','tad',NULL,NULL,NULL);
 
+INSERT INTO game_featuredMods_version (game_featuredMods_id,version,ta_hash,confirmed,observation_count,comment,git_branch,display_name) VALUES
+	 (6,'4.3','4.3',1,0,NULL,NULL,NULL),
+	 (6,'4.3','022871225a7fd5e3b97bda2ad73899a9',1,698,NULL,'tavmod-4.3','4.3'),
+	 (3,'9.86','9.86',1,0,NULL,NULL,NULL),
+	 (3,'9.86','e882ee9fc9d2e361612aa8e4cf53a52b',1,207,NULL,'taesc-9.86','9.8.6'),
+	 (6,'4.3','1ef1cea8598dccf9fa80c7c2f94c1c05',0,9,NULL,NULL,NULL),
+	 (1,'3.1','881cddda192f17f5563c5650982841d1',0,90,'CC+flea+scarab+hhog+immo+fark+necro','tacc-3.9.02','3.9.02'),
+	 (1,'3.1','ff6266aad4e16877d1467b66034eae8c',0,5,'CC+flea+scarab+hhog+immo+fark+necro+QFluxor','tacc-3.9.02','3.9.02'),
+	 (7,'3.1','9d083dd8d506b41ca819c2987b685af8',0,39,NULL,'tatw-2.0b52','2.0 beta 52'),
+	 (5,'8.1','50ec609145bb9e3fed2aa0c766f72aa3',0,56,NULL,'tamayhem-8.1.5','8.1.5'),
+	 (6,'4.3','7b644aa331e346c28ca084bdc6f5e174',0,1,NULL,NULL,NULL);
+INSERT INTO game_featuredMods_version (game_featuredMods_id,version,ta_hash,confirmed,observation_count,comment,git_branch,display_name) VALUES
+	 (3,'9.8','64ef1153a1019ba6b6874296be0c9e08',0,1,NULL,NULL,NULL),
+	 (7,'3.1','3f2ea84d6971ed5240fa98e484f5b1b9',0,1,NULL,NULL,NULL),
+	 (3,'9.86','35d28638a7e8a042d56ad3d5c7f92045',0,3,NULL,NULL,NULL),
+	 (6,'4.3','d41d8cd98f00b204e9800998ecf8427e',0,1,NULL,NULL,NULL),
+	 (6,'4.3','db2b00111041f67363c06ddd32e43215',0,1,NULL,NULL,NULL),
+	 (6,'4.3','3216809dc7ab6abcb13524e39b23bb6d',0,1,NULL,NULL,NULL),
+	 (6,'4.3','ad2dff4285aef45bce3d2ee50efcc640',0,1,NULL,NULL,NULL),
+	 (6,'4.3','c543bd0ed11742bc9bf34f7c88b968c5',0,58,NULL,NULL,NULL),
+	 (6,'4.3','0545fffddce117518af6825cab092735',0,2,NULL,NULL,NULL),
+	 (6,'9.86','e882ee9fc9d2e361612aa8e4cf53a52b',0,2,NULL,NULL,NULL);
+INSERT INTO game_featuredMods_version (game_featuredMods_id,version,ta_hash,confirmed,observation_count,comment,git_branch,display_name) VALUES
+	 (1,'9.86','e882ee9fc9d2e361612aa8e4cf53a52b',0,9,NULL,NULL,NULL),
+	 (3,'9.86','2d8ff3cade65006f1c68016e4e3ea44d',0,2,NULL,NULL,NULL),
+	 (3,'9.9','e125c7fa8fc192f6a41cdfef0cf9d5f6',1,81,NULL,'taesc-9.90','9.9.0'),
+	 (3,'9.7','ffa6fbaa849b6ce76ee97702fabced09',0,1,NULL,NULL,NULL),
+	 (1,'9.7','f702ac89d703e842f7eaf41cae762b28',0,2,NULL,NULL,NULL),
+	 (3,'9.7','f702ac89d703e842f7eaf41cae762b28',0,3,NULL,NULL,NULL),
+	 (6,'4.3','3705e637b0e22a16b90a63eaeb454456',0,1,NULL,NULL,NULL),
+	 (3,'9.9','327a647e55ed76ed49446e4878663d0b',0,2,NULL,NULL,NULL),
+	 (1,'3.1','20f788dd66e4d90a8ba78915c5ba690d',0,3,NULL,NULL,NULL),
+	 (1,'9.9','e125c7fa8fc192f6a41cdfef0cf9d5f6',0,9,NULL,NULL,NULL);
+INSERT INTO game_featuredMods_version (game_featuredMods_id,version,ta_hash,confirmed,observation_count,comment,git_branch,display_name) VALUES
+	 (3,'3.1','881cddda192f17f5563c5650982841d1',0,1,NULL,NULL,NULL),
+	 (1,'3.1','9d083dd8d506b41ca819c2987b685af8',0,1,NULL,NULL,NULL),
+	 (3,'9.9','9.9',1,0,NULL,NULL,NULL),
+	 (3,'9.85','3894742b09c27e7b207a1890da45af37',0,1,NULL,NULL,NULL),
+	 (6,'4.4','cdacdbed29ad1081f088a4cc0f537394',0,5,NULL,NULL,NULL);
+ 
 insert into game_stats (id, startTime, gameName, gameType, gameMod, host, mapId, validity) values
   (1, NOW(), 'Test game', '0', 6, 1, 1, 0),
   (41935, NOW(), 'MapRepetition', '0', 6, 1, NULL, 0),
@@ -257,6 +274,7 @@ insert into game_stats (id, startTime, gameName, gameType, gameMod, host, mapId,
 
 insert into game_player_stats (gameId, playerId, AI, faction, color, team, place, mean, deviation, scoreTime) values
   (1, 1, 0, 0, 0, 2, 0, 1500, 500, NOW()),
+  (1, 2, 0, 0, 0, 2, 0, 1500, 500, NOW()),
   (41935, 1, 0, 0, 0, 2, 0, 1500, 500, NOW()),
   (41936, 1, 0, 0, 0, 2, 0, 1500, 500, NOW() + interval 1 minute),
   (41937, 1, 0, 0, 0, 2, 0, 1500, 500, NOW() + interval 2 minute),
@@ -281,11 +299,9 @@ insert into game_player_stats (gameId, playerId, AI, faction, color, team, place
   (41943, 51, 0, 0, 0, 2, 0, 1500, 500, NOW(), 1400),
   (41944, 51, 0, 0, 0, 2, 0, 1500, 500, NOW(), 1600);
 
-insert into matchmaker_queue (id, technical_name, featured_mod_id, leaderboard_id, name_key, team_size, enabled) values
-  (1, "ladder1v1", 6, 2, "matchmaker.ladder1v1", 1, true),
-  (2, "tmm2v2", 1, 3, "matchmaker.tmm2v2", 2, true),
-  (3, "disabled", 1, 1, "matchmaker.disabled", 4, false),
-  (4, "neroxis1v1", 1, 2, "matchmaker.neroxis", 1, true);
+INSERT INTO matchmaker_queue (id,technical_name,featured_mod_id,leaderboard_id,name_key,create_time,update_time,team_size,enabled) VALUES
+	 (1,'ladder1v1_tacc',1,2,'matchmaker.ladder1v1','2021-05-14 09:25:41','2021-05-14 09:25:41',1,1),
+	 (2,'ladder1v1_tavmod',6,3,'matchmaker.ladder1v1_tavmod','2021-05-14 09:25:41','2021-05-14 09:25:41',1,1);
 
 insert into matchmaker_queue_game (matchmaker_queue_id, game_stats_id) values
   (1, 1),
@@ -311,29 +327,42 @@ insert into matchmaker_queue_game (matchmaker_queue_id, game_stats_id) values
   (2, 41954),
   (2, 41955);
 
-insert into map_pool (id, name) values
-  (1, "Ladder1v1 season 1: 5-10k"),
-  (2, "Ladder1v1 season 1: all"),
-  (3, "Large maps"),
-  (4, "Generated Maps with Errors");
+INSERT INTO map_pool (id,name,create_time,update_time) VALUES
+	 (1,'tacc 1v1','2020-11-07 00:15:08','2021-05-14 09:25:42'),
+	 (2,'tavmod 1v1','2021-05-14 09:25:43','2021-05-14 09:25:43');
 
-insert into map_pool_map_version (map_pool_id, map_version_id, weight, map_params) values
-  (1, 15, 1, NULL), (1, 16, 1, NULL), (1, 17, 1, NULL),
-  (2, 11, 1, NULL), (2, 14, 1, NULL), (2, 15, 1, NULL), (2, 16, 1, NULL), (2, 17, 1, NULL),
-  (3, 1, 1, NULL), (3, 2, 1, NULL), (3, 3, 1, NULL),
-  (4, NULL, 1, '{"type": "neroxis", "size": 512, "spawns": 2, "version": "0.0.0"}'),
-  -- Bad Generated Map Parameters should not be included in pool
-  (4, NULL, 1, '{"type": "neroxis", "size": 513, "spawns": 2, "version": "0.0.0"}'),
-  (4, NULL, 1, '{"type": "neroxis", "size": 0, "spawns": 2, "version": "0.0.0"}'),
-  (4, NULL, 1, '{"type": "neroxis", "size": 512, "spawns": 3, "version": "0.0.0"}'),
-  (4, NULL, 1, '{"type": "beroxis", "size": 512, "spawns": 2, "version": "0.0.0"}');
+INSERT INTO map_pool_map_version (map_pool_id,map_version_id,weight,map_params,create_time,update_time) VALUES
+	 (1,1,1,'null','2021-05-14 10:58:29','2021-05-14 10:58:29'),
+	 (1,2,1,'null','2021-05-14 10:58:30','2021-05-14 10:58:30'),
+	 (1,3,1,'null','2021-05-14 10:58:30','2021-05-14 10:58:30'),
+	 (1,4,1,'null','2021-05-14 10:58:30','2021-05-14 10:58:30'),
+	 (1,5,1,'null','2021-05-14 10:58:30','2021-05-14 10:58:30'),
+	 (1,6,1,'null','2021-05-14 10:58:31','2021-05-14 10:58:31'),
+	 (1,7,1,'null','2021-05-14 10:58:31','2021-05-14 10:58:31'),
+	 (1,8,1,'null','2021-05-14 10:58:31','2021-05-14 10:58:31'),
+	 (1,9,1,'null','2021-05-14 10:58:32','2021-05-14 10:58:32'),
+	 (1,10,1,'null','2021-05-14 10:58:32','2021-05-14 10:58:32');
+INSERT INTO map_pool_map_version (map_pool_id,map_version_id,weight,map_params,create_time,update_time) VALUES
+	 (1,11,1,'null','2021-05-14 10:58:32','2021-05-14 10:58:32'),
+	 (2,12,1,'null','2022-01-21 21:55:47','2022-01-21 21:55:47'),
+	 (2,13,1,'null','2022-01-21 21:55:47','2022-01-21 21:55:47'),
+	 (2,14,1,'null','2022-01-21 21:55:47','2022-01-21 21:55:47'),
+	 (2,15,1,'null','2022-01-21 21:55:47','2022-01-21 21:55:47'),
+	 (2,16,1,'null','2022-01-21 21:55:47','2022-01-21 21:55:47'),
+	 (2,17,1,'null','2022-01-21 21:55:47','2022-01-21 21:55:47'),
+	 (2,1,1,'null','2022-01-21 21:55:47','2022-01-21 21:55:47'),
+	 (2,2,1,'null','2022-01-21 21:55:47','2022-01-21 21:55:47'),
+	 (2,3,1,'null','2022-01-21 21:55:47','2022-01-21 21:55:47');
+INSERT INTO map_pool_map_version (map_pool_id,map_version_id,weight,map_params,create_time,update_time) VALUES
+	 (2,4,1,'null','2022-01-21 21:55:48','2022-01-21 21:55:48'),
+	 (2,5,1,'null','2022-01-21 21:55:48','2022-01-21 21:55:48'),
+	 (2,6,1,'null','2022-01-21 21:55:48','2022-01-21 21:55:48'),
+	 (2,7,1,'null','2022-01-21 21:55:48','2022-01-21 21:55:48'),
+	 (2,8,1,'null','2022-01-21 21:55:48','2022-01-21 21:55:48');
 
-insert into matchmaker_queue_map_pool (matchmaker_queue_id, map_pool_id, min_rating, max_rating) values
-  (1, 1, NULL, 800),
-  (1, 2, 800, NULL),
-  (1, 3, 1000, NULL),
-  (2, 3, NULL, NULL),
-  (4, 4, NULL, NULL);
+INSERT INTO matchmaker_queue_map_pool (matchmaker_queue_id,map_pool_id,min_rating,max_rating,create_time,update_time) VALUES
+	 (1,1,NULL,NULL,'2021-05-14 09:25:43','2021-05-14 09:25:43'),
+	 (2,2,NULL,NULL,'2021-05-14 09:25:43','2021-05-14 09:25:43');
 
 insert into friends_and_foes (user_id, subject_id, `status`) values
   (1, 3, 'FOE'),
@@ -361,7 +390,7 @@ insert into mod_stats (mod_id, times_played, likers) VALUES
 -- sample avatars
 insert into avatars_list (id, filename, tooltip) values
   (1, 'qai2.png', 'QAI'),
-  (2, 'UEF.png', 'UEF');
+  (2, 'CORE.png', 'CORE');
 
 insert into avatars (idUser, idAvatar, selected) values
   (2, 1, 0),

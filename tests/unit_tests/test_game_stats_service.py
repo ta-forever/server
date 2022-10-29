@@ -166,8 +166,8 @@ async def test_process_game_stats(
     event_service.record_event.assert_any_call(
         ev.EVENT_BUILT_ENGINEERS, 22, []
     )
-    event_service.record_event.assert_any_call(ev.EVENT_SERAPHIM_PLAYS, 1, [])
-    event_service.record_event.assert_any_call(ev.EVENT_SERAPHIM_WINS, 1, [])
+    event_service.record_event.assert_any_call(ev.EVENT_GOK_PLAYS, 1, [])
+    event_service.record_event.assert_any_call(ev.EVENT_GOK_WINS, 1, [])
     event_service.execute_batch_update.assert_called_once_with(42, [])
 
     achievement_service.increment.assert_any_call(ach.ACH_NOVICE, 1, [])
@@ -377,13 +377,13 @@ async def test_category_stats_won_more_naval_and_three_experimentals(
     assert len(achievement_service.mock_calls) == 7
 
 
-async def test_faction_played_aeon_survived(
+async def test_faction_played_gok_survived(
     game_stats_service, achievement_service, event_service
 ):
-    game_stats_service._faction_played(Faction.aeon, True, [], [])
+    game_stats_service._faction_played(Faction.gok, True, [], [])
 
-    event_service.record_event.assert_any_call(ev.EVENT_AEON_PLAYS, 1, [])
-    event_service.record_event.assert_any_call(ev.EVENT_AEON_WINS, 1, [])
+    event_service.record_event.assert_any_call(ev.EVENT_GOK_PLAYS, 1, [])
+    event_service.record_event.assert_any_call(ev.EVENT_GOK_WINS, 1, [])
     achievement_service.increment.assert_any_call(ach.ACH_AURORA, 1, [])
     achievement_service.increment.assert_any_call(ach.ACH_BLAZE, 1, [])
     achievement_service.increment.assert_any_call(ach.ACH_SERENITY, 1, [])
@@ -391,22 +391,22 @@ async def test_faction_played_aeon_survived(
     assert len(achievement_service.mock_calls) == 3
 
 
-async def test_faction_played_aeon_died(game_stats_service, event_service):
-    game_stats_service._faction_played(Faction.aeon, False, [], [])
+async def test_faction_played_gok_died(game_stats_service, event_service):
+    game_stats_service._faction_played(Faction.gok, False, [], [])
 
     event_service.record_event.assert_called_once_with(
-        ev.EVENT_AEON_PLAYS, 1, []
+        ev.EVENT_GOK_PLAYS, 1, []
     )
     assert len(event_service.mock_calls) == 1
 
 
-async def test_faction_played_cybran_survived(
+async def test_faction_played_arm_survived(
     game_stats_service, achievement_service, event_service
 ):
-    game_stats_service._faction_played(Faction.cybran, True, [], [])
+    game_stats_service._faction_played(Faction.arm, True, [], [])
 
-    event_service.record_event.assert_any_call(ev.EVENT_CYBRAN_PLAYS, 1, [])
-    event_service.record_event.assert_any_call(ev.EVENT_CYBRAN_WINS, 1, [])
+    event_service.record_event.assert_any_call(ev.EVENT_ARM_PLAYS, 1, [])
+    event_service.record_event.assert_any_call(ev.EVENT_ARM_WINS, 1, [])
     achievement_service.increment.assert_any_call(ach.ACH_MANTIS, 1, [])
     achievement_service.increment.assert_any_call(ach.ACH_WAGNER, 1, [])
     achievement_service.increment.assert_any_call(ach.ACH_TREBUCHET, 1, [])
@@ -414,22 +414,22 @@ async def test_faction_played_cybran_survived(
     assert len(achievement_service.mock_calls) == 3
 
 
-async def test_faction_played_cybran_died(game_stats_service, event_service):
-    game_stats_service._faction_played(Faction.cybran, False, [], [])
+async def test_faction_played_arm_died(game_stats_service, event_service):
+    game_stats_service._faction_played(Faction.arm, False, [], [])
 
     event_service.record_event.assert_called_once_with(
-        ev.EVENT_CYBRAN_PLAYS, 1, []
+        ev.EVENT_ARM_PLAYS, 1, []
     )
     assert len(event_service.mock_calls) == 1
 
 
-async def test_faction_played_uef_survived(
+async def test_faction_played_core_survived(
     game_stats_service, achievement_service, event_service
 ):
-    game_stats_service._faction_played(Faction.uef, True, [], [])
+    game_stats_service._faction_played(Faction.core, True, [], [])
 
-    event_service.record_event.assert_any_call(ev.EVENT_UEF_PLAYS, 1, [])
-    event_service.record_event.assert_any_call(ev.EVENT_UEF_WINS, 1, [])
+    event_service.record_event.assert_any_call(ev.EVENT_CORE_PLAYS, 1, [])
+    event_service.record_event.assert_any_call(ev.EVENT_CORE_WINS, 1, [])
     achievement_service.increment.assert_any_call(ach.ACH_MA12_STRIKER, 1, [])
     achievement_service.increment.assert_any_call(ach.ACH_RIPTIDE, 1, [])
     achievement_service.increment.assert_any_call(ach.ACH_DEMOLISHER, 1, [])
@@ -437,39 +437,13 @@ async def test_faction_played_uef_survived(
     assert len(achievement_service.mock_calls) == 3
 
 
-async def test_faction_played_uef_died(game_stats_service, event_service):
-    game_stats_service._faction_played(Faction.uef, False, [], [])
+async def test_faction_played_core_died(game_stats_service, event_service):
+    game_stats_service._faction_played(Faction.core, False, [], [])
 
     event_service.record_event.assert_called_once_with(
-        ev.EVENT_UEF_PLAYS, 1, []
+        ev.EVENT_CORE_PLAYS, 1, []
     )
     assert len(event_service.mock_calls) == 1
-
-
-async def test_faction_played_seraphim_survived(
-    game_stats_service, achievement_service, event_service
-):
-    game_stats_service._faction_played(Faction.seraphim, True, [], [])
-
-    event_service.record_event.assert_any_call(ev.EVENT_SERAPHIM_PLAYS, 1, [])
-    event_service.record_event.assert_any_call(ev.EVENT_SERAPHIM_WINS, 1, [])
-    achievement_service.increment.assert_any_call(ach.ACH_THAAM, 1, [])
-    achievement_service.increment.assert_any_call(ach.ACH_YENZYNE, 1, [])
-    achievement_service.increment.assert_any_call(ach.ACH_SUTHANUS, 1, [])
-    assert len(event_service.mock_calls) == 2
-    assert len(achievement_service.mock_calls) == 3
-
-
-async def test_faction_played_seraphim_died(
-    game_stats_service, achievement_service, event_service
-):
-    game_stats_service._faction_played(Faction.seraphim, False, [], [])
-
-    event_service.record_event.assert_called_once_with(
-        ev.EVENT_SERAPHIM_PLAYS, 1, []
-    )
-    assert len(event_service.mock_calls) == 1
-    assert len(achievement_service.mock_calls) == 0
 
 
 async def test_killed_acus_none_and_survived(

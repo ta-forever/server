@@ -9,7 +9,7 @@ def ratings():
 
 
 def test_rating_type_default(ratings):
-    for rating_type in (RatingType.GLOBAL, RatingType.LADDER_1V1):
+    for rating_type in (RatingType.GLOBAL, RatingType.TEST_LADDER):
         assert ratings[rating_type] == (1500, 500)
 
 
@@ -21,7 +21,7 @@ def test_str_keys(ratings):
 
 def test_key_type(ratings):
     ratings[RatingType.GLOBAL]
-    ratings[RatingType.LADDER_1V1]
+    ratings[RatingType.TEST_LADDER]
 
     assert ratings == {"global": (1500, 500), "ladder_1v1": (1500, 500)}
     assert list(ratings) == ["global", "ladder_1v1"]

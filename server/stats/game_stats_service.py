@@ -10,6 +10,7 @@ from server.stats.event_service import *
 from server.stats.unit import *
 
 from ..factions import Faction
+from ..rating import RatingType
 
 
 @with_logger
@@ -66,7 +67,7 @@ class GameStatsService(Service):
         unit_stats = stats["units"]
         scored_highest = highest_scorer == player.login
 
-        if survived and game.game_mode == FeaturedModType.LADDER_1V1:
+        if survived and game.rating_type != RatingType.GLOBAL:
             self._unlock(ACH_FIRST_SUCCESS, a_queue)
 
         self._increment(ACH_NOVICE, 1, a_queue)
@@ -159,38 +160,31 @@ class GameStatsService(Service):
                     self._increment(ACH_EXPERIMENTALIST, 1, achievements_queue)
 
     def _faction_played(self, faction, survived, achievements_queue, events_queue):
-        if faction == Faction.aeon:
-            self._record_event(EVENT_AEON_PLAYS, 1, events_queue)
+        if faction == Faction.gok:
+            self._record_event(EVENT_GOK_PLAYS, 1, events_queue)
 
             if survived:
-                self._record_event(EVENT_AEON_WINS, 1, events_queue)
+                self._record_event(EVENT_GOK_WINS, 1, events_queue)
                 self._increment(ACH_AURORA, 1, achievements_queue)
                 self._increment(ACH_BLAZE, 1, achievements_queue)
                 self._increment(ACH_SERENITY, 1, achievements_queue)
-        elif faction == Faction.cybran:
-            self._record_event(EVENT_CYBRAN_PLAYS, 1, events_queue)
+        elif faction == Faction.arm:
+            self._record_event(EVENT_ARM_PLAYS, 1, events_queue)
 
             if survived:
-                self._record_event(EVENT_CYBRAN_WINS, 1, events_queue)
+                self._record_event(EVENT_ARM_WINS, 1, events_queue)
                 self._increment(ACH_MANTIS, 1, achievements_queue)
                 self._increment(ACH_WAGNER, 1, achievements_queue)
                 self._increment(ACH_TREBUCHET, 1, achievements_queue)
-        elif faction == Faction.uef:
-            self._record_event(EVENT_UEF_PLAYS, 1, events_queue)
+        elif faction == Faction.core:
+            self._record_event(EVENT_CORE_PLAYS, 1, events_queue)
 
             if survived:
-                self._record_event(EVENT_UEF_WINS, 1, events_queue)
+                self._record_event(EVENT_CORE_WINS, 1, events_queue)
                 self._increment(ACH_MA12_STRIKER, 1, achievements_queue)
                 self._increment(ACH_RIPTIDE, 1, achievements_queue)
                 self._increment(ACH_DEMOLISHER, 1, achievements_queue)
-        elif faction == Faction.seraphim:
-            self._record_event(EVENT_SERAPHIM_PLAYS, 1, events_queue)
 
-            if survived:
-                self._record_event(EVENT_SERAPHIM_WINS, 1, events_queue)
-                self._increment(ACH_THAAM, 1, achievements_queue)
-                self._increment(ACH_YENZYNE, 1, achievements_queue)
-                self._increment(ACH_SUTHANUS, 1, achievements_queue)
 
     def _killed_acus(self, unit_stats, survived, achievements_queue):
         killed_acus = unit_stats["cdr"].get("kills", 0)

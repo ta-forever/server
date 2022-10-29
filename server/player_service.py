@@ -152,12 +152,9 @@ class PlayerService(Service):
             player.ratings[rating_type] = rating
             player.game_count[rating_type] = total_games
 
-        types_not_found = [
-            rating_type for rating_type in (
-                RatingType.GLOBAL, RatingType.LADDER_1V1
-            )
-            if rating_type not in retrieved_ratings
-        ]
+        types_not_found = [rating_type
+                           for rating_type in (RatingType.GLOBAL,)
+                           if rating_type not in retrieved_ratings]
         await self._fetch_player_legacy_rating(player, types_not_found, conn)
 
     async def _fetch_player_legacy_rating(self, player, rating_types, conn):
@@ -183,10 +180,7 @@ class PlayerService(Service):
             self._logger.info("Found no ratings for Player with id %i", player.id)
             return
 
-        table_map = {
-            RatingType.GLOBAL: "global_rating_{}",
-            RatingType.LADDER_1V1: "ladder1v1_rating_{}",
-        }
+        table_map = {RatingType.GLOBAL: "global_rating_{}"}
         for rating_type in rating_types:
             if rating_type not in table_map:
                 raise ValueError(f"Unknown rating type {rating_type}.")

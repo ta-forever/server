@@ -245,7 +245,7 @@ async def test_set_factions(party_service, player_factory):
     party_service.set_factions(sender, [1, 4])
 
     party_member = next(iter(party_service.player_parties[sender].members))
-    assert party_member.factions == [Faction.uef, Faction.seraphim]
+    assert party_member.factions == [Faction.core, Faction.gok]
 
 
 async def test_set_factions_creates_party(party_service, player_factory):

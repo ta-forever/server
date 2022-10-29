@@ -282,17 +282,17 @@ async def test_write_rating_progress(ladder_service: LadderService, player_facto
         lobby_connection_spec="auto"
     )
 
-    ladder_service.write_rating_progress(p1, RatingType.LADDER_1V1)
+    ladder_service.write_rating_progress(p1, RatingType.TEST_LADDER)
     # Message is sent after the first call
     p1.lobby_connection.write.assert_called_once()
 
-    ladder_service.write_rating_progress(p1, RatingType.LADDER_1V1)
+    ladder_service.write_rating_progress(p1, RatingType.TEST_LADDER)
     p1.lobby_connection.write.reset_mock()
     # But not after the second
     p1.lobby_connection.write.assert_not_called()
 
     ladder_service.on_connection_lost(p1.lobby_connection)
-    ladder_service.write_rating_progress(p1, RatingType.LADDER_1V1)
+    ladder_service.write_rating_progress(p1, RatingType.TEST_LADDER)
     # But it is called if the player relogs
     p1.lobby_connection.write.assert_called_once()
 
@@ -805,7 +805,7 @@ async def test_game_name_conflicting(player_factory):
     p1 = player_factory(login="Dostya", clan="CYB")
     p2 = player_factory(login="QAI", clan="CYB")
     p3 = player_factory(login="Rhiza", clan="AEO")
-    p4 = player_factory(login="Hall", clan="UEF")
+    p4 = player_factory(login="Hall", clan="CORE")
 
     assert game_name([p1, p2], [p3, p4]) == "Team CYB Vs Team Rhiza"
 
@@ -850,7 +850,7 @@ async def test_write_rating_progress_message(
     player = player_factory(ladder_rating=(1500, 500))
     player.write_message = CoroutineMock()
 
-    ladder_service.write_rating_progress(player, RatingType.LADDER_1V1)
+    ladder_service.write_rating_progress(player, RatingType.TEST_LADDER)
 
     player.write_message.assert_called_once_with({
         "command": "notice",
@@ -874,7 +874,7 @@ async def test_write_rating_progress_message_2(
     player = player_factory(ladder_rating=(1500, 400.1235))
     player.write_message = CoroutineMock()
 
-    ladder_service.write_rating_progress(player, RatingType.LADDER_1V1)
+    ladder_service.write_rating_progress(player, RatingType.TEST_LADDER)
 
     player.write_message.assert_called_once()
     assert player.write_message.call_args[0][0].get("command") == "notice"

@@ -65,7 +65,7 @@ class Game():
         host: Optional[Player] = None,
         name: str = "None",
         map_: str = "SHERWOOD",
-        game_mode: str = FeaturedModType.FAF,
+        game_mode: str = FeaturedModType.DEFAULT,
         mod_version: str = None,
         matchmaker_queue_id: Optional[int] = None,
         rating_type: Optional[str] = None,
@@ -76,6 +76,7 @@ class Game():
         map_pool_map_ids: Iterable[int] = None,
         galactic_war_planet_name: str = None
     ):
+        self._logger.info(f"[Game.__init__] id={id}, game_mode={game_mode}, rating_type={rating_type}")
         self._db = database
         self._results = GameResultReports(id_)
         self._army_stats_list = []
@@ -607,10 +608,10 @@ class Game():
         """
         self._player_options[player_id][key] = value
         if key == 'Faction':
-            player = [p for p in self.players if p.id == player_id]
-            if len(player) == 1:
-                self._logger.info(f"[set_player_option] player_id={player_id}, key={key}, value={value}")
-                player.faction = int(value)
+            for player in self.players:
+                if player.id == player_id:
+                    player.faction = int(value)
+                    break
 
     def get_player_option(self, player_id: int, key: str) -> Optional[Any]:
         """

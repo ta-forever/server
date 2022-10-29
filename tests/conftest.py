@@ -191,12 +191,12 @@ def make_player(
 ):
     ratings = {k: v for k, v in {
         RatingType.GLOBAL: global_rating,
-        RatingType.LADDER_1V1: ladder_rating,
+        RatingType.TEST_LADDER: ladder_rating,
     }.items() if v is not None}
 
     games = {
         RatingType.GLOBAL: global_games,
-        RatingType.LADDER_1V1: ladder_games
+        RatingType.TEST_LADDER: ladder_games
     }
 
     p = Player(login=login, ratings=ratings, game_count=games, **kwargs)
@@ -320,8 +320,8 @@ def matchmaker_queue(game_service) -> MatchmakerQueue:
         game_service,
         mock.Mock(),
         "ladder1v1test",
-        FeaturedModType.LADDER_1V1,
-        RatingType.LADDER_1V1,
+        FeaturedModType.DEFAULT,
+        RatingType.TEST_LADDER,
         1
     )
     return queue

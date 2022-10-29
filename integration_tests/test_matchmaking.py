@@ -20,13 +20,13 @@ async def test_ladder_1v1_match(client_factory):
     await client1.send_message({
         "command": "game_matchmaking",
         "state": "start",
-        "faction": "uef"
+        "faction": "arm"
     })
 
     await client2.send_message({
         "command": "game_matchmaking",
         "state": "start",
-        "faction": "seraphim"
+        "faction": "gok"
     })
 
     await client1.read_until_command("match_found", timeout=60)
@@ -85,13 +85,13 @@ async def test_ladder_1v1_game(client_factory):
     await client1.send_message({
         "command": "game_matchmaking",
         "state": "start",
-        "faction": "uef"
+        "faction": "arm"
     })
 
     await client2.send_message({
         "command": "game_matchmaking",
         "state": "start",
-        "faction": "seraphim"
+        "faction": "gok"
     })
 
     player_positions = {}

@@ -45,7 +45,7 @@ class Player:
         game_count=None,
         lobby_connection: Optional["LobbyConnection"] = None
     ) -> None:
-        self._faction = Faction.uef
+        self._faction = Faction.arm
 
         self.id = player_id
         self.login = login
@@ -186,9 +186,6 @@ class Player:
                     ("state", player_state),
                     ("afk_seconds", self._afk_seconds),
                     ("current_game_uid", self.game.id if self.game else -1),
-                    # Deprecated
-                    ("global_rating", self.ratings[RatingType.GLOBAL]),
-                    ("ladder_rating", self.ratings[RatingType.LADDER_1V1]),
                     ("number_of_games", self.game_count[RatingType.GLOBAL]),
                 )
             )
@@ -196,8 +193,7 @@ class Player:
 
     def __str__(self) -> str:
         return (f"Player({self.login}, {self.id}, "
-                f"{self.ratings[RatingType.GLOBAL]}, "
-                f"{self.ratings[RatingType.LADDER_1V1]})")
+                f"{self.ratings[RatingType.GLOBAL]}, ")
 
     def __repr__(self) -> str:
         return (f"Player(login={self.login}, session={self.session}, "

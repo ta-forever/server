@@ -62,8 +62,8 @@ def test_newbie_detection(matchmaker_players):
 def test_newbies_have_adjusted_rating(matchmaker_players):
     pro, _, _, _, _, newbie = matchmaker_players
     s1, s6 = Search([pro]), Search([newbie])
-    assert s1.ratings[0] == pro.ratings[RatingType.LADDER_1V1]
-    assert s6.ratings[0] < newbie.ratings[RatingType.LADDER_1V1]
+    assert s1.ratings[0] == pro.ratings[RatingType.TEST_LADDER]
+    assert s6.ratings[0] < newbie.ratings[RatingType.TEST_LADDER]
 
 
 @given(rating=st_rating())
@@ -154,10 +154,10 @@ def test_search_no_match_wrong_type(matchmaker_players):
 def test_search_boundaries(matchmaker_players):
     p1 = matchmaker_players[0]
     s1 = Search([p1])
-    assert p1.ratings[RatingType.LADDER_1V1][0] > s1.boundary_80[0]
-    assert p1.ratings[RatingType.LADDER_1V1][0] < s1.boundary_80[1]
-    assert p1.ratings[RatingType.LADDER_1V1][0] > s1.boundary_75[0]
-    assert p1.ratings[RatingType.LADDER_1V1][0] < s1.boundary_75[1]
+    assert p1.ratings[RatingType.TEST_LADDER][0] > s1.boundary_80[0]
+    assert p1.ratings[RatingType.TEST_LADDER][0] < s1.boundary_80[1]
+    assert p1.ratings[RatingType.TEST_LADDER][0] > s1.boundary_75[0]
+    assert p1.ratings[RatingType.TEST_LADDER][0] < s1.boundary_75[1]
 
 
 def test_search_expansion_controlled_by_failed_matching_attempts(matchmaker_players, mocker):
@@ -198,9 +198,9 @@ def test_combined_search_attributes(matchmaker_players):
     search = CombinedSearch(s1, s2)
     assert search.players == [p1, p2, p3]
     assert search.raw_ratings == [
-        p1.ratings[RatingType.LADDER_1V1],
-        p2.ratings[RatingType.LADDER_1V1],
-        p3.ratings[RatingType.LADDER_1V1]
+        p1.ratings[RatingType.TEST_LADDER],
+        p2.ratings[RatingType.TEST_LADDER],
+        p3.ratings[RatingType.TEST_LADDER]
     ]
     assert search.failed_matching_attempts == 1
 

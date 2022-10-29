@@ -11,18 +11,17 @@ from server.db.models import (
     leaderboard_rating,
     leaderboard_rating_journal
 )
+from server.factions import Faction
 from server.games.game_results import GameOutcome
 from server.games.typedefs import (
     EndedGameInfo,
-    TeamRatingSummary,
-    ValidityState
+    ValidityState, EndedGamePlayerSummary, FeaturedModType
 )
 from server.rating import RatingType
 from server.rating_service.rating_service import (
     RatingService,
     ServiceNotReadyError
 )
-from server.rating_service.typedefs import GameRatingSummary, TeamRatingData
 
 pytestmark = pytest.mark.asyncio
 
@@ -48,30 +47,38 @@ async def semiinitialized_service(database, player_service):
 
 
 @pytest.fixture
-def game_rating_summary():
-    return GameRatingSummary(
-        1,
-        RatingType.GLOBAL,
-        [
-            TeamRatingSummary(GameOutcome.VICTORY, {1}),
-            TeamRatingSummary(GameOutcome.DEFEAT, {2}),
-        ],
-    )
-
-
-@pytest.fixture
 def game_info():
     return EndedGameInfo(
         1,
         RatingType.GLOBAL,
-        1,
-        "faf",
+        1, "SHERWOOD",
+        FeaturedModType.DEFAULT,
+        None,
         [],
         {},
         ValidityState.VALID,
         [
-            TeamRatingSummary(GameOutcome.VICTORY, {1}),
-            TeamRatingSummary(GameOutcome.DEFEAT, {2}),
+            EndedGamePlayerSummary(1, 1, Faction.core, GameOutcome.VICTORY),
+            EndedGamePlayerSummary(2, 2, Faction.arm, GameOutcome.DEFEAT),
+        ],
+    )
+
+@pytest.fixture
+def game_info_2v2():
+    return EndedGameInfo(
+        1,
+        RatingType.GLOBAL,
+        1, "SHERWOOD",
+        FeaturedModType.DEFAULT,
+        None,
+        [],
+        {},
+        ValidityState.VALID,
+        [
+            EndedGamePlayerSummary(1, 1, Faction.core, GameOutcome.VICTORY),
+            EndedGamePlayerSummary(2, 1, Faction.arm, GameOutcome.VICTORY),
+            EndedGamePlayerSummary(3, 2, Faction.core, GameOutcome.DEFEAT),
+            EndedGamePlayerSummary(4, 2, Faction.arm, GameOutcome.DEFEAT),
         ],
     )
 
@@ -84,14 +91,15 @@ def bad_game_info():
     return EndedGameInfo(
         1,
         RatingType.GLOBAL,
-        1,
-        "faf",
+        1, "SHERWOOD",
+        FeaturedModType.DEFAULT,
+        None,
         [],
         {},
         ValidityState.VALID,
         [
-            TeamRatingSummary(GameOutcome.VICTORY, {1}),
-            TeamRatingSummary(GameOutcome.VICTORY, {2}),
+            EndedGamePlayerSummary(1, 1, Faction.core, GameOutcome.VICTORY),
+            EndedGamePlayerSummary(2, 2, Faction.arm, GameOutcome.VICTORY),
         ],
     )
 
@@ -100,7 +108,7 @@ async def test_enqueue_manual_initialization(uninitialized_service, game_info):
     service = uninitialized_service
     await service.initialize()
     service._rate = CoroutineMock()
-    await service.enqueue(game_info.to_dict())
+    await service.enqueue(game_info)
     await service.shutdown()
 
     service._rate.assert_called()
@@ -118,7 +126,7 @@ async def test_enqueue_initialized(rating_service, game_info):
     service = rating_service
     service._rate = CoroutineMock()
 
-    await service.enqueue(game_info.to_dict())
+    await service.enqueue(game_info)
     await service.shutdown()
 
     service._rate.assert_called()
@@ -127,7 +135,7 @@ async def test_enqueue_initialized(rating_service, game_info):
 async def test_enqueue_uninitialized(uninitialized_service, game_info):
     service = uninitialized_service
     with pytest.raises(ServiceNotReadyError):
-        await service.enqueue(game_info.to_dict())
+        await service.enqueue(game_info)
     await service.shutdown()
 
 
@@ -143,8 +151,8 @@ async def test_load_rating_type_ids(uninitialized_service):
 
     assert service._rating_type_ids == {
         "global": 1,
-        "ladder_1v1": 2,
-        "tmm_2v2": 3
+        "ladder1v1": 2,
+        "ladder1v1_tavmod": 3
     }
 
 
@@ -160,7 +168,7 @@ async def test_get_player_rating_ladder(semiinitialized_service):
     service = semiinitialized_service
     player_id = 50
     true_rating = Rating(1300, 400)
-    rating = await service._get_player_rating(player_id, RatingType.LADDER_1V1)
+    rating = await service._get_player_rating(player_id, RatingType.TEST_LADDER)
     assert rating == true_rating
 
 
@@ -176,29 +184,6 @@ async def get_all_ratings(db: FAFDatabase, player_id: int):
     return rows
 
 
-async def test_get_player_rating_legacy(semiinitialized_service):
-    service = semiinitialized_service
-    # Player 51 should have no leaderboard_rating entry
-    # but entries in the legacy global_rating and ladder1v1_rating tables
-    player_id = 51
-    legacy_global_rating = Rating(1201, 250)
-    legacy_ladder_rating = Rating(1301, 400)
-
-    db_ratings = await get_all_ratings(service._db, player_id)
-    assert len(db_ratings) == 0  # no new rating entries yet
-
-    rating = await service._get_player_rating(player_id, RatingType.GLOBAL)
-    assert rating == legacy_global_rating
-
-    rating = await service._get_player_rating(player_id, RatingType.LADDER_1V1)
-    assert rating == legacy_ladder_rating
-
-    db_ratings = await get_all_ratings(service._db, player_id)
-    assert len(db_ratings) == 2  # new rating entries were created
-    assert db_ratings[0]["mean"] == 1201
-    assert db_ratings[1]["mean"] == 1301
-
-
 async def test_get_new_player_rating_created(semiinitialized_service):
     """
     Upon rating games of players without a rating entry in both new and legacy
@@ -206,7 +191,7 @@ async def test_get_new_player_rating_created(semiinitialized_service):
     """
     service = semiinitialized_service
     player_id = 300
-    rating_type = RatingType.LADDER_1V1
+    rating_type = RatingType.TEST_LADDER
 
     db_ratings = await get_all_ratings(service._db, player_id)
     assert len(db_ratings) == 0  # Rating does not exist yet
@@ -231,52 +216,38 @@ async def test_get_rating_data(semiinitialized_service):
     player2_db_rating = Rating(1500, 75)
     player2_outcome = GameOutcome.DEFEAT
 
-    summary = GameRatingSummary(
+    summary = EndedGameInfo(
         game_id,
         RatingType.GLOBAL,
+        1, "SHERWOOD", FeaturedModType.DEFAULT, None, [], {}, ValidityState.VALID,
         [
-            TeamRatingSummary(player1_outcome, {player1_id}),
-            TeamRatingSummary(player2_outcome, {player2_id}),
+            EndedGamePlayerSummary(player1_id, 1, Faction.core, player1_outcome),
+            EndedGamePlayerSummary(player2_id, 2, Faction.arm, player2_outcome),
         ],
     )
 
     rating_data = await service._get_rating_data(summary)
-
-    player1_expected_data = TeamRatingData(
-        player1_outcome, {player1_id: player1_db_rating}
-    )
-    player2_expected_data = TeamRatingData(
-        player2_outcome, {player2_id: player2_db_rating}
-    )
-
-    assert rating_data[0] == player1_expected_data
-    assert rating_data[1] == player2_expected_data
+    assert rating_data[player1_id] == player1_db_rating
+    assert rating_data[player2_id] == player2_db_rating
 
 
-async def test_rating(semiinitialized_service, game_rating_summary):
+async def test_rating(semiinitialized_service, game_info):
     service = semiinitialized_service
     service._persist_rating_changes = CoroutineMock()
-
-    await service._rate(game_rating_summary)
-
+    await service._rate(game_info)
     service._persist_rating_changes.assert_called()
 
 
-async def test_rating_persistence(semiinitialized_service):
+async def test_rating_persistence(semiinitialized_service, game_info):
     # Assumes that game_player_stats has an entry for player 1 in game 1.
     service = semiinitialized_service
     game_id = 1
     player_id = 1
-    rating_type = RatingType.GLOBAL
     rating_type_id = service._rating_type_ids[RatingType.GLOBAL]
-    old_ratings = {player_id: Rating(1000, 500)}
+    old_ratings = {player_id: Rating(1000, 500), 2: Rating(1000, 500)}
     after_mean = 1234
-    new_ratings = {player_id: Rating(after_mean, 400)}
-    outcomes = {player_id: GameOutcome.VICTORY}
-
-    await service._persist_rating_changes(
-        game_id, rating_type, old_ratings, new_ratings, outcomes
-    )
+    new_ratings = {player_id: Rating(after_mean, 400), 2: Rating(after_mean, 400)}
+    await service._persist_rating_changes(game_info, old_ratings, new_ratings)
 
     async with service._db.acquire() as conn:
         sql = select([game_player_stats.c.id, game_player_stats.c.after_mean]).where(
@@ -314,19 +285,9 @@ async def test_update_player_service(uninitialized_service, player_service):
     player_id = 1
     player_service._players = {player_id: mock.MagicMock()}
 
-    service._update_player_object(player_id, RatingType.GLOBAL, Rating(1000, 100))
+    service._on_player_rating_change(player_id, RatingType.GLOBAL, Rating(1000, 100))
 
     player_service[player_id].ratings.__setitem__.assert_called()
-
-
-async def test_update_player_service_failure_warning(uninitialized_service):
-    service = uninitialized_service
-    service._player_service_callback = None
-    service._logger = mock.Mock()
-
-    service._update_player_object(1, RatingType.GLOBAL, Rating(1000, 100))
-
-    service._logger.warning.assert_called()
 
 
 async def test_game_rating_error_handled(rating_service, game_info, bad_game_info):
@@ -334,8 +295,8 @@ async def test_game_rating_error_handled(rating_service, game_info, bad_game_inf
     service._persist_rating_changes = CoroutineMock()
     service._logger = mock.Mock()
 
-    await service.enqueue(bad_game_info.to_dict())
-    await service.enqueue(game_info.to_dict())
+    await service.enqueue(bad_game_info)
+    await service.enqueue(game_info)
 
     await service._join_rating_queue()
 
@@ -353,8 +314,78 @@ async def test_game_update_empty_resultset(rating_service):
     old_ratings = {player_id: Rating(1000, 500)}
     after_mean = 1234
     new_ratings = {player_id: Rating(after_mean, 400)}
-    outcomes = {player_id: GameOutcome.VICTORY}
+
+    game_info = EndedGameInfo(
+        game_id, rating_type, 0, "SHERWOOD", FeaturedModType.DEFAULT, None, [], {}, ValidityState.VALID,
+        [EndedGamePlayerSummary(player_id, 0, Faction.core, GameOutcome.VICTORY),
+         EndedGamePlayerSummary(player_id, 0, Faction.core, GameOutcome.DEFEAT)])
 
     await service._persist_rating_changes(
-        game_id, rating_type, old_ratings, new_ratings, outcomes
+        game_info, old_ratings, new_ratings
     )
+
+async def test_game_rating_callbacks(rating_service, game_info):
+    service = rating_service
+    service._get_rating_data = CoroutineMock(return_value={
+        1: Rating(1234., 123.),
+        2: Rating(1212., 50.)
+    })
+
+    class Consumer(object):
+        def __init__(self):
+            self.rating_results = None
+
+        async def set_rating_results(self, game_info, old_ratings, new_ratings):
+            self.rating_results = [game_info, old_ratings, new_ratings]
+
+        def get_rating_results(self):
+            return self.rating_results
+
+    consumer = Consumer()
+    service.add_game_rating_callback(lambda gi, old, new: consumer.set_rating_results(gi, old, new))
+
+    await service.enqueue(game_info)
+    await service._join_rating_queue()
+
+    assert (consumer.get_rating_results() is not None)
+    gi, old_ratings, new_ratings = consumer.get_rating_results()
+    assert (gi == game_info)
+    assert (old_ratings[1] == Rating(1234., 123.))
+    assert (old_ratings[2] == Rating(1212., 50.))
+    assert (new_ratings[1].mu > 1234.)
+    assert (new_ratings[1].sigma < 124.)
+    assert (new_ratings[2].mu < 1212.)
+    assert (new_ratings[2].sigma < 51.)
+
+
+async def test_game_rating_2v2(rating_service, game_info_2v2):
+    service = rating_service
+    service._get_rating_data = CoroutineMock(return_value={
+        1: Rating(1000., 100.),
+        2: Rating(1100., 100.),
+        3: Rating(900., 100.),
+        4: Rating(1200., 100.)
+    })
+
+    class Consumer(object):
+        def __init__(self):
+            self.rating_results = None
+
+        def set_rating_results(self, game_info, old_ratings, new_ratings):
+            self.rating_results = [game_info, old_ratings, new_ratings]
+
+        def get_rating_results(self):
+            return self.rating_results
+
+    consumer = Consumer()
+    service.add_game_rating_callback(lambda gi, old, new: consumer.set_rating_results(gi, old, new))
+
+    await service.enqueue(game_info_2v2)
+    await service._join_rating_queue()
+
+    assert (consumer.get_rating_results() is not None)
+    gi, old_ratings, new_ratings = consumer.get_rating_results()
+    assert (new_ratings[1].mu > 1000.)
+    assert (new_ratings[2].mu > 1100.)
+    assert (new_ratings[3].mu < 900.)
+    assert (new_ratings[4].mu < 1200.)

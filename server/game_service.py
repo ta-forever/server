@@ -1,4 +1,5 @@
 from collections import Counter
+from contextlib import asynccontextmanager
 from typing import Dict, List, Optional, Type, Union, ValuesView
 
 import aiocron
@@ -14,14 +15,11 @@ from . import metrics
 from .core import Service
 from .db import FAFDatabase
 from .decorators import with_logger
+from .factions import Faction
 from .games import (
-    CoopGame,
-    CustomGame,
     FeaturedMod,
-    FeaturedModType,
     Game,
     GameState,
-    LadderGame,
     ValidityState,
     VisibilityState
 )
@@ -30,8 +28,6 @@ from .matchmaker import MatchmakerQueue
 from .message_queue_service import MessageQueueService
 from .players import Player
 from .rating_service import RatingService
-from .galactic_war_service import GalacticWarService
-
 
 @with_logger
 class GameService(Service):
@@ -45,15 +41,13 @@ class GameService(Service):
             player_service,
             game_stats_service,
             rating_service: RatingService,
-            message_queue_service: MessageQueueService,
-            galactic_war_service: GalacticWarService
+            message_queue_service: MessageQueueService
     ):
         self._db = database
         self._dirty_games = set()
         self._dirty_queues = set()
         self.player_service = player_service
         self.game_stats_service = game_stats_service
-        self.galactic_war_service = galactic_war_service
         self._rating_service = rating_service
         self._message_queue_service = message_queue_service
         self.game_id_counter = 0
@@ -161,6 +155,19 @@ class GameService(Service):
             units_hash = data.get("unitsHash")
             map_hash = data.get("taMapHash")
 
+            if config.ENABLE_FACTION_LOOKUP_FROM_REPLAY_META and game_id in self._games:
+                try:
+                    game = self._games[game_id]
+                    for game_player in game.players:
+                        for replay_player in data["players"]:
+                            if game_player.alias == replay_player["name"]:
+                                self._logger.info(f"[process_replay_metadata] updating {game_player.alias}({game_player.id}) for game {game_id} to faction={replay_player['side']}")
+                                game_player.faction = Faction.from_value(replay_player["side"])
+                                break
+
+                except (KeyError, ValueError) as e:
+                    self._logger.warn(f"[process_replay_metadata] unable to update player faction from replay meta: {str(e)}")
+
             async with self._db.acquire() as conn:
                 result = await conn.execute(sqlalchemy.sql.text(
                     "SELECT `gameMod`, `mapId` from `game_stats` WHERE id = :game_id"), game_id=game_id)
@@ -253,9 +260,9 @@ class GameService(Service):
 
     def create_game(
             self,
-            game_mode: str,
+            game_mode: str,     # mod technical name eg tacc, tavmod, taesc, etc
             mod_version: str,
-            game_class: Type[Game] = None,
+            game_class: Type[Game],
             visibility=VisibilityState.PUBLIC,
             host: Optional[Player] = None,
             name: Optional[str] = None,
@@ -281,24 +288,10 @@ class GameService(Service):
             "matchmaker_queue_id": matchmaker_queue_id
         }
         game_args.update(kwargs)
-
-        if not game_class:
-            game_class = {
-                FeaturedModType.LADDER_1V1: LadderGame,
-                FeaturedModType.COOP: CoopGame,
-                FeaturedModType.FAF: CustomGame,
-                FeaturedModType.FAFBETA: CustomGame,
-                FeaturedModType.EQUILIBRIUM: CustomGame
-            }.get(game_mode, Game)
-
-        self._logger.info("[create_game] game_class=%s, game_args=%s", repr(game_class), repr(game_args))
         game = game_class(**game_args)
-
         self._games[game_id] = game
-
         game.visibility = visibility
         game.password = password
-
         self.mark_dirty(game)
         return game
 

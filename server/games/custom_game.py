@@ -19,6 +19,7 @@ class CustomGame(Game):
             "rating_type": RatingType.GLOBAL
         }
         new_kwargs.update(kwargs)
+        self._logger.info(f"[CustomGame.__init__] id={id_}, args={args}, kwargs={kwargs}, new_kwargs={new_kwargs}")
         super().__init__(id_, *args, **new_kwargs)
         asyncio.get_event_loop().create_task(self.timeout_hosted_staging())
 

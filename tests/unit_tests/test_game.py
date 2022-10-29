@@ -80,9 +80,7 @@ async def test_validate_game_settings(game: Game, game_add_players):
         ("TeamLock", "unlocked", ValidityState.UNLOCKED_TEAMS)
     ]
     mods = (
-        FeaturedModType.FAF,
-        FeaturedModType.LADDER_1V1,
-        FeaturedModType.EQUILIBRIUM,
+        FeaturedModType.DEFAULT,
         "AnythingReally"
     )
 
@@ -832,8 +830,8 @@ async def test_players_exclude_observers(
 
 async def test_game_outcomes(game: Game, database, players):
     game.state = GameState.LOBBY
-    players.hosting.ratings[RatingType.LADDER_1V1] = Rating(1500, 250)
-    players.joining.ratings[RatingType.LADDER_1V1] = Rating(1500, 250)
+    players.hosting.ratings[RatingType.TEST_LADDER] = Rating(1500, 250)
+    players.joining.ratings[RatingType.TEST_LADDER] = Rating(1500, 250)
     add_connected_players(game, [players.hosting, players.joining])
     await game.launch()
     await game.add_result(players.hosting.id, 0, "victory", 1)
@@ -856,8 +854,8 @@ async def test_game_outcomes(game: Game, database, players):
 
 async def test_game_outcomes_no_results(game: Game, database, players):
     game.state = GameState.LOBBY
-    players.hosting.ratings[RatingType.LADDER_1V1] = Rating(1500, 250)
-    players.joining.ratings[RatingType.LADDER_1V1] = Rating(1500, 250)
+    players.hosting.ratings[RatingType.TEST_LADDER] = Rating(1500, 250)
+    players.joining.ratings[RatingType.TEST_LADDER] = Rating(1500, 250)
     add_connected_players(game, [players.hosting, players.joining])
     await game.launch()
     game.set_player_option(players.hosting.id, "Team", 1)
@@ -875,8 +873,8 @@ async def test_game_outcomes_no_results(game: Game, database, players):
 
 async def test_game_outcomes_conflicting(game: Game, database, players):
     game.state = GameState.LOBBY
-    players.hosting.ratings[RatingType.LADDER_1V1] = Rating(1500, 250)
-    players.joining.ratings[RatingType.LADDER_1V1] = Rating(1500, 250)
+    players.hosting.ratings[RatingType.TEST_LADDER] = Rating(1500, 250)
+    players.joining.ratings[RatingType.TEST_LADDER] = Rating(1500, 250)
     add_connected_players(game, [players.hosting, players.joining])
     await game.launch()
     await game.add_result(players.hosting.id, 0, "victory", 1)

@@ -269,6 +269,9 @@ class GameConnection(GpgNetServerProtocol):
             self.game.rating_type = value
             self.game.rating_type_preferred = value
 
+        elif key == "ReplayDelaySeconds":
+            self.game.replay_delay_seconds = int(value)
+
         elif key == "Title":
             with contextlib.suppress(ValueError):
                 self.game.name = value
@@ -304,7 +307,6 @@ class GameConnection(GpgNetServerProtocol):
         # (gpgnet4ta can't work out for the host who's joined until game actually starts)
         # if not self.is_host():
         #     return
-        self._logger.info("[handle_player_option] player_id={}, command={}, value={}", player_id, command, value)
         self.game.set_player_option(int(player_id), command, value)
         self._mark_dirty()
 

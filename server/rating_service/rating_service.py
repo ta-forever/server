@@ -1,6 +1,6 @@
 import asyncio
 from contextlib import asynccontextmanager
-from typing import Dict, Callable
+from typing import Dict, Callable, Coroutine, Awaitable
 
 import aiocron
 from sqlalchemy import and_, case, func, select
@@ -11,8 +11,6 @@ from server.core import Service
 from server.db import FAFDatabase
 from server.db.models import (
     game_player_stats,
-    global_rating,
-    ladder1v1_rating,
     leaderboard,
     leaderboard_rating,
     leaderboard_rating_journal
@@ -21,7 +19,7 @@ from server.decorators import with_logger
 from server.games.game_results import GameOutcome
 from server.metrics import rating_service_backlog
 from server.player_service import PlayerService
-from server.rating import RatingType, RatingTypeMap
+from server.rating import RatingTypeMap
 
 from .game_rater import GameRater, GameRatingError
 from .typedefs import (
@@ -50,7 +48,7 @@ class RatingService(Service):
 
     def __init__(self, database: FAFDatabase, player_service: PlayerService):
         self._db = database
-        self._player_service = player_service
+        self._on_player_rating_change = player_service.on_player_rating_change
         self._accept_input = False
         self._queue = asyncio.Queue()
         self._task = None
@@ -60,7 +58,8 @@ class RatingService(Service):
     def add_game_rating_callback(self, callback: Callable[[EndedGameInfo,
                                                            Dict[PlayerID, Rating],  # old_ratings
                                                            Dict[PlayerID, Rating],  # new_ratings
-                                                           ], None]) -> None:
+                                                           float    # likelihood of outcome
+                                                           ], Awaitable[None]]) -> None:
         self._game_rating_callbacks += [callback]
 
     async def initialize(self) -> None:
@@ -126,16 +125,16 @@ class RatingService(Service):
 
     async def _rate(self, game_info: EndedGameInfo) -> None:
         old_ratings: Dict[PlayerID, Rating] = await self._get_rating_data(game_info)
-        new_ratings: Dict[PlayerID, Rating] = GameRater.compute_rating(game_info.endedGamePlayerSummary, old_ratings)
+        new_ratings, team_outcome_likelihoods = GameRater.compute_rating(game_info.ended_game_player_summary, old_ratings)
 
         for f in self._game_rating_callbacks:
-            f(game_info, old_ratings, new_ratings)
+            await f(game_info, old_ratings, new_ratings, team_outcome_likelihoods)
 
         await self._persist_rating_changes(game_info, old_ratings, new_ratings)
 
     async def _get_rating_data(self, game_info: EndedGameInfo) -> Dict[PlayerID, Rating]:
         ratings = {}
-        for p in game_info.endedGamePlayerSummary:
+        for p in game_info.ended_game_player_summary:
             ratings[p.player_id] = await self._get_player_rating(
                 p.player_id, game_info.rating_type)
         return ratings
@@ -167,93 +166,7 @@ class RatingService(Service):
             row = await result.fetchone()
 
             if not row:
-                # TODO: Generalize for arbitrary ratings
-                # https://github.com/FAForever/server/issues/727
-                if rating_type == RatingType.TMM_2V2:
-                    return await self._create_tmm_2v2_rating(
-                        conn, player_id
-                    )
-
-                try:
-                    return await self._get_player_legacy_rating(
-                        conn, player_id, rating_type
-                    )
-                except ValueError:
-                    return await self._create_default_rating(
-                        conn, player_id, rating_type
-                    )
-
-        return Rating(row["mean"], row["deviation"])
-
-    async def _create_tmm_2v2_rating(
-        self, conn, player_id: int
-    ) -> Rating:
-        mean, dev = await self._get_player_rating(
-            player_id, RatingType.GLOBAL, conn=conn
-        )
-        if dev < 250:
-            dev = min(dev + 150, 250)
-
-        insertion_sql = leaderboard_rating.insert().values(
-            login_id=player_id,
-            mean=mean,
-            deviation=dev,
-            total_games=0,
-            won_games=0,
-            lost_games=0,
-            drawn_games=0,
-            streak=0,
-            best_streak=0,
-            recent_scores="",
-            leaderboard_id=self._rating_type_ids[RatingType.TMM_2V2],
-        )
-        await conn.execute(insertion_sql)
-
-        return Rating(mean, dev)
-
-    async def _get_player_legacy_rating(
-        self, conn, player_id: int, rating_type: str
-    ) -> Rating:
-        if rating_type == RatingType.GLOBAL:
-            table = global_rating
-            sql = select([table.c.mean, table.c.deviation, table.c.numGames]).where(
-                table.c.id == player_id
-            )
-        elif rating_type == RatingType.LADDER_1V1:
-            table = ladder1v1_rating
-            sql = select(
-                [table.c.mean, table.c.deviation, table.c.numGames, table.c.winGames]
-            ).where(table.c.id == player_id)
-        else:
-            raise ValueError(f"Unknown rating type {rating_type}.")
-
-        result = await conn.execute(sql)
-        row = await result.fetchone()
-
-        if not row:
-            return await self._create_default_rating(
-                conn, player_id, rating_type
-            )
-
-        if rating_type == RatingType.GLOBAL:
-            won_games = int(row["numGames"] / 2)
-        else:
-            won_games = row["winGames"]
-
-        insertion_sql = leaderboard_rating.insert().values(
-            login_id=player_id,
-            mean=row["mean"],
-            deviation=row["deviation"],
-            total_games=row["numGames"],
-            won_games=won_games,
-            lost_games=row["numGames"] - won_games,
-            drawn_games=0,
-            streak=0,
-            best_streak=0,
-            recent_scores="",
-            leaderboard_id=self._rating_type_ids[rating_type],
-        )
-        await conn.execute(insertion_sql)
+                return await self._create_default_rating(conn, player_id, rating_type)
 
         return Rating(row["mean"], row["deviation"])
 
@@ -293,7 +206,7 @@ class RatingService(Service):
         self._logger.debug("Saving rating change stats for game %i", game_info.game_id)
 
         async with self._db.acquire() as conn:
-            for player_info in game_info.endedGamePlayerSummary:
+            for player_info in game_info.ended_game_player_summary:
                 old_rating = old_ratings[player_info.player_id]
                 new_rating = new_ratings[player_info.player_id]
                 self._logger.debug(
@@ -379,10 +292,8 @@ class RatingService(Service):
                 )
                 await conn.execute(rating_update_sql)
 
-                # we have to do this here to keep player service synchronised with DB as much as possible?
-                self.player_service.on_player_rating_change(
+                self._on_player_rating_change(
                     player_info.player_id, game_info.rating_type, new_ratings[player_info.player_id])
-
 
     async def _join_rating_queue(self) -> None:
             """

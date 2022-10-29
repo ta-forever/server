@@ -17,10 +17,10 @@ def test_ratings():
     p.ratings[RatingType.GLOBAL] = Rating(1700, 20)
     assert p.ratings[RatingType.GLOBAL] == (1700, 20)
     assert p.ratings["tmm_2v2"] == (1700, 170)
-    p.ratings[RatingType.LADDER_1V1] = (1200, 20)
-    assert p.ratings[RatingType.LADDER_1V1] == (1200, 20)
-    p.ratings[RatingType.LADDER_1V1] = Rating(1200, 20)
-    assert p.ratings[RatingType.LADDER_1V1] == (1200, 20)
+    p.ratings[RatingType.TEST_LADDER] = (1200, 20)
+    assert p.ratings[RatingType.TEST_LADDER] == (1200, 20)
+    p.ratings[RatingType.TEST_LADDER] = Rating(1200, 20)
+    assert p.ratings[RatingType.TEST_LADDER] == (1200, 20)
     assert p.ratings["Something completely different"] == (1500, 500)
 
 
@@ -30,10 +30,10 @@ def test_faction():
     :return:
     """
     p = Player("Schroedinger2")
-    p.faction = "aeon"
-    assert p.faction == Faction.aeon
-    p.faction = Faction.aeon
-    assert p.faction == Faction.aeon
+    p.faction = "gok"
+    assert p.faction == Faction.gok
+    p.faction = Faction.gok
+    assert p.faction == Faction.gok
 
 
 def test_equality_by_id():
@@ -72,7 +72,7 @@ def test_serialize():
         login="Something",
         ratings={
            RatingType.GLOBAL: (1234, 68),
-           RatingType.LADDER_1V1: (1500, 230),
+           RatingType.TEST_LADDER: (1500, 230),
         },
         clan="TOAST",
         game_count={RatingType.GLOBAL: 542}

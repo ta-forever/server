@@ -12,6 +12,7 @@ name = "pypi"
 
 [packages]
 typing = "*"
+aiofiles = "*"
 aiohttp = "*"
 prometheus_client = "*"
 docopt = "*"
@@ -29,6 +30,7 @@ lxml = "*"
 networkx = "*"
 pygmlparser = "*"
 pathlib = "*"
+scipy = "*"
 
 [dev-packages]
 pytest = "*"
@@ -38,7 +40,7 @@ pytest-asyncio = "==0.12.0"
 mock = "*"
 vulture = "*"
 asynctest = "*"
-hypothesis = "*"
+hypothesis = "<=6.47.1"
 pdoc3 = "*"
 
 [requires]

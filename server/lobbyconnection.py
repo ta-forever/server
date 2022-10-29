@@ -231,11 +231,8 @@ class LobbyConnection:
 
             maps = []
             campaigns = [
-                "FA Campaign",
-                "Aeon Vanilla Campaign",
-                "Cybran Vanilla Campaign",
-                "UEF Vanilla Campaign",
-                "Custom Missions"
+                "Arm Campaign",
+                "Core Campaign"
             ]
             async for row in result:
                 json_to_send = {
@@ -940,7 +937,7 @@ class LobbyConnection:
         if not title.isascii():
             raise ClientError("Title must contain only ascii characters.")
 
-        mod = message.get("mod") or FeaturedModType.FAF
+        mod = message.get("mod") or FeaturedModType.DEFAULT
         mod_version = message.get("mod_version")
         mapname = message.get("mapname") or "scmp_007"
         password = message.get("password")

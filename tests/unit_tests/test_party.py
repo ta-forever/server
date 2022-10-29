@@ -78,11 +78,11 @@ def test_serialize(party, players):
         "members": [
             {
                 "player": players.hosting.id,
-                "factions": ["uef", "aeon", "cybran", "seraphim"]
+                "factions": ["arm", "core", "gok"]
             },
             {
                 "player": players.joining.id,
-                "factions": ["uef", "aeon", "cybran", "seraphim"]
+                "factions": ["arm", "core", "gok"]
             }
         ]
     }

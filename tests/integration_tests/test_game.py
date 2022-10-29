@@ -74,7 +74,7 @@ async def queue_player_for_matchmaking(user, lobby_server, queue_name):
     await proto.send_message({
         "command": "game_matchmaking",
         "state": "start",
-        "faction": "uef",
+        "faction": "core",
         "queue_name": queue_name
     })
     await read_until_command(

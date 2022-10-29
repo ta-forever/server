@@ -122,8 +122,8 @@ def add_players_with_rating(player_factory, game, ratings, teams):
         )
         rating_service.set_mock_rating(
             player.id,
-            RatingType.LADDER_1V1,
-            Rating(*player.ratings[RatingType.LADDER_1V1]),
+            RatingType.TEST_LADDER,
+            Rating(*player.ratings[RatingType.TEST_LADDER]),
         )
         player._mock_team = team
         game.set_player_option(player.id, "Team", player._mock_team)
@@ -205,7 +205,7 @@ async def test_on_game_end_ladder_ratings_(ladder_game, players):
     await rating_service._join_rating_queue()
 
     results = get_persisted_results(rating_service)
-    assert results.rating_type is RatingType.LADDER_1V1
+    assert results.rating_type is RatingType.TEST_LADDER
     assert players.hosting.id in results.ratings
     assert players.joining.id in results.ratings
     assert results.outcomes[players.hosting.id] is GameOutcome.VICTORY
@@ -231,7 +231,7 @@ async def test_on_game_end_ladder_ratings_without_score_override(
     await rating_service._join_rating_queue()
 
     results = get_persisted_results(rating_service)
-    assert results.rating_type is RatingType.LADDER_1V1
+    assert results.rating_type is RatingType.TEST_LADDER
     assert players.hosting.id in results.ratings
     assert players.joining.id in results.ratings
     assert results.outcomes[players.hosting.id] is GameOutcome.VICTORY
@@ -257,7 +257,7 @@ async def test_on_game_end_ladder_ratings_uses_score_override(
     await rating_service._join_rating_queue()
 
     results = get_persisted_results(rating_service)
-    assert results.rating_type is RatingType.LADDER_1V1
+    assert results.rating_type is RatingType.TEST_LADDER
     assert players.hosting.id in results.ratings
     assert players.joining.id in results.ratings
     assert results.outcomes[players.hosting.id] is GameOutcome.VICTORY
@@ -283,7 +283,7 @@ async def test_on_game_end_ladder_ratings_score_override_draw(
     await rating_service._join_rating_queue()
 
     results = get_persisted_results(rating_service)
-    assert results.rating_type is RatingType.LADDER_1V1
+    assert results.rating_type is RatingType.TEST_LADDER
     assert players.hosting.id in results.ratings
     assert players.joining.id in results.ratings
     assert results.outcomes[players.hosting.id] is GameOutcome.DRAW

@@ -60,11 +60,11 @@ async def test_invite_party_workflow(lobby_server, party_service):
         "owner": test_id,
         "members": [
             {
-                "factions": ["uef", "aeon", "cybran", "seraphim"],
+                "factions": ["arm", "core", "gok"],
                 "player": test_id,
             },
             {
-                "factions": ["uef", "aeon", "cybran", "seraphim"],
+                "factions": ["arm", "core", "gok"],
                 "player": rhiza_id,
             }
         ]
@@ -72,7 +72,7 @@ async def test_invite_party_workflow(lobby_server, party_service):
     # 3. Player sets factions
     await proto.send_message({
         "command": "set_party_factions",
-        "factions": ["uef"]
+        "factions": ["core"]
     })
     msg1 = await read_until_command(proto, "update_party")
     msg2 = await read_until_command(proto2, "update_party")
@@ -82,11 +82,11 @@ async def test_invite_party_workflow(lobby_server, party_service):
         "owner": test_id,
         "members": [
             {
-                "factions": ["uef"],
+                "factions": ["core"],
                 "player": test_id,
             },
             {
-                "factions": ["uef", "aeon", "cybran", "seraphim"],
+                "factions": ["arm", "core", "gok"],
                 "player": rhiza_id,
             }
         ]
@@ -105,7 +105,7 @@ async def test_invite_party_workflow(lobby_server, party_service):
         "owner": test_id,
         "members": [
             {
-                "factions": ["uef"],
+                "factions": ["core"],
                 "player": test_id,
             }
         ]
@@ -161,7 +161,7 @@ async def test_player_switches_parties(lobby_server):
     # 3. Player sets factions
     await proto2.send_message({
         "command": "set_party_factions",
-        "factions": ["uef"]
+        "factions": ["core"]
     })
     msg1 = await read_until_command(proto, "update_party")
     msg2 = await read_until_command(proto2, "update_party")
@@ -171,11 +171,11 @@ async def test_player_switches_parties(lobby_server):
         "owner": test_id,
         "members": [
             {
-                "factions": ["uef", "aeon", "cybran", "seraphim"],
+                "factions": ["arm", "core", "gok"],
                 "player": test_id,
             },
             {
-                "factions": ["uef"],
+                "factions": ["core"],
                 "player": rhiza_id,
             }
         ]
@@ -195,7 +195,7 @@ async def test_player_switches_parties(lobby_server):
         "owner": test_id,
         "members": [
             {
-                "factions": ["uef", "aeon", "cybran", "seraphim"],
+                "factions": ["arm", "core", "gok"],
                 "player": test_id,
             }
         ]
@@ -209,11 +209,11 @@ async def test_player_switches_parties(lobby_server):
         "owner": test_2_id,
         "members": [
             {
-                "factions": ["uef", "aeon", "cybran", "seraphim"],
+                "factions": ["arm", "core", "gok"],
                 "player": test_2_id,
             },
             {
-                "factions": ["uef"],
+                "factions": ["core"],
                 "player": rhiza_id,
             }
         ]
@@ -341,7 +341,7 @@ async def test_party_while_queuing(lobby_server):
     await proto.send_message({
         "command": "game_matchmaking",
         "state": "start",
-        "faction": "uef"
+        "faction": "core"
     })
     await read_until_command(proto, "search_info")
 
@@ -417,7 +417,7 @@ async def test_set_party_factions_duplicate(lobby_server):
 
     await proto.send_message({
         "command": "set_party_factions",
-        "factions": ["uef", "uef", "uef"]
+        "factions": ["core", "core", "core"]
     })
 
     msg = await read_until_command(proto, "update_party")
@@ -426,7 +426,7 @@ async def test_set_party_factions_duplicate(lobby_server):
         "owner": test_id,
         "members": [
             {
-                "factions": ["uef"],
+                "factions": ["core"],
                 "player": test_id,
             }
         ]

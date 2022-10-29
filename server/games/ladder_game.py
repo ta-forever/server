@@ -22,11 +22,12 @@ class LadderGame(Game):
 
     def __init__(self, id_, *args, **kwargs):
         new_kwargs = {
-            "game_mode": FeaturedModType.LADDER_1V1,
-            "rating_type": RatingType.LADDER_1V1,
+            "game_mode": FeaturedModType.DEFAULT,
+            "rating_type": RatingType.TEST_LADDER,
             "max_players": 2,
         }
         new_kwargs.update(kwargs)
+        self._logger.info(f"[LadderGame.__init__] id={id_}, args={args}, kwargs={kwargs}, new_kwargs={new_kwargs}")
         super().__init__(id_, *args, **new_kwargs)
         asyncio.get_event_loop().create_task(self.timeout_hosted_battleroom())
 

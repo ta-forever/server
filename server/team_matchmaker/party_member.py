@@ -9,10 +9,9 @@ class PartyMember:
     def __init__(self, player: Player):
         self.player = player
         self.factions = [
-            Faction.uef,
-            Faction.aeon,
-            Faction.cybran,
-            Faction.seraphim
+            Faction.arm,
+            Faction.core,
+            Faction.gok
         ]
 
     def set_player_faction(self) -> None:

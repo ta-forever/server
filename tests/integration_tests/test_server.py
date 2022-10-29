@@ -106,7 +106,7 @@ async def test_info_broadcast_authenticated(lobby_server):
         "command": "game_matchmaking",
         "state": "start",
         "mod": "ladder1v1",
-        "faction": "uef"
+        "faction": "core"
     })
     # Will timeout if the message is never received
     await read_until_command(proto2, "matchmaker_info")
@@ -345,7 +345,7 @@ async def test_play_game_while_queueing(lobby_server):
     await proto.send_message({
         "command": "game_matchmaking",
         "state": "start",
-        "faction": "uef"
+        "faction": "core"
     })
 
     await proto.send_message({"command": "game_host"})
@@ -512,7 +512,7 @@ async def test_avatar_select_not_owned(lobby_server, database):
     await proto.send_message({
         "command": "avatar",
         "action": "select",
-        "avatar": "https://content.faforever.com/faf/avatars/UEF.png"
+        "avatar": "https://content.faforever.com/faf/avatars/CORE.png"
     })
     with pytest.raises(asyncio.TimeoutError):
         await read_until_command(proto, "player_info", timeout=10)

@@ -1,6 +1,7 @@
 from collections import namedtuple
+from dataclasses import dataclass
 from enum import Enum, unique
-from typing import Any, Dict, List, NamedTuple, Optional, Set
+from typing import Any, Dict, List, NamedTuple, Optional, Set, Union
 
 from server.factions import Faction
 from server.games.game_results import GameOutcome
@@ -94,12 +95,7 @@ class FeaturedModType():
     """
     String constants for featured mod technical_name
     """
-
-    COOP = "coop"
-    EQUILIBRIUM = "equilibrium"
-    FAF = "faf"
-    FAFBETA = "fafbeta"
-    LADDER_1V1 = "ladder1v1"
+    DEFAULT = "tacc"
 
 
 class BasicGameInfo(NamedTuple):
@@ -155,13 +151,13 @@ class EndedGameInfo(NamedTuple):
     game_id: int
     rating_type: Optional[str]
     map_id: int
-    map_name: str
+    map_name: Union[str, None]
     game_mode: str
     galactic_war_planet_name: str
     mods: List[int]
     commander_kills: Dict[str, int]
     validity: ValidityState
-    endedGamePlayerSummary: List[EndedGamePlayerSummary]
+    ended_game_player_summary: List[EndedGamePlayerSummary]
 
     @classmethod
     def from_basic(
@@ -208,9 +204,16 @@ class EndedGameInfo(NamedTuple):
             "sim_mod_ids": self.mods,
             "commander_kills": self.commander_kills,
             "validity": self.validity.name,
-            "endedGamePlayerSummary": [player_data.to_dict()
-                                       for player_data in self.endedGamePlayerSummary]
+            "ended_game_player_summary": [player_data.to_dict()
+                                       for player_data in self.ended_game_player_summary]
         }
+
+
+@dataclass
+class OutcomeLikelihoods:
+    pwin: float
+    pdraw: float
+    plose: float
 
 
 class _FATrue(object):

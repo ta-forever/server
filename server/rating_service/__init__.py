@@ -1,4 +1,3 @@
 from .rating_service import RatingService
-from .typedefs import GameRatingSummary
 
-__all__ = ("RatingService", "GameRatingSummary")
+__all__ = ("RatingService")

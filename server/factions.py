@@ -15,8 +15,16 @@ class Faction(IntEnum):
     @staticmethod
     def from_value(value: Union[str, int]) -> "Faction":
         if isinstance(value, str):
-            return Faction.from_string(value)
+            return Faction.from_string(value.lower())
         elif isinstance(value, int):
             return Faction(value)
 
         raise TypeError(f"Unsupported faction type {type(value)}!")
+
+    @property
+    def capitalized(self):
+        return {
+            Faction.arm: "Arm",
+            Faction.core: "Core",
+            Faction.gok: "GoK"
+        }[self._value_]

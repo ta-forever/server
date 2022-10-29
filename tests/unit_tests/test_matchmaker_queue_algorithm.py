@@ -562,8 +562,8 @@ def test_make_teams_single_2v2_large_pool(player_factory):
 
     for search in matched:
         p1, p2 = search.players
-        p1_mean, _ = p1.ratings[RatingType.LADDER_1V1]
-        p2_mean, _ = p2.ratings[RatingType.LADDER_1V1]
+        p1_mean, _ = p1.ratings[RatingType.TEST_LADDER]
+        p2_mean, _ = p2.ratings[RatingType.TEST_LADDER]
         #
         assert math.fabs(p1_mean - p2_mean) <= 100
 
@@ -595,11 +595,11 @@ def test_make_teams_single_2v2_small_pool(player_factory):
         for search in matched:
             p1, p2 = search.players
             # Order doesn't matter
-            if p1.ratings[RatingType.LADDER_1V1][0] > 900:
-                assert p2.ratings[RatingType.LADDER_1V1][0] < 600
+            if p1.ratings[RatingType.TEST_LADDER][0] > 900:
+                assert p2.ratings[RatingType.TEST_LADDER][0] < 600
             else:
-                assert p1.ratings[RatingType.LADDER_1V1][0] < 600
-                assert p2.ratings[RatingType.LADDER_1V1][0] > 900
+                assert p1.ratings[RatingType.TEST_LADDER][0] < 600
+                assert p2.ratings[RatingType.TEST_LADDER][0] > 900
 
 
 def test_make_buckets_performance(bench, player_factory):

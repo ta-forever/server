@@ -25,8 +25,8 @@ class Search:
     def __init__(
         self,
         players: List[Player],
+        rating_type: str = RatingType.TEST_LADDER,
         start_time: Optional[float] = None,
-        rating_type: str = RatingType.LADDER_1V1,
         on_matched: OnMatchedCallback = lambda _1, _2: None
     ):
         """

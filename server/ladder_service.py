@@ -1,7 +1,6 @@
 import asyncio
 import json
 import random
-import re
 from collections import defaultdict
 from typing import Dict, List, Optional, Set, Tuple
 

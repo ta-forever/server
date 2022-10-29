@@ -35,7 +35,7 @@ async def test_game_launch_message(lobby_server):
     assert msg1["mapname"] == msg2["mapname"]
     assert msg1["team"] == 2
     assert msg2["team"] == 3
-    assert msg1["faction"] == msg2["faction"] == 1  # faction 1 is uef
+    assert msg1["faction"] == msg2["faction"] == 1  # faction 1 is core
     assert msg1["expected_players"] == msg2["expected_players"] == 2
     assert msg1["map_position"] == 1
     assert msg2["map_position"] == 2
@@ -157,7 +157,7 @@ async def test_game_matchmaking_timeout(lobby_server, game_service):
     await proto1.send_message({
         "command": "game_matchmaking",
         "state": "start",
-        "faction": "uef"
+        "faction": "core"
     })
     await read_until_command(proto1, "search_info", state="start", timeout=5)
 
@@ -165,7 +165,7 @@ async def test_game_matchmaking_timeout(lobby_server, game_service):
     await proto2.send_message({
         "command": "game_matchmaking",
         "state": "start",
-        "faction": "uef"
+        "faction": "core"
     })
     with pytest.raises(asyncio.TimeoutError):
         await read_until_command(proto2, "search_info", state="start", timeout=5)
@@ -205,7 +205,7 @@ async def test_game_matchmaking_timeout_guest(lobby_server, game_service):
     await proto1.send_message({
         "command": "game_matchmaking",
         "state": "start",
-        "faction": "uef"
+        "faction": "core"
     })
     await read_until_command(proto1, "search_info", state="start", timeout=5)
 
@@ -213,7 +213,7 @@ async def test_game_matchmaking_timeout_guest(lobby_server, game_service):
     await proto2.send_message({
         "command": "game_matchmaking",
         "state": "start",
-        "faction": "uef"
+        "faction": "core"
     })
     with pytest.raises(asyncio.TimeoutError):
         await read_until_command(proto2, "search_info", state="start", timeout=5)
@@ -411,7 +411,7 @@ async def test_matchmaker_info_message_on_cancel(lobby_server):
     await proto.send_message({
         "command": "game_matchmaking",
         "state": "start",
-        "faction": "uef"
+        "faction": "core"
     })
 
     async def read_update_msg():
@@ -455,7 +455,7 @@ async def test_search_info_messages(lobby_server):
     await proto.send_message({
         "command": "game_matchmaking",
         "state": "start",
-        "faction": "uef"
+        "faction": "core"
     })
     msg = await read_until_command(proto, "search_info")
     assert msg == {

@@ -516,32 +516,32 @@ async def test_coop_list(mocker, lobbyconnection):
         },
         {
             "command": "coop_info",
-            "name": "Aeon Campaign map",
-            "description": "A map from the Aeon campaign",
+            "name": "GoK Campaign map",
+            "description": "A map from the GoK campaign",
             "filename": "maps/scmp_coop_124.v0000.zip",
             "featured_mod": "coop",
-            "type": "Aeon Vanilla Campaign"
+            "type": "GoK Vanilla Campaign"
         },
         {
             "command": "coop_info",
-            "name": "Cybran Campaign map",
-            "description": "A map from the Cybran campaign",
+            "name": "Arm Campaign map",
+            "description": "A map from the Arm campaign",
             "filename": "maps/scmp_coop_125.v0001.zip",
             "featured_mod": "coop",
-            "type": "Cybran Vanilla Campaign"
+            "type": "Arm Vanilla Campaign"
         },
         {
             "command": "coop_info",
-            "name": "UEF Campaign map",
-            "description": "A map from the UEF campaign",
+            "name": "CORE Campaign map",
+            "description": "A map from the CORE campaign",
             "filename": "maps/scmp_coop_126.v0099.zip",
             "featured_mod": "coop",
-            "type": "UEF Vanilla Campaign"
+            "type": "CORE Vanilla Campaign"
         },
         {
             "command": "coop_info",
             "name": "Prothyon - 16",
-            "description": "Prothyon - 16 is a secret UEF facility...",
+            "description": "Prothyon - 16 is a secret CORE facility...",
             "filename": "maps/prothyon16.v0005.zip",
             "featured_mod": "coop",
             "type": "Custom Missions"
@@ -615,7 +615,7 @@ async def test_command_avatar_list(mocker, lobbyconnection: LobbyConnection):
 
     lobbyconnection.send.assert_any_call({
         "command": "avatar",
-        "avatarlist": [{"url": "https://content.faforever.com/faf/avatars/qai2.png", "tooltip": "QAI"}, {"url": "https://content.faforever.com/faf/avatars/UEF.png", "tooltip": "UEF"}]
+        "avatarlist": [{"url": "https://content.faforever.com/faf/avatars/qai2.png", "tooltip": "QAI"}, {"url": "https://content.faforever.com/faf/avatars/CORE.png", "tooltip": "CORE"}]
     })
 
 
@@ -836,7 +836,7 @@ async def test_game_connection_not_restored_if_game_state_prohibits(
     })
 
 
-@pytest.mark.parametrize("game_state", [GameState.LIVE, GameState.LOBBY])
+@pytest.mark.parametrize("game_state", [GameState.LIVE, GameState.BATTLEROOM])
 async def test_game_connection_restored_if_game_exists(
     lobbyconnection: LobbyConnection,
     game_service: GameService,
@@ -943,7 +943,7 @@ async def test_command_game_matchmaking_not_party_owner(
     await lobbyconnection.on_message_received({
         "command": "game_matchmaking",
         "state": "start",
-        "faction": "seraphim"
+        "faction": "gok"
     })
 
     lobbyconnection.ladder_service.start_search.assert_not_called()
@@ -962,7 +962,7 @@ async def test_command_matchmaker_info(
     queue_factory,
     player_factory
 ):
-    queue = queue_factory("test", rating_type=RatingType.LADDER_1V1)
+    queue = queue_factory("test", rating_type=RatingType.TEST_LADDER)
     queue.timer.next_queue_pop = 1_562_000_000
     queue.push(Search([
         player_factory(player_id=1, ladder_rating=(2000, 100), ladder_games=200),

@@ -85,7 +85,7 @@ async def test_game_result_draw_bug(laddergame, players):
     assert not laddergame.is_winner(players.joining)
 
     results = await laddergame.resolve_game_results()
-    for summary in results.team_summaries:
+    for summary in results.ended_game_player_summary:
         assert summary.outcome is GameOutcome.DRAW
 
 
@@ -94,8 +94,8 @@ async def test_rate_game(laddergame: LadderGame, database, game_add_players):
     players = game_add_players(laddergame, 2)
     laddergame.set_player_option(players[0].id, "Team", 2)
     laddergame.set_player_option(players[1].id, "Team", 3)
-    player_1_old_mean = players[0].ratings[RatingType.LADDER_1V1][0]
-    player_2_old_mean = players[1].ratings[RatingType.LADDER_1V1][0]
+    player_1_old_mean = players[0].ratings[RatingType.TEST_LADDER][0]
+    player_2_old_mean = players[1].ratings[RatingType.TEST_LADDER][0]
 
     # As saved in test-data.sql:
     before_mean = {1: 2000, 2: 1500}
@@ -110,8 +110,8 @@ async def test_rate_game(laddergame: LadderGame, database, game_add_players):
     await laddergame.game_service._rating_service._join_rating_queue()
 
     assert laddergame.validity is ValidityState.VALID
-    assert players[0].ratings[RatingType.LADDER_1V1][0] > player_1_old_mean
-    assert players[1].ratings[RatingType.LADDER_1V1][0] < player_2_old_mean
+    assert players[0].ratings[RatingType.TEST_LADDER][0] > player_1_old_mean
+    assert players[1].ratings[RatingType.TEST_LADDER][0] < player_2_old_mean
 
     async with database.acquire() as conn:
         result = await conn.execute("SELECT mean, deviation, after_mean, after_deviation FROM game_player_stats WHERE gameid = %s", laddergame.id)

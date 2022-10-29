@@ -6,7 +6,7 @@ import asynctest
 import pytest
 from asynctest import CoroutineMock
 
-from server import GameStatsService
+from server import GameStatsService, PlayerService
 from server.game_service import GameService
 from server.gameconnection import GameConnection, GameConnectionState
 from server.games import Game
@@ -50,9 +50,10 @@ async def ladder_service(
     mocker,
     database,
     game_service: GameService,
+    player_service: PlayerService
 ):
     mocker.patch("server.matchmaker.pop_timer.config.QUEUE_POP_TIME_MAX", 1)
-    ladder_service = LadderService(database, game_service)
+    ladder_service = LadderService(database, game_service, player_service)
     await ladder_service.initialize()
 
     yield ladder_service
