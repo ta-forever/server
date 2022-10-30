@@ -170,8 +170,7 @@ class GalacticWarService(Service):
 
     def _get_next_scenario(self) -> Path:
         scenario_root = Path(config.GALACTIC_WAR_SCENARIO_PATH)
-        scenario_files = [p for p in scenario_root.glob("*.gml")]
-        scenario_files.sort(key=str)
+        scenario_files = sorted(filter(lambda path: path.suffix in [".gml", ".json"], scenario_root.glob('*')))
         idx_scenario = [i for i, file in enumerate(scenario_files) if file == scenario_root / self._state.get_label()]
         if len(idx_scenario) == 0:
             return scenario_root / config.GALACTIC_WAR_INITIAL_SCENARIO
