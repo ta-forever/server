@@ -144,6 +144,7 @@ game_stats = Table(
     Column("mapId",     Integer,        ForeignKey("map_version.id")),
     Column("gameName",  String(128),    nullable=False),
     Column("validity",  Integer,        nullable=False),
+    Column("replay_hidden", Boolean,    nullable=False)
 )
 
 global_rating = Table(

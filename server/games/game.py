@@ -864,6 +864,7 @@ class Game():
                     mapId=self.map_id,
                     gameName=self.name,
                     validity=self.validity.value,
+                    replay_hidden=self.replay_delay_seconds < 0     # hide the replay is user requested no live replay
                 )
             )
 
