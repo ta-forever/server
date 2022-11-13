@@ -17,7 +17,7 @@ from typing import Dict, List
 
 from .galactic_war.planet import Planet
 from .games.typedefs import EndedGameInfo, OutcomeLikelihoods
-from .rating_service.typedefs import PlayerID, TeamID
+from .rating_service.typedefs import PlayerID, TeamID, RankedRating
 
 
 @with_logger
@@ -93,7 +93,7 @@ class GalacticWarService(Service):
         self._dirty = dirty
 
     async def on_game_rating(self, game_info: EndedGameInfo,
-                             old_ratings: Dict[PlayerID, Rating],
+                             old_ratings: Dict[PlayerID, RankedRating],
                              new_ratings: Dict[PlayerID, Rating],
                              team_outcome_likelihoods: Dict[TeamID, OutcomeLikelihoods]):
 

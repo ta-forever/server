@@ -14,6 +14,7 @@ from server.games.game_results import GameOutcome
 from server.games.typedefs import EndedGameInfo, ValidityState, EndedGamePlayerSummary, OutcomeLikelihoods
 from server.matchmaker import MatchmakerQueue, MapPool
 from server.rating import RatingType
+from server.rating_service.typedefs import RankedRating
 from server.types import Map
 
 pytestmark = pytest.mark.asyncio
@@ -277,10 +278,10 @@ async def test_validate_bad_validity_state(galactic_war_service, game_info):
 async def test_process_game_still_contested(galactic_war_service, game_info):
     service = galactic_war_service
     old_ratings = {
-        1: Rating(1000., 10.),
-        2: Rating(1000., 10.),
-        3: Rating(1000., 10.),
-        4: Rating(1000., 10.)
+        1: RankedRating(1000., 10., 1, 100),
+        2: RankedRating(1000., 10., 4, 100),
+        3: RankedRating(1000., 10., 2, 100),
+        4: RankedRating(1000., 10., 3, 100)
     }
     new_ratings = {
         1: Rating(1001., 10.),
@@ -311,10 +312,10 @@ async def test_process_game_still_contested(galactic_war_service, game_info):
 async def test_process_game_captured(galactic_war_service, game_info):
     service = galactic_war_service
     old_ratings = {
-        1: Rating(1000., 10.),
-        2: Rating(1000., 10.),
-        3: Rating(1000., 10.),
-        4: Rating(1000., 10.)
+        1: RankedRating(100., 10., 98, 100),
+        2: RankedRating(10., 10., 99, 100),
+        3: RankedRating(2000., 10., 0, 100),
+        4: RankedRating(1900., 10., 1, 100)
     }
     new_ratings = {
         1: Rating(1100., 10.),
@@ -393,10 +394,10 @@ async def test_end_scenario(galactic_war_service):
 async def test_periodic_update(periodic_update_galactic_war_service, game_info):
     service = periodic_update_galactic_war_service
     old_ratings = {
-        1: Rating(1000., 10.),
-        2: Rating(1000., 10.),
-        3: Rating(1000., 10.),
-        4: Rating(1000., 10.)
+        1: RankedRating(100., 10., 98, 100),
+        2: RankedRating(10., 10., 99, 100),
+        3: RankedRating(2000., 10., 0, 100),
+        4: RankedRating(1900., 10., 1, 100)
     }
     new_ratings = {
         1: Rating(1100., 10.),
@@ -509,12 +510,12 @@ async def test_bugfix1(periodic_update_galactic_war_service):
     )
 
     old_ratings = {
-        1: trueskill.Rating(mu=1744.170, sigma=185.524),
-        2: trueskill.Rating(mu=1255.830, sigma=185.524)
+        1: RankedRating(1744.170, 185.524, 1, 10),
+        2: RankedRating(1255.830, 185.524, 2, 10)
     }
     new_ratings = {
-        1: trueskill.Rating(mu=1766.175, sigma=179.436),
-        2: trueskill.Rating(mu=1233.825, sigma=179.436)
+        1: Rating(1766.175, 179.436),
+        2: Rating(1233.825, 179.436)
     }
     team_outcome_likelihoods = {
         0: OutcomeLikelihoods(0.01, 0., 0.99),

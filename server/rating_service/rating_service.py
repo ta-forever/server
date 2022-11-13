@@ -1,6 +1,6 @@
 import asyncio
 from contextlib import asynccontextmanager
-from typing import Dict, Callable, Coroutine, Awaitable
+from typing import Dict, Callable, Coroutine, Awaitable, List, Set
 
 import aiocron
 from sqlalchemy import and_, case, func, select
@@ -24,9 +24,9 @@ from server.rating import RatingTypeMap
 from .game_rater import GameRater, GameRatingError
 from .typedefs import (
     PlayerID,
-    ServiceNotReadyError,
+    ServiceNotReadyError, RankedRating, TeamID,
 )
-from ..games.typedefs import EndedGameInfo
+from ..games.typedefs import EndedGameInfo, OutcomeLikelihoods
 
 
 @asynccontextmanager
@@ -56,9 +56,9 @@ class RatingService(Service):
         self._game_rating_callbacks = []
 
     def add_game_rating_callback(self, callback: Callable[[EndedGameInfo,
-                                                           Dict[PlayerID, Rating],  # old_ratings
-                                                           Dict[PlayerID, Rating],  # new_ratings
-                                                           float    # likelihood of outcome
+                                                           Dict[PlayerID, RankedRating],        # old_ratings
+                                                           Dict[PlayerID, Rating],              # new_ratings
+                                                           Dict[TeamID, OutcomeLikelihoods]     # likelihood of outcome
                                                            ], Awaitable[None]]) -> None:
         self._game_rating_callbacks += [callback]
 
@@ -124,24 +124,17 @@ class RatingService(Service):
         self._logger.debug("RatingService stopped.")
 
     async def _rate(self, game_info: EndedGameInfo) -> None:
-        old_ratings: Dict[PlayerID, Rating] = await self._get_rating_data(game_info)
+        player_id_set = set([player_info.player_id for player_info in game_info.ended_game_player_summary])
+        _old_ratings: Dict[PlayerID, RankedRating] = await self._get_player_ratings(player_id_set, game_info.rating_type)
+        old_ratings: Dict[PlayerID, Rating] = {pid: r.rating for pid, r in _old_ratings.items()}
         new_ratings, team_outcome_likelihoods = GameRater.compute_rating(game_info.ended_game_player_summary, old_ratings)
 
         for f in self._game_rating_callbacks:
-            await f(game_info, old_ratings, new_ratings, team_outcome_likelihoods)
+            await f(game_info, _old_ratings, new_ratings, team_outcome_likelihoods)
 
         await self._persist_rating_changes(game_info, old_ratings, new_ratings)
 
-    async def _get_rating_data(self, game_info: EndedGameInfo) -> Dict[PlayerID, Rating]:
-        ratings = {}
-        for p in game_info.ended_game_player_summary:
-            ratings[p.player_id] = await self._get_player_rating(
-                p.player_id, game_info.rating_type)
-        return ratings
-
-    async def _get_player_rating(
-        self, player_id: int, rating_type: str, conn=None
-    ) -> Rating:
+    async def _get_player_ratings(self, player_ids: Set[int], rating_type: str, conn=None) -> Dict[PlayerID, RankedRating]:
         if self._rating_type_ids is None:
             self._logger.warning(
                 "Tried to fetch player data before initializing service."
@@ -154,21 +147,23 @@ class RatingService(Service):
 
         async with acquire_or_default(self._db, conn) as conn:
             sql = select(
-                [leaderboard_rating.c.mean, leaderboard_rating.c.deviation]
-            ).where(
-                and_(
-                    leaderboard_rating.c.login_id == player_id,
-                    leaderboard_rating.c.leaderboard_id == rating_type_id,
-                )
-            )
+                [leaderboard_rating.c.login_id, leaderboard_rating.c.mean, leaderboard_rating.c.deviation, leaderboard_rating.c.rating]
+            ).where(leaderboard_rating.c.leaderboard_id == rating_type_id)
 
             result = await conn.execute(sql)
-            row = await result.fetchone()
+            rows = await result.fetchall()
 
-            if not row:
-                return await self._create_default_rating(conn, player_id, rating_type)
+            ratings = [(row["login_id"], row["mean"], row["deviation"], row["rating"]) for row in rows]
+            retrieved_player_ids = set([row["login_id"] for row in rows])
+            for pid in player_ids:
+                if pid not in retrieved_player_ids:
+                    new_rating = await self._create_default_rating(conn, pid, rating_type)
+                    ratings += [(pid, new_rating.mu, new_rating.sigma, new_rating.mu-3.*new_rating.sigma)]
 
-        return Rating(row["mean"], row["deviation"])
+        sorted_ratings = sorted(ratings, key=lambda x: x[3], reverse=True)
+        return {r[0]: RankedRating(r[1], r[2], rank, len(sorted_ratings))
+                for rank, r in enumerate(sorted_ratings)
+                if r[0] in player_ids}
 
     async def _create_default_rating(
         self, conn, player_id: int, rating_type: str

@@ -22,6 +22,7 @@ from server.rating_service.rating_service import (
     RatingService,
     ServiceNotReadyError
 )
+from server.rating_service.typedefs import RankedRating
 
 pytestmark = pytest.mark.asyncio
 
@@ -142,7 +143,7 @@ async def test_enqueue_uninitialized(uninitialized_service, game_info):
 async def test_get_rating_uninitialized(uninitialized_service):
     service = uninitialized_service
     with pytest.raises(ServiceNotReadyError):
-        await service._get_player_rating(1, RatingType.GLOBAL)
+        await service._get_player_ratings({1}, RatingType.GLOBAL)
 
 
 async def test_load_rating_type_ids(uninitialized_service):
@@ -159,17 +160,17 @@ async def test_load_rating_type_ids(uninitialized_service):
 async def test_get_player_rating_global(semiinitialized_service):
     service = semiinitialized_service
     player_id = 50
-    true_rating = Rating(1200, 250)
-    rating = await service._get_player_rating(player_id, RatingType.GLOBAL)
-    assert rating == true_rating
+    true_rating = RankedRating(1200, 250, 3, 7)
+    rating = await service._get_player_ratings({player_id}, RatingType.GLOBAL)
+    assert rating[50] == true_rating
 
 
 async def test_get_player_rating_ladder(semiinitialized_service):
     service = semiinitialized_service
     player_id = 50
-    true_rating = Rating(1300, 400)
-    rating = await service._get_player_rating(player_id, RatingType.TEST_LADDER)
-    assert rating == true_rating
+    true_rating = RankedRating(1300, 400, 3, 7)
+    rating = await service._get_player_ratings({player_id}, RatingType.TEST_LADDER)
+    assert rating[50] == true_rating
 
 
 async def get_all_ratings(db: FAFDatabase, player_id: int):
@@ -196,7 +197,7 @@ async def test_get_new_player_rating_created(semiinitialized_service):
     db_ratings = await get_all_ratings(service._db, player_id)
     assert len(db_ratings) == 0  # Rating does not exist yet
 
-    await service._get_player_rating(player_id, rating_type)
+    await service._get_player_ratings({player_id}, rating_type)
 
     db_ratings = await get_all_ratings(service._db, player_id)
     assert len(db_ratings) == 1  # Rating has been created
@@ -209,11 +210,11 @@ async def test_get_rating_data(semiinitialized_service):
     game_id = 1
 
     player1_id = 1
-    player1_db_rating = Rating(2000, 125)
+    player1_db_rating = RankedRating(2000, 125, 0, 7)
     player1_outcome = GameOutcome.VICTORY
 
     player2_id = 2
-    player2_db_rating = Rating(1500, 75)
+    player2_db_rating = RankedRating(1500, 75, 2, 7)
     player2_outcome = GameOutcome.DEFEAT
 
     summary = EndedGameInfo(
@@ -226,7 +227,7 @@ async def test_get_rating_data(semiinitialized_service):
         ],
     )
 
-    rating_data = await service._get_rating_data(summary)
+    rating_data = await service._get_player_ratings({player1_id, player2_id}, summary.rating_type)
     assert rating_data[player1_id] == player1_db_rating
     assert rating_data[player2_id] == player2_db_rating
 
@@ -326,32 +327,32 @@ async def test_game_update_empty_resultset(rating_service):
 
 async def test_game_rating_callbacks(rating_service, game_info):
     service = rating_service
-    service._get_rating_data = CoroutineMock(return_value={
-        1: Rating(1234., 123.),
-        2: Rating(1212., 50.)
+    service._get_player_ratings = CoroutineMock(return_value={
+        1: RankedRating(1234., 123., 1, 10),
+        2: RankedRating(1212., 50., 2, 10)
     })
 
     class Consumer(object):
         def __init__(self):
             self.rating_results = None
 
-        async def set_rating_results(self, game_info, old_ratings, new_ratings):
-            self.rating_results = [game_info, old_ratings, new_ratings]
+        async def set_rating_results(self, game_info, old_ratings, new_ratings, likelihoods):
+            self.rating_results = [game_info, old_ratings, new_ratings, likelihoods]
 
         def get_rating_results(self):
             return self.rating_results
 
     consumer = Consumer()
-    service.add_game_rating_callback(lambda gi, old, new: consumer.set_rating_results(gi, old, new))
+    service.add_game_rating_callback(lambda gi, old, new, likelihoods: consumer.set_rating_results(gi, old, new, likelihoods))
 
     await service.enqueue(game_info)
     await service._join_rating_queue()
 
     assert (consumer.get_rating_results() is not None)
-    gi, old_ratings, new_ratings = consumer.get_rating_results()
+    gi, old_ratings, new_ratings, likelihoods = consumer.get_rating_results()
     assert (gi == game_info)
-    assert (old_ratings[1] == Rating(1234., 123.))
-    assert (old_ratings[2] == Rating(1212., 50.))
+    assert (old_ratings[1] == RankedRating(1234., 123., 1, 10))
+    assert (old_ratings[2] == RankedRating(1212., 50., 2, 10))
     assert (new_ratings[1].mu > 1234.)
     assert (new_ratings[1].sigma < 124.)
     assert (new_ratings[2].mu < 1212.)
@@ -360,31 +361,31 @@ async def test_game_rating_callbacks(rating_service, game_info):
 
 async def test_game_rating_2v2(rating_service, game_info_2v2):
     service = rating_service
-    service._get_rating_data = CoroutineMock(return_value={
-        1: Rating(1000., 100.),
-        2: Rating(1100., 100.),
-        3: Rating(900., 100.),
-        4: Rating(1200., 100.)
+    service._get_player_ratings = CoroutineMock(return_value={
+        1: RankedRating(1000., 100., 1, 10),
+        2: RankedRating(1100., 100., 2, 10),
+        3: RankedRating(900., 100., 3, 10),
+        4: RankedRating(1200., 100., 4, 10)
     })
 
     class Consumer(object):
         def __init__(self):
             self.rating_results = None
 
-        def set_rating_results(self, game_info, old_ratings, new_ratings):
-            self.rating_results = [game_info, old_ratings, new_ratings]
+        def set_rating_results(self, game_info, old_ratings, new_ratings, likelihoods):
+            self.rating_results = [game_info, old_ratings, new_ratings, likelihoods]
 
         def get_rating_results(self):
             return self.rating_results
 
     consumer = Consumer()
-    service.add_game_rating_callback(lambda gi, old, new: consumer.set_rating_results(gi, old, new))
+    service.add_game_rating_callback(lambda gi, old, new, likelihoods: consumer.set_rating_results(gi, old, new, likelihoods))
 
     await service.enqueue(game_info_2v2)
     await service._join_rating_queue()
 
     assert (consumer.get_rating_results() is not None)
-    gi, old_ratings, new_ratings = consumer.get_rating_results()
+    gi, old_ratings, new_ratings, likelihoods = consumer.get_rating_results()
     assert (new_ratings[1].mu > 1000.)
     assert (new_ratings[2].mu > 1100.)
     assert (new_ratings[3].mu < 900.)

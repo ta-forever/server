@@ -209,6 +209,7 @@ leaderboard_rating = Table(
     Column("login_id",          Integer,    ForeignKey("login.id")),
     Column("mean",              Float),
     Column("deviation",         Float),
+    Column("rating",            Float),
     Column("total_games",       Integer,    nullable=False),
     Column("won_games",         Integer,    nullable=False),
     Column("lost_games",        Integer,    nullable=False),

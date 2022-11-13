@@ -12,8 +12,9 @@ from ..games.game_results import GameOutcome
 from ..games.typedefs import EndedGameInfo, ValidityState, OutcomeLikelihoods
 from ..matchmaker import MatchmakerQueue
 from ..rating import RatingType
-from ..rating_service.typedefs import PlayerID, TeamID
+from ..rating_service.typedefs import PlayerID, TeamID, RankedRating
 
+import scipy.stats
 
 class InvalidGalacticWarGame(Exception):
     """ raised by validate_game when illegal game settings are found """
@@ -89,40 +90,90 @@ class GalacticWarState(object):
 
     def update_scores(self,
                       game_info: EndedGameInfo,
-                      old_ratings: Dict[PlayerID, Rating],
+                      old_ratings: Dict[PlayerID, RankedRating],
                       new_ratings: Dict[PlayerID, Rating],
                       team_outcome_likelihoods: Dict[TeamID, OutcomeLikelihoods]):
         planet = self._planets_by_name[game_info.galactic_war_planet_name]
 
-        pot = 0.
-        for player_info in game_info.ended_game_player_summary:
-            # each player "bets" an amount proportional to their team's win likelihood
-            pwin = team_outcome_likelihoods[player_info.team_id].pwin
-            bet = pwin * config.GALACTIC_WAR_MAX_SCORE
-            planet.set_score(player_info.faction, planet.get_score(player_info.faction) - bet)
-            planet.adjust_belligerent(player_info.player_id, player_info.faction, -bet)
-            pot += bet
-            self._logger.info(f"[update_scores] player {player_info.player_id} of {player_info.faction.name} with pwin={pwin} adding {bet} to pot")
+        # each player stakes an amount proportional to their team's win likelihood
+        if config.GALACTIC_WAR_STAKES_STRATEGY == "rank":
+            stakes = self._calculate_stakes_from_rank(game_info, old_ratings)
+        elif config.GALACTIC_WAR_STAKES_STRATEGY == "rating":
+            stakes = self._calculate_stakes_from_rating(game_info, team_outcome_likelihoods)
+        else:
+            stakes = self._calculate_stakes_from_rating(game_info, team_outcome_likelihoods)
 
-        for player_info in game_info.ended_game_player_summary:
-            if player_info.outcome == GameOutcome.VICTORY:
-                # allocate pot to faction of winning team
-                self._logger.info(f"[update_scores] total pot={pot} allocated to {player_info.faction.name}")
-                planet.set_score(player_info.faction, planet.get_score(player_info.faction) + pot)
-                break
+        # players stakes are returned depending on outcome
+        returned_stakes = {player_info.player_id: {
+            GameOutcome.VICTORY: stakes[player_info.player_id],
+            GameOutcome.DRAW: stakes[player_info.player_id] / 2.0,
+            GameOutcome.DEFEAT: 0.0
+        }[player_info.outcome] for player_info in game_info.ended_game_player_summary}
 
-        team_size = len(game_info.ended_game_player_summary) / 2.
-        for player_info in game_info.ended_game_player_summary:
-            if player_info.outcome == GameOutcome.VICTORY:
-                # attribute pot equally amongst the winning belligerents
-                planet.adjust_belligerent(player_info.player_id, player_info.faction, pot / team_size)
+        # stakes lost by losers are distributed to winners
+        total_lost_stakes = sum(stakes.values()) - sum(returned_stakes.values())
+        team_size = len(stakes) // 2
+        winners_gains = {player_info.player_id: {
+            GameOutcome.VICTORY: total_lost_stakes / team_size,
+            GameOutcome.DRAW: 0.0,
+            GameOutcome.DEFEAT: 0.0
+        }[player_info.outcome] for player_info in game_info.ended_game_player_summary}
 
-        # make sure planet scores never go negative
-        scores_by_faction = planet.get_ro_scores()
-        min_score = min(scores_by_faction.values())
-        if min_score < 0.:
-            for faction, dominance in scores_by_faction.items():
-                planet.set_score(faction, dominance - min_score)
+        # execute adjustments to score
+        for player_info in game_info.ended_game_player_summary:
+            pid = player_info.player_id
+            belligerent_attribution_adjustment = winners_gains[pid] + returned_stakes[pid] - stakes[pid]
+            if config.GALACTIC_WAR_WINNER_TAKES_THE_POT:
+                planet_adjustment = winners_gains[pid] + returned_stakes[pid] - stakes[pid]
+            else:
+                planet_adjustment = returned_stakes[pid] - stakes[pid]
+
+            self._logger.info("[update_scores] player %d of %s. stake=%.1f, returned=%.1f, winnings=%.1f, planet_adj=%.1f, belligerent_adj=%.1f",
+                              pid, player_info.faction.name, stakes[pid], returned_stakes[pid], winners_gains[pid], planet_adjustment, belligerent_attribution_adjustment)
+
+            planet.set_score(player_info.faction, planet.get_score(player_info.faction) + planet_adjustment)
+            planet.adjust_belligerent(player_info.player_id, player_info.faction, belligerent_attribution_adjustment)
+
+    def _calculate_stakes_from_rating(self,
+                                      game_info: EndedGameInfo,
+                                      team_outcome_likelihoods: Dict[TeamID, OutcomeLikelihoods]) -> Dict[PlayerID, float]:
+
+        return {player_info.player_id: team_outcome_likelihoods[player_info.team_id].pwin * config.GALACTIC_WAR_MAX_SCORE
+                  for player_info in game_info.ended_game_player_summary}
+
+
+    def _calculate_stakes_from_rank(self,
+                                    game_info: EndedGameInfo,
+                                    old_ratings: Dict[PlayerID, RankedRating]) -> Dict[PlayerID, float]:
+
+        team_ids = list({player_info.team_id for player_info in game_info.ended_game_player_summary})
+        assert(len(team_ids) == 2)
+
+        player_ids_by_team = {
+            tid: [player_info.player_id for player_info in game_info.ended_game_player_summary if player_info.team_id == tid]
+            for tid in team_ids
+        }
+
+        team_size = len(game_info.ended_game_player_summary) // 2
+        max_stake_per_opponent = config.GALACTIC_WAR_MAX_SCORE / team_size
+        stakes = {player_info.player_id: 0. for player_info in game_info.ended_game_player_summary}
+        for pid1 in player_ids_by_team[team_ids[0]]:
+            for pid2 in player_ids_by_team[team_ids[1]]:
+                if old_ratings[pid1].leaderboard_size < 10:
+                    stakes[pid1] += max_stake_per_opponent / 2.
+                    stakes[pid2] += max_stake_per_opponent / 2.
+
+                elif abs(old_ratings[pid1].penis_points - old_ratings[pid2].penis_points) < 1.:
+                    stakes[pid1] += max_stake_per_opponent / 2.
+                    stakes[pid2] += max_stake_per_opponent / 2.
+
+                else:
+                    rank_difference = (old_ratings[pid2].rank - old_ratings[pid1].rank) / old_ratings[pid1].leaderboard_size
+                    stakes[pid1] += scipy.stats.norm.cdf(rank_difference / config.GALACTIC_WAR_STAKES_RANK_FACTOR) * max_stake_per_opponent
+                    stakes[pid2] += scipy.stats.norm.cdf(-rank_difference / config.GALACTIC_WAR_STAKES_RANK_FACTOR) * max_stake_per_opponent
+
+        return stakes
+
 
     def update_front_lines(self, planet=None):
         changes_made = 0

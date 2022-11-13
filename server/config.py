@@ -104,11 +104,14 @@ class ConfigurationStore:
         self.GALACTIC_WAR_STATE_FILE = "/content/galactic_war/galactic_war.json"
         self.GALACTIC_WAR_SCENARIO_PATH = "/content/galactic_war/scenarios"
         self.GALACTIC_WAR_INITIAL_SCENARIO = "scenario_0.gml"
+        self.GALACTIC_WAR_WINNER_TAKES_THE_POT = True       # otherwise winner keeps original score
         self.GALACTIC_WAR_RELOAD_STATE = 0      # a change will trigger GalacticWarService to reload its state
         self.GALACTIC_WAR_RESET = 0             # a change will trigger GalacticWarService to reset to GALACTIC_WAR_INITIAL_SCENARIO
         self.GALACTIC_WAR_REQUIRED_DOMINANCE_RATIO = 3.0    # ratio between highest score to lowest score to consider a planet conquered
         self.GALACTIC_WAR_MAX_SCORE = 20.0                  # maximum amount per player by which faction-score for a planet may increase
-        self.GALACTIC_WAR_UPDATE_CRONTAB = "*/10 * * * *"   # periods at which to process state updates
+        self.GALACTIC_WAR_STAKES_STRATEGY = "rank"          # "rank" or "rating"
+        self.GALACTIC_WAR_STAKES_RANK_FACTOR = 0.333        # stake is proportional to norm.cdf(rank_difference/GALACTIC_WAR_RANK_ORDERED_SIGMA)
+        self.GALACTIC_WAR_UPDATE_CRONTAB = "*/10 * * * *"   # periods at which to process state updates. Or empty string to update immediately after each game
         self.GALACTIC_WAR_REQUIRE_CORRECT_MOD = True        # require games to be played on the correct mod
         self.GALACTIC_WAR_INITIALISE_DEFAULT_MOD = "tacc:100" # initialise planets' mods.  <modname>:<likelihood>;<modname>:<likelihood> ...
         self.GALACTIC_WAR_INITIALISE_ENSURE_RANKED_MAPS = True
