@@ -186,13 +186,11 @@ class GameService(Service):
                     "UPDATE `game_stats` SET replay_meta = :replay_meta WHERE id = :game_id"),
                     replay_meta=file_content, game_id=game_id)
 
+                os.remove(file_path)
                 if row[1] is None:
-                    os.rename(file_path, file_path + ".unknown_map")
                     self._logger.info(
                         f"[process_replay_metadata] ditching {file_path} because row[1] is None (unknown map)")
                     continue
-                else:
-                    os.remove(file_path)
 
                 featured_mod_id = int(row[0])
                 map_version_id = int(row[1])
