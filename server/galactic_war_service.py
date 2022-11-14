@@ -32,6 +32,7 @@ class GalacticWarService(Service):
         self._update_state_cron = None
 
     async def initialize(self):
+        for mod in
         await self._load_state()
         self.set_dirty(True)
         self.set_crontab()
@@ -65,11 +66,12 @@ class GalacticWarService(Service):
 
     async def manual_capture(self):
         try:
-            planet_name, faction_name = config.GALACTIC_WAR_MANUAL_CAPTURE.split(";")
-            self._logger.info(f"[manual_capture] capturing {planet_name} for {faction_name}")
-            planet = self._state._planets_by_name[planet_name]
-            for faction in planet.get_ro_scores().keys():
-                planet.set_score(faction, 100.0 if faction.name.lower() == faction_name.lower() else 0.0)
+            for capture in config.GALACTIC_WAR_MANUAL_CAPTURE.split(";"):
+                planet_name, faction_name = capture.split(':')
+                self._logger.info(f"[manual_capture] capturing {planet_name} for {faction_name}")
+                planet = self._state._planets_by_name[planet_name]
+                for faction in planet.get_ro_scores().keys():
+                    planet.set_score(faction, 100.0 if faction.name.lower() == faction_name.lower() else 0.0)
             await self._save_state()
             self.set_dirty(True)
 
@@ -136,7 +138,7 @@ class GalacticWarService(Service):
         other_changes_made = 1
         while other_changes_made > 0:
             other_changes_made = self._state.capture_isolated_planets() + \
-                           self._state.capture_uncontested_planets()
+                                 self._state.capture_uncontested_planets()
 
         uncaptured_capitals: List[Planet] = self._state.get_capitals(standing=True, contested=True, captured=False)
         if len(uncaptured_capitals) < 2:

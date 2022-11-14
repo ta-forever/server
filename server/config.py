@@ -116,7 +116,7 @@ class ConfigurationStore:
         self.GALACTIC_WAR_INITIALISE_DEFAULT_MOD = "tacc:100" # initialise planets' mods.  <modname>:<likelihood>;<modname>:<likelihood> ...
         self.GALACTIC_WAR_INITIALISE_ENSURE_RANKED_MAPS = True
         self.GALACTIC_WAR_DEFAULT_PLANET_SIZE = 100
-        self.GALACTIC_WAR_MANUAL_CAPTURE = ""           # capture a planet for debugging purposes. eg "Core Prime;arm"
+        self.GALACTIC_WAR_MANUAL_CAPTURE = ""           # capture a planet for debugging purposes. eg "Core Prime:arm;Empyrrean:arm"
         self.ENABLE_FACTION_LOOKUP_FROM_REPLAY_META = True
 
         self._defaults = {
