@@ -32,7 +32,6 @@ class GalacticWarService(Service):
         self._update_state_cron = None
 
     async def initialize(self):
-        for mod in
         await self._load_state()
         self.set_dirty(True)
         self.set_crontab()

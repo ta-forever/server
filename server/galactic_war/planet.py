@@ -4,24 +4,38 @@ from server.config import config
 from server.factions import Faction
 from server.rating_service.typedefs import PlayerID
 
+random.seed()
+
 LATIN_NOUNS = []
 with open("latin_nouns.txt", "r") as fp:
     for line in fp:
         LATIN_NOUNS += [line.strip().capitalize()]
+    LATIN_NOUNS = random.sample(LATIN_NOUNS, len(LATIN_NOUNS))
+
 
 LATIN_ADJECTIVES = []
 with open("latin_adjectives.txt", "r") as fp:
     for line in fp:
         LATIN_ADJECTIVES += [line.strip().capitalize()]
+    LATIN_ADJECTIVES = random.sample(LATIN_ADJECTIVES, len(LATIN_ADJECTIVES))
 
 
-random.seed()
+def get_random_noun():
+    idx = 0
+    while True:
+        yield LATIN_NOUNS[idx % len(LATIN_NOUNS)]
+        idx += 1
+
+
+def get_random_adjective():
+    idx = 0
+    while True:
+        yield LATIN_ADJECTIVES[idx % len(LATIN_ADJECTIVES)]
+        idx += 1
+
+
 def get_random_name():
-    idx_noun = random.randint(0, len(LATIN_NOUNS)-1)
-    idx_adj = random.randint(0, len(LATIN_ADJECTIVES)-1)
-    noun = LATIN_NOUNS[idx_noun]
-    adj = LATIN_ADJECTIVES[idx_adj]
-    return f"{noun} {adj}"
+    return get_random_noun()
 
 
 def get_random_mod():
