@@ -155,6 +155,15 @@ class GameService(Service):
             units_hash = data.get("unitsHash")
             map_hash = data.get("taMapHash")
 
+            if data.get("cheatsEnabled", False):
+                try:
+                    game = self._games[game_id]
+                    game.gameOptions["CheatsEnabled"] = "true"
+                    await game.mark_invalid(ValidityState.CHEATS_ENABLED)
+
+                except KeyError as e:
+                    self._logger.warn(f"[process_replay_metadata] unable to update 'cheatsEnabled' from replay meta: {str(e)}")
+
             if config.ENABLE_FACTION_LOOKUP_FROM_REPLAY_META and game_id in self._games:
                 try:
                     game = self._games[game_id]
