@@ -50,14 +50,15 @@ class GameRater:
             for team in new_rating_groups
             for player_id, new_rating in team.items()
         }
-        cls._logger.debug("New Ratings: %s", new_rating_groups)
+        cls._logger.debug("New Ratings (canonical): %s", new_rating_groups)
 
         def penis_points(rating: Rating):
             return rating.mu - 3. * rating.sigma
 
         new_ratings = {
             pd.player_id: ratings[pd.player_id]
-            if pd.outcome == GameOutcome.VICTORY and penis_points(new_ratings[pd.player_id]) < penis_points(ratings[pd.player_id])
+            if pd.outcome == GameOutcome.DRAW or
+               pd.outcome == GameOutcome.VICTORY and penis_points(new_ratings[pd.player_id]) < penis_points(ratings[pd.player_id])
             else new_ratings[pd.player_id]
             for pd in player_data
         }
