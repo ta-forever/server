@@ -80,13 +80,14 @@ class ServerContext:
                 )
 
     async def client_connected(self, stream_reader, stream_writer):
-        self._logger.debug("%s: Client connected", self.name)
+        addr = Address(*stream_writer.get_extra_info("peername"))
+        self._logger.debug("%s: Client connected from '%s' port %d", self.name, addr.host, addr.port)
         protocol = self.protocol_class(stream_reader, stream_writer)
         connection = self._connection_factory()
         self.connections[connection] = protocol
 
         try:
-            await connection.on_connection_made(protocol, Address(*stream_writer.get_extra_info("peername")))
+            await connection.on_connection_made(protocol, addr)
             metrics.user_connections.labels("None", "None").inc()
             while protocol.is_connected():
                 message = await protocol.read_message()
@@ -98,7 +99,7 @@ class ServerContext:
             if not stream_reader.at_eof():
                 self._logger.exception(ex)
         except Exception as ex:
-            self._logger.exception(ex)
+            self._logger.exception("Error accepting connection from '%s': %s", addr.host, ex)
         finally:
             del self.connections[connection]
             await protocol.close()
@@ -114,7 +115,7 @@ class ServerContext:
                         exc_info=True
                     )
 
-            self._logger.debug("%s: Client disconnected", self.name)
+            self._logger.debug("%s: Client disconnected '%s' port %d", self.name, addr.host, addr.port)
             metrics.user_connections.labels(
                 connection.user_agent,
                 connection.version

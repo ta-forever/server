@@ -7,6 +7,7 @@ from server.decorators import with_logger
 
 from .protocol import Protocol, json_encoder
 
+QDATASTREAM_PROTOCOL_MAX_BLOCK_LENGTH = 65535
 
 @with_logger
 class QDataStreamProtocol(Protocol):
@@ -33,8 +34,8 @@ class QDataStreamProtocol(Protocol):
         (size, ) = struct.unpack("!I", chunk)
         if len(rest) < size:
             raise ValueError(
-                "Malformed QString: Claims length {} but actually {}. Entire buffer: {}"
-                .format(size, len(rest), base64.b64encode(buffer)))
+                "Malformed QString: Claims length {} but actually {}. 1st Kb of buffer: {}"
+                .format(size, len(rest), base64.b64encode(buffer[:1024])))
         return size + pos + 4, (buffer[pos + 4:pos + 4 + size]).decode("UTF-16BE")
 
     @staticmethod
@@ -88,6 +89,8 @@ class QDataStreamProtocol(Protocol):
         :return dict: Parsed message
         """
         (block_length, ) = struct.unpack("!I", (await self.reader.readexactly(4)))
+        if block_length > QDATASTREAM_PROTOCOL_MAX_BLOCK_LENGTH:
+            raise ValueError(f"block_length={block_length} exceeds maximum {QDATASTREAM_PROTOCOL_MAX_BLOCK_LENGTH}")
         block = await self.reader.readexactly(block_length)
         # FIXME: New protocol will remove the need for this
 
