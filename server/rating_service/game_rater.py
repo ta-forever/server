@@ -39,12 +39,7 @@ class GameRater:
         else:
             raise GameRatingError("Sorry multiteam/ffa not implemented")
 
-        cls._logger.debug("Rating groups: %s", rating_groups)
-        cls._logger.debug("Ranks: %s", ranks)
-
         new_rating_groups: List[Dict[PlayerID, Rating]] = trueskill.rate(list(rating_groups.values()), ranks)
-        cls._logger.debug("New Rating groups: %s", new_rating_groups)
-
         new_ratings = {
             player_id: new_rating
             for team in new_rating_groups
