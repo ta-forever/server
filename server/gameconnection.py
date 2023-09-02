@@ -294,8 +294,8 @@ class GameConnection(GpgNetServerProtocol):
                 result = await conn.execute(
                     text("SELECT `uid`, `name` from `table_mod` WHERE `uid` in :ids"),
                     ids=tuple(uids))
-                async for row in result:
-                    self.game.mods[row["uid"]] = row["name"]
+                for row in result:
+                    self.game.mods[row.uid] = row.name
         else:
             self._logger.warning("Ignoring game mod: %s, %s", mode, args)
             return
@@ -344,15 +344,15 @@ class GameConnection(GpgNetServerProtocol):
         async with self._db.acquire() as conn:
             # FIXME: Resolve used map earlier than this
             result = await conn.execute(
-                select([coop_map.c.id]).where(
+                select(coop_map.c.id).where(
                     coop_map.c.filename == self.game.map_file_path
                 )
             )
-            row = await result.fetchone()
+            row = result.fetchone()
             if not row:
                 self._logger.debug("can't find coop map: %s", self.game.map_file_path)
                 return
-            mission = row["id"]
+            mission = row.id
 
             await conn.execute(
                 coop_leaderboard.insert().values(

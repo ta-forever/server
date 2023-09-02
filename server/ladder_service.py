@@ -107,22 +107,21 @@ class LadderService(Service):
 
     async def fetch_map_pools(self, conn) -> Dict[int, Tuple[str, List[Map]]]:
         result = await conn.execute(
-            select([
-                map_pool.c.id,
-                map_pool.c.name,
-                map_pool_map_version.c.weight,
-                map_pool_map_version.c.map_params,
-                map_version.c.id.label("map_id"),
-                map_version.c.filename,
-                t_map.c.display_name
-            ]).select_from(
-                map_pool.outerjoin(map_pool_map_version)
-                .outerjoin(map_version)
-                .outerjoin(t_map)
-            )
-        )
+           select(
+               map_pool.c.id,
+               map_pool.c.name,
+               map_pool_map_version.c.weight,
+               map_pool_map_version.c.map_params,
+               map_version.c.id.label("map_id"),
+               map_version.c.filename,
+               t_map.c.display_name
+           ).select_from(
+               map_pool.outerjoin(map_pool_map_version)
+               .outerjoin(map_version)
+               .outerjoin(t_map)
+           ))
         map_pool_maps = {}
-        async for row in result:
+        for row in result:
             id_ = row.id
             name = row.name
             if id_ not in map_pool_maps:
@@ -158,7 +157,7 @@ class LadderService(Service):
 
     async def fetch_matchmaker_queues(self, conn):
         result = await conn.execute(
-            select([
+            select(
                 matchmaker_queue.c.id,
                 matchmaker_queue.c.technical_name,
                 matchmaker_queue.c.team_size,
@@ -167,7 +166,7 @@ class LadderService(Service):
                 matchmaker_queue_map_pool.c.max_rating,
                 game_featuredMods.c.gamemod,
                 leaderboard.c.technical_name.label("rating_type")
-            ])
+            )
             .select_from(
                 matchmaker_queue
                 .join(matchmaker_queue_map_pool)
@@ -176,7 +175,7 @@ class LadderService(Service):
             ).where(matchmaker_queue.c.enabled == true())
         )
         matchmaker_queues = defaultdict(lambda: defaultdict(list))
-        async for row in result:
+        for row in result:
             name = row.technical_name
             info = matchmaker_queues[name]
             info["id"] = row.id
@@ -491,9 +490,9 @@ class LadderService(Service):
         async with self._db.acquire() as conn:
             result = []
             for player in players:
-                query = select([
+                query = select(
                     game_stats.c.mapId,
-                ]).select_from(
+                ).select_from(
                     game_player_stats
                     .join(game_stats)
                     .join(matchmaker_queue_game)
@@ -509,7 +508,7 @@ class LadderService(Service):
                 ).order_by(game_stats.c.startTime.desc()).limit(limit)
 
                 result.extend([
-                    row.mapId async for row in await conn.execute(query)
+                    row.mapId for row in await conn.execute(query)
                 ])
         return result
 

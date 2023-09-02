@@ -75,13 +75,24 @@ class RatingService(Service):
 
     async def update_data(self):
         async with self._db.acquire() as conn:
-            sql = select([leaderboard])
+
+            initializer = leaderboard.alias()
+            sql = select(
+                leaderboard.c.id,
+                leaderboard.c.technical_name,
+                initializer.c.technical_name.label("initializer")
+            ).select_from(
+                leaderboard.outerjoin(
+                    initializer,
+                    leaderboard.c.initializer_id == initializer.c.id
+                )
+            )
             result = await conn.execute(sql)
-            rows = await result.fetchall()
+            rows = result.fetchall()
 
         self._rating_type_ids = RatingTypeMap(
             None,
-            ((row["technical_name"], row["id"]) for row in rows)
+            ((row.technical_name, row.id) for row in rows)
         )
 
     async def enqueue(self, game_info: EndedGameInfo) -> None:
@@ -147,14 +158,13 @@ class RatingService(Service):
 
         async with acquire_or_default(self._db, conn) as conn:
             sql = select(
-                [leaderboard_rating.c.login_id, leaderboard_rating.c.mean, leaderboard_rating.c.deviation, leaderboard_rating.c.rating]
+                leaderboard_rating.c.login_id, leaderboard_rating.c.mean, leaderboard_rating.c.deviation, leaderboard_rating.c.rating
             ).where(leaderboard_rating.c.leaderboard_id == rating_type_id)
-
             result = await conn.execute(sql)
-            rows = await result.fetchall()
+            rows = result.fetchall()
 
-            ratings = [(row["login_id"], row["mean"], row["deviation"], row["rating"]) for row in rows]
-            retrieved_player_ids = set([row["login_id"] for row in rows])
+            ratings = [(row.login_id, row.mean, row.deviation, row.rating) for row in rows]
+            retrieved_player_ids = set([row.login_id for row in rows])
             for pid in player_ids:
                 if pid not in retrieved_player_ids:
                     new_rating = await self._create_default_rating(conn, pid, rating_type)
@@ -242,12 +252,12 @@ class RatingService(Service):
                     rating_deviation_before=old_rating.sigma,
                     rating_mean_after=new_rating.mu,
                     rating_deviation_after=new_rating.sigma,
-                    game_player_stats_id=select([game_player_stats.c.id]).where(
+                    game_player_stats_id=select(game_player_stats.c.id).where(
                         and_(
                             game_player_stats.c.playerId == player_info.player_id,
                             game_player_stats.c.gameId == game_info.game_id,
                         )
-                    ),
+                    ).scalar_subquery(),
                 )
                 await conn.execute(journal_insert_sql)
 
@@ -279,8 +289,8 @@ class RatingService(Service):
                         won_games=leaderboard_rating.c.won_games + victory_increment,
                         drawn_games=leaderboard_rating.c.drawn_games + draw_increment,
                         lost_games=leaderboard_rating.c.lost_games + defeat_increment,
-                        streak=case([(leaderboard_rating.c.streak * score >= 0, leaderboard_rating.c.streak + score)], else_ = score),
-                        best_streak=case([(leaderboard_rating.c.streak > leaderboard_rating.c.best_streak, leaderboard_rating.c.streak)], else_=leaderboard_rating.c.best_streak),
+                        streak=case((leaderboard_rating.c.streak * score >= 0, leaderboard_rating.c.streak + score), else_ = score),
+                        best_streak=case((leaderboard_rating.c.streak > leaderboard_rating.c.best_streak, leaderboard_rating.c.streak), else_=leaderboard_rating.c.best_streak),
                         recent_scores=func.substr(func.concat(str(score+1), leaderboard_rating.c.recent_scores), 1, 10),
                         recent_mod=game_info.game_mode
                     )

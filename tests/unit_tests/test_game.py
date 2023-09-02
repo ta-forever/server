@@ -53,7 +53,7 @@ async def game_player_scores(database, game):
             "SELECT playerId, score FROM game_player_stats WHERE gameid = %s",
             game.id
         )
-        return set(f.as_tuple() for f in await results.fetchall())
+        return set(f.as_tuple() for f in await results)
 
 
 async def test_initialization(game: Game):

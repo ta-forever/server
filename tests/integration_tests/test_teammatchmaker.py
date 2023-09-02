@@ -661,19 +661,19 @@ async def test_ratings_initialized_based_on_global_persisted(
     )
 
     async with database.acquire() as conn:
-        res = await conn.execute(
-            select([leaderboard_rating]).select_from(
+        result = await conn.execute(
+            select(leaderboard_rating).select_from(
                 leaderboard.join(leaderboard_rating)
             ).where(and_(
                 leaderboard.c.technical_name == "tmm_2v2",
                 leaderboard_rating.c.login_id == test_id
             ))
         )
-        row = await res.fetchone()
+        row = result.fetchone()
         assert row.mean > 2000
 
-        res = await conn.execute(
-            select([leaderboard_rating_journal]).select_from(
+        result = await conn.execute(
+            select(leaderboard_rating_journal).select_from(
                 leaderboard
                 .join(leaderboard_rating_journal)
                 .join(game_player_stats)
@@ -682,7 +682,7 @@ async def test_ratings_initialized_based_on_global_persisted(
                 game_player_stats.c.playerId == test_id
             ))
         )
-        rows = await res.fetchall()
+        rows = result.fetchall()
         assert len(rows) == 1
         assert rows[0].rating_mean_before == 2000
         assert rows[0].rating_deviation_before == 250

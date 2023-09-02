@@ -115,7 +115,7 @@ async def test_rate_game(laddergame: LadderGame, database, game_add_players):
 
     async with database.acquire() as conn:
         result = await conn.execute("SELECT mean, deviation, after_mean, after_deviation FROM game_player_stats WHERE gameid = %s", laddergame.id)
-        rows = list(await result.fetchall())
+        rows = list(result)
 
     assert rows[0]["mean"] == before_mean[players[0].id]
     assert rows[0]["deviation"] == before_deviation[players[0].id]
@@ -135,10 +135,10 @@ async def test_persist_rating_victory(laddergame: LadderGame, database,
     laddergame.set_player_option(players[0].id, "Team", 2)
     laddergame.set_player_option(players[1].id, "Team", 3)
 
-    rating_sql = select([
+    rating_sql = select(
         leaderboard_rating.c.total_games,
         leaderboard_rating.c.won_games
-    ]).where(
+    ).where(
         and_(
             leaderboard_rating.c.login_id.in_((players[0].id, players[1].id)),
             leaderboard_rating.c.leaderboard_id == 2,
@@ -146,8 +146,8 @@ async def test_persist_rating_victory(laddergame: LadderGame, database,
     ).order_by(leaderboard_rating.c.login_id)
 
     async with database.acquire() as conn:
-        result = await conn.execute(rating_sql)
-        result_before = await result.fetchall()
+        result_before = await conn.execute(rating_sql)
+        result_before = result_before.fetchall()
 
     await laddergame.launch()
     laddergame.launched_at = time.time() - 60*20
@@ -160,8 +160,8 @@ async def test_persist_rating_victory(laddergame: LadderGame, database,
     assert laddergame.validity is ValidityState.VALID
 
     async with database.acquire() as conn:
-        result = await conn.execute(rating_sql)
-        result_after = await result.fetchall()
+        result_after = await conn.execute(rating_sql)
+        result_after = result_after.fetchall()
 
     assert result_after[0]["total_games"] == result_before[0]["total_games"] + 1
     assert result_after[1]["total_games"] == result_before[1]["total_games"] + 1

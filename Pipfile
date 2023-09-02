@@ -23,7 +23,7 @@ oauthlib = "*"
 sqlalchemy = "*"
 twilio = "*"
 humanize = ">=2.6.0"
-aiomysql = {editable = true, git = "https://github.com/aio-libs/aiomysql"}
+aiomysql = {git = "https://github.com/aio-libs/aiomysql"}
 pyyaml = "*"
 aio_pika = "*"
 lxml = "*"
@@ -44,4 +44,4 @@ hypothesis = "<=6.47.1"
 pdoc3 = "*"
 
 [requires]
-python_version = "3.7"
+python_version = "3.11"

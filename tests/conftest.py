@@ -92,9 +92,7 @@ async def global_database(request):
         opt("--mysql_database"),
         opt("--mysql_port")
     )
-    db = FAFDatabase(asyncio.get_running_loop())
-
-    await db.connect(
+    db = FAFDatabase(
         host=host,
         user=user,
         password=pw or None,

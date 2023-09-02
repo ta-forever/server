@@ -437,7 +437,7 @@ async def test_ice_servers_empty(lobby_server):
 
 async def get_player_selected_avatars(conn, player_id):
     return await conn.execute(
-        select([avatars.c.id, avatars_list.c.url])
+        select(avatars.c.id, avatars_list.c.url)
         .select_from(avatars_list.join(avatars))
         .where(
             and_(
@@ -478,9 +478,9 @@ async def test_avatar_select(lobby_server, database):
 
     async with database.acquire() as conn:
         result = await get_player_selected_avatars(conn, player_id)
+        row = result.fetchone()
         assert result.rowcount == 1
-        row = await result.fetchone()
-        assert row[avatars_list.c.url] == avatar["url"]
+        assert row.url == avatar["url"]
 
     await proto.send_message({
         "command": "avatar",
@@ -492,9 +492,8 @@ async def test_avatar_select(lobby_server, database):
 
     async with database.acquire() as conn:
         result = await get_player_selected_avatars(conn, player_id)
-        assert result.rowcount == 1
-        row = await result.fetchone()
-        assert row[avatars_list.c.url] == avatar["url"]
+        row = result.fetchone()
+        assert row.url == avatar["url"]
 
 
 @fast_forward(30)

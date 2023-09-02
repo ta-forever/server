@@ -594,12 +594,11 @@ async def test_rating_errors_persisted(custom_game, player_factory):
     await rating_service._join_rating_queue()
 
     async with rating_service._db.acquire() as conn:
-        rows = await conn.execute(
+        validity = await conn.scalar(
             "SELECT `validity` FROM `game_stats` " "WHERE `id`=%s", (custom_game.id,)
         )
-    row = await rows.fetchone()
 
-    assert row[0] == ValidityState.UNKNOWN_RESULT.value
+    assert validity == ValidityState.UNKNOWN_RESULT.value
 
 
 async def test_rate_game_treats_double_defeat_as_draw(custom_game, player_factory):

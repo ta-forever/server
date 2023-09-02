@@ -174,13 +174,13 @@ async def test_get_player_rating_ladder(semiinitialized_service):
 
 
 async def get_all_ratings(db: FAFDatabase, player_id: int):
-    rating_sql = select([leaderboard_rating]).where(
+    rating_sql = select(leaderboard_rating).where(
         and_(leaderboard_rating.c.login_id == player_id)
     )
 
     async with db.acquire() as conn:
         result = await conn.execute(rating_sql)
-        rows = await result.fetchall()
+        rows = result.fetchall()
 
     return rows
 
@@ -251,34 +251,34 @@ async def test_rating_persistence(semiinitialized_service, game_info):
     await service._persist_rating_changes(game_info, old_ratings, new_ratings)
 
     async with service._db.acquire() as conn:
-        sql = select([game_player_stats.c.id, game_player_stats.c.after_mean]).where(
+        sql = select(game_player_stats.c.id, game_player_stats.c.after_mean).where(
             and_(
                 game_player_stats.c.gameId == game_id,
                 game_player_stats.c.playerId == player_id,
             )
         )
-        results = await conn.execute(sql)
-        gps_row = await results.fetchone()
+        result = await conn.execute(sql).fetchone()
+        gpw_row = result.fetchone()
 
-        sql = select([leaderboard_rating.c.mean]).where(
+        sql = select(leaderboard_rating.c.mean).where(
             and_(
                 leaderboard_rating.c.login_id == player_id,
                 leaderboard_rating.c.leaderboard_id == rating_type_id,
             )
         )
-        results = await conn.execute(sql)
-        rating_row = await results.fetchone()
+        result = await conn.execute(sql).fetchone()
+        rating_row = result.fetchone()
 
-        sql = select([leaderboard_rating_journal.c.rating_mean_after]).where(
+        sql = select(leaderboard_rating_journal.c.rating_mean_after).where(
             leaderboard_rating_journal.c.game_player_stats_id
-            == gps_row[game_player_stats.c.id]
+            == gps_row.id
         )
-        results = await conn.execute(sql)
-        journal_row = await results.fetchone()
+        result = await conn.execute(sql).fetchone()
+        journal_row = result.fetchone()
 
-    assert gps_row[game_player_stats.c.after_mean] == after_mean
-    assert rating_row[leaderboard_rating.c.mean] == after_mean
-    assert journal_row[leaderboard_rating_journal.c.rating_mean_after] == after_mean
+    assert gps_row.after_mean == after_mean
+    assert rating_row.mean == after_mean
+    assert journal_row.rating_mean_after == after_mean
 
 
 async def test_update_player_service(uninitialized_service, player_service):

@@ -191,7 +191,7 @@ class GameResultReports(Mapping):
                 (game_id,),
             )
 
-            async for row in rows:
+            for row in rows:
                 startspot, score = row[0], row[1]
                 # FIXME: Assertion about startspot == army
                 with contextlib.suppress(ValueError):

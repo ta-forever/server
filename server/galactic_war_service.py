@@ -77,7 +77,7 @@ class GalacticWarService(Service):
         except Exception as e:
             self._logger.warn(f"unable to capture planet: {e}")
 
-    def shutdown(self):
+    async def shutdown(self):
         if self._update_state_cron is not None:
             self._update_state_cron.stop()
             self._update_state_cron = None

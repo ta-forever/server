@@ -260,8 +260,15 @@ class ServerInstance(object):
                     ctx
                 )
 
-        await asyncio.gather(*[
-            service.shutdown() for service in self.services.values()
-        ])
+        results = await asyncio.gather(
+            *(service.shutdown() for service in self.services.values()),
+            return_exceptions=True
+        )
+        for result, service in zip(results, self.services.values()):
+            if isinstance(result, BaseException):
+                self._logger.error(
+                    "Unexpected error when shutting down service %s",
+                    service
+                )
 
         self.started = False

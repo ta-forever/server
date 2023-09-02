@@ -91,6 +91,11 @@ connection_on_message_received = Histogram(
     "Seconds spent in 'connection.on_message_received'",
 )
 
+db_exceptions = Counter(
+    "db_exceptions_total",
+    "Total number of database exceptions when executing queries",
+    ["class", "code"]
+)
 
 # =====
 # Games

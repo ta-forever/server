@@ -5,12 +5,12 @@ import time
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Set, Tuple, Iterable
 
-import pymysql
-from sqlalchemy import and_, bindparam
+import sqlalchemy
+from sqlalchemy.exc import DBAPIError
+from sqlalchemy import and_, bindparam, text
 from sqlalchemy.sql.functions import now as sql_now
 
 from server.config import FFA_TEAM, config
-from server.db import deadlock_retry_execute
 from server.db.models import (
     game_player_stats,
     game_stats,
@@ -584,7 +584,7 @@ class Game():
                 scoreTime=sql_now(),
                 result=bindparam("result"),
             )
-            await deadlock_retry_execute(conn, update_statement, rows)
+            await conn.deadlock_retry_execute(update_statement, rows)
 
     def get_basic_info(self) -> BasicGameInfo:
         return BasicGameInfo(
@@ -823,17 +823,17 @@ class Game():
         self.map_ranked = ranked
 
     async def fetch_map_file_path(self, default_hpi, map_name, crc):
-        sql = "SELECT id, filename, ranked FROM map_version "\
-              "WHERE filename like %s order by version desc limit 1", "%/{}/{}".format(map_name, crc)
         async with self._db.acquire() as conn:
-            result = await conn.execute(*sql)
-            row = await result.fetchone()
+            result = await conn.execute(sqlalchemy.sql.text(
+                "SELECT id, filename, ranked FROM map_version " \
+                "WHERE filename like :map_path order by version desc limit 1"),
+                map_path="%/{}/{}".format(map_name, crc))
+            row = result.fetchone()
 
         if row:
             self.set_map(row.id, row.filename, row.ranked)
         else:
             self._logger.debug(f"{map_name}/{crc} not found. defaulting to {default_hpi}/{map_name}/{crc} with id=None and unranked")
-            self._logger.debug(repr(sql))
             self.set_map(None, f"{default_hpi}/{map_name}/{crc}", True)
 
     async def persist_game_stats(self):
@@ -918,7 +918,7 @@ class Game():
         try:
             async with self._db.acquire() as conn:
                 await conn.execute(game_player_stats.insert().values(query_args))
-        except pymysql.MySQLError:
+        except DBAPIError:
             self._logger.exception(
                 "Failed to update game_player_stats. Query args %s:", query_args
             )

@@ -91,9 +91,8 @@ class GameService(Service):
             # doing LAST_UPDATE_ID to get the id number, and then doing an UPDATE when the actual
             # data to go into the row becomes available: we now only do a single insert for each
             # game, and don't end up with 800,000 junk rows in the database.
-            result = await conn.execute("SELECT MAX(id) FROM game_stats")
-            row = await result.fetchone()
-            self.game_id_counter = row[0] or 0
+            sql = "SELECT MAX(id) FROM game_stats"
+            self.game_id_counter = await conn.scalar(sql) or 0
 
     async def update_data(self):
         """
@@ -104,13 +103,13 @@ class GameService(Service):
             result = await conn.execute(
                 "SELECT `id`, `gamemod`, `name`, description, publish, `order` FROM game_featuredMods")
 
-            async for row in result:
+            for row in result:
                 mod_id, name, full_name, description, publish, order = (row[i] for i in range(6))
                 self.featured_mods[name] = FeaturedMod(
                     mod_id, name, full_name, description, publish, order)
 
             result = await conn.execute("SELECT uid FROM table_mod WHERE ranked = 1")
-            rows = await result.fetchall()
+            rows = result.fetchall()
 
             # Turn resultset into a list of uids
             self.ranked_mods = set(map(lambda x: x[0], rows))
@@ -180,7 +179,7 @@ class GameService(Service):
             async with self._db.acquire() as conn:
                 result = await conn.execute(sqlalchemy.sql.text(
                     "SELECT `gameMod`, `mapId` from `game_stats` WHERE id = :game_id"), game_id=game_id)
-                row = await result.fetchone()
+                row = result.fetchone()
                 if row is None:
                     if game_id not in self._games:
                         self._logger.info(
@@ -223,7 +222,7 @@ class GameService(Service):
             JOIN `game_featuredMods` on game_featuredMods.id = game_stats.gameMod
             WHERE game_stats.id = :game_id
             """), game_id=game_id)
-        row = await result.fetchone()
+        row = result.fetchone()
         if row is None:
             raise ValueError(f"Unable to find any information about replay id={game_id}")
         replay_meta = json.loads(row[0]) if row[0] is not None else None
