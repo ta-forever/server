@@ -249,11 +249,11 @@ class GameService(Service):
     def dirty_queues(self):
         return self._dirty_queues
 
-    def mark_dirty(self, obj: Union[Game, MatchmakerQueue]):
+    def mark_dirty(self, obj: Union[Game, MatchmakerQueue], only_to_peers=False, pings_only=False):
         if isinstance(obj, Game):
-            self._dirty_games.add(obj)
+            self._dirty_games.add((obj, only_to_peers, pings_only))
         elif isinstance(obj, MatchmakerQueue):
-            self._dirty_queues.add(obj)
+            self._dirty_queues.add((obj, only_to_peers, pings_only))
 
     def clear_dirty(self):
         self._dirty_games = set()

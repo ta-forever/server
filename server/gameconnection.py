@@ -278,6 +278,15 @@ class GameConnection(GpgNetServerProtocol):
 
         self._mark_dirty()
 
+    async def handle_game_metrics(self, key, value):
+        if key == "PlayerPings" and len(value) > 0:
+            self._logger.debug("[PlayerPings] %d = %s", self.player.id, value)
+            self.game.update_player_pings(self.player.id, value)
+
+        if self.is_host():
+            # @TODO set pings_only=True once everyone has upgraded their clients to cope with it
+            self._mark_dirty(only_to_peers=True, pings_only=False)
+
     async def handle_game_mods(self, mode, args):
         if not self.is_host():
             return
@@ -529,9 +538,9 @@ class GameConnection(GpgNetServerProtocol):
         """
         pass
 
-    def _mark_dirty(self):
+    def _mark_dirty(self, only_to_peers=False, pings_only=False):
         if self.game:
-            self.game_service.mark_dirty(self.game)
+            self.game_service.mark_dirty(self.game, only_to_peers, pings_only)
 
     async def abort(self, log_message: str = ""):
         """
@@ -611,5 +620,6 @@ COMMAND_HANDLERS = {
     "Disconnected":         GameConnection.handle_disconnected,
     "IceMsg":               GameConnection.handle_ice_message,
     "Chat":                 GameConnection.handle_chat,
-    "GameFull":             GameConnection.handle_game_full
+    "GameFull":             GameConnection.handle_game_full,
+    "GameMetrics":          GameConnection.handle_game_metrics
 }

@@ -125,6 +125,7 @@ class Game():
             "AIReplacement": "Off",
             "RestrictedCategories": 0
         }
+        self.player_pings = {}
         self.mods = {}
 
         self.map_pool_map_ids = None
@@ -983,7 +984,20 @@ class Game():
         else:
             return player.id not in self.host.foes
 
-    def to_dict(self):
+    def update_player_pings(self, player_id: int, peer_pings_str: str) -> int:
+        current_player_ids = set([p.id for p in self.players])
+        self.player_pings[player_id] = [
+            [pid2, ping]
+            for (pid2, ping) in [[int(x) for x in pair.split(':')[0:2]] for pair in peer_pings_str.split(';')]
+            if pid2 in current_player_ids
+        ]
+        self.player_pings = {
+            pid: pings
+            for (pid, pings) in self.player_pings.items()
+            if pid in current_player_ids
+        }
+
+    def to_dict(self, pings_only=False):
         client_state = {
             GameState.INITIALIZING: "unknown",
             GameState.STAGING: "staging",
@@ -992,40 +1006,47 @@ class Game():
             GameState.LIVE: "live",
             GameState.ENDED: "ended"
         }.get(self.state, "unknown")
-        return {
+        current_player_list = [p for p in self.players]
+
+        result = {
             "command": "game_info",
-            "visibility": self.visibility.value,
-            "password_protected": self.password is not None,
             "uid": self.id,
-            "title": self.name,
             "state": client_state,
-            "replay_delay_seconds": self.replay_delay_seconds,
-            "game_type": GameType.to_string(self.game_type),
-            "featured_mod": self.game_mode,
-            "featured_mod_version": self.mod_version,
-            "sim_mods": self.mods,
-            "map_name": self.map_name,
-            "map_file_path": self.map_file_path,    # "archive.ufo/Map Name/deadbeef"
-            "host": self.host.login if self.host else "",
-            "num_players": len(self.players),
-            "max_players": self.max_players,
-            "launched_at": self.launched_at,
-            "rating_type": self.rating_type,
-            "rating_min": self.displayed_rating_range.lo,
-            "rating_max": self.displayed_rating_range.hi,
-            "enforce_rating_range": self.enforce_rating_range,
-            "galactic_war_planet_name": self.galactic_war_planet_name,
-            "teams": {
-                k:v for k,v in {
-                    team: [
-                        player.login for player in self.players
-                        if self.get_player_option(player.id, "Team") == team
-                    ]
-                    for team in list(self.teams)+[-1]  # playing teams + watchers
-                }.items()
-                if len(v)>0     # only teams with members
-            }
+            "pings": self.player_pings
         }
+        if not pings_only:
+            result.update({
+                "visibility": self.visibility.value,
+                "password_protected": self.password is not None,
+                "title": self.name,
+                "replay_delay_seconds": self.replay_delay_seconds,
+                "game_type": GameType.to_string(self.game_type),
+                "featured_mod": self.game_mode,
+                "featured_mod_version": self.mod_version,
+                "sim_mods": self.mods,
+                "map_name": self.map_name,
+                "map_file_path": self.map_file_path,    # "archive.ufo/Map Name/deadbeef"
+                "host": self.host.login if self.host else "",
+                "num_players": len(current_player_list),
+                "max_players": self.max_players,
+                "launched_at": self.launched_at,
+                "rating_type": self.rating_type,
+                "rating_min": self.displayed_rating_range.lo,
+                "rating_max": self.displayed_rating_range.hi,
+                "enforce_rating_range": self.enforce_rating_range,
+                "galactic_war_planet_name": self.galactic_war_planet_name,
+                "teams": {
+                    k:v for k,v in {
+                        team: [
+                            player.login for player in current_player_list
+                            if self.get_player_option(player.id, "Team") == team
+                        ]
+                        for team in list(self.teams)+[-1]  # playing teams + watchers
+                    }.items()
+                    if len(v)>0     # only teams with members
+                }
+            })
+        return result
 
     @property
     def map_name(self):

@@ -167,7 +167,7 @@ class ServerInstance(object):
             if dirty_queues:
                 self.write_broadcast({
                     "command": "matchmaker_info",
-                    "queues": [queue.to_dict() for queue in dirty_queues]
+                    "queues": [queue.to_dict() for (queue, _, _) in dirty_queues]
                 })
 
             if dirty_players:
@@ -181,20 +181,19 @@ class ServerInstance(object):
 
             # TODO: This spams squillions of messages: we should implement per-
             # connection message aggregation at the next abstraction layer down :P
-            for game in dirty_games:
+            for (game, only_to_peers, pings_only) in dirty_games:
                 if game.state == GameState.ENDED:
                     game_service.remove_game(game)
 
                 # So we're going to be broadcasting this to _somebody_...
-                message = game.to_dict()
+                message = game.to_dict(pings_only=pings_only)
+                game_players = game.players
+                def predicate(conn):
+                    return conn.authenticated \
+                        and game.is_visible_to_player(conn.player) \
+                        and ((not only_to_peers) or (conn.player in game_players))
 
-                self.write_broadcast(
-                    message,
-                    lambda conn: (
-                        conn.authenticated
-                        and game.is_visible_to_player(conn.player)
-                    )
-                )
+                self.write_broadcast(message, predicate)
 
             def get_game_datetime(iso_date_string):
                 for fmt in ["%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y"]:
