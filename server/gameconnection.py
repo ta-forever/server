@@ -280,7 +280,7 @@ class GameConnection(GpgNetServerProtocol):
 
     async def handle_game_metrics(self, key, value):
         if key == "PlayerPings" and len(value) > 0:
-            self._logger.debug("[PlayerPings] %d = %s", self.player.id, value)
+            self._logger.trace("[PlayerPings] gameid=%d, playerid=%d, pings=%s", self.game.id, self.player.id, value)
             self.game.update_player_pings(self.player.id, value)
 
         if self.is_host():
