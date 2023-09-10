@@ -279,13 +279,16 @@ class GameConnection(GpgNetServerProtocol):
         self._mark_dirty()
 
     async def handle_game_metrics(self, key, value):
+        ping_table_len_changed = False
         if key == "PlayerPings" and len(value) > 0:
             self._logger.trace("[PlayerPings] gameid=%d, playerid=%d, pings=%s", self.game.id, self.player.id, value)
+            ping_table_size = len(self.game.player_pings)
             self.game.update_player_pings(self.player.id, value)
+            ping_table_len_changed = ping_table_size != len(self.game.player_pings)
 
-        if self.is_host():
+        if self.is_host() or (ping_table_len_changed and self.game.host.id not in self.game.player_pings.keys()):
             # @TODO set pings_only=True once everyone has upgraded their clients to cope with it
-            self._mark_dirty(only_to_peers=True, pings_only=False)
+            self._mark_dirty(only_to_peers=not ping_table_len_changed, pings_only=False)
 
     async def handle_game_mods(self, mode, args):
         if not self.is_host():
