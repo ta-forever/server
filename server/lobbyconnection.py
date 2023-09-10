@@ -113,7 +113,8 @@ class LobbyConnection:
 
     async def ensure_authenticated(self, cmd):
         if not self._authenticated:
-            if cmd not in ["hello", "ask_session", "create_account", "ping", "pong", "Bottleneck"]:  # Bottleneck is sent by the game during reconnect
+            # Bottleneck is sent by the game during reconnect.  GameMetrics is sent by gpgnet4ta periodically
+            if cmd not in ["hello", "ask_session", "create_account", "ping", "pong", "Bottleneck", "GameMetrics"]:
                 metrics.unauth_messages.labels(cmd).inc()
                 await self.abort("Message invalid for unauthenticated connection: %s" % cmd)
                 return False
@@ -1160,8 +1161,11 @@ class LobbyConnection:
         if self.game_connection and self.game_connection.game:
             game = self.game_connection.game
             if game.host.id == self.player.id and game.state == GameState.STAGING:
-                password = message["password"]
-                self.game_connection.game.password = password if len(password) > 0 else None
+                try:
+                    password = message["password"]
+                    self.game_connection.game.password = password if len(password) > 0 else None
+                except KeyError:
+                    self.game_connection.game.password = None
                 self.game_connection._mark_dirty()
 
     async def command_set_game_map_details(self, message):
