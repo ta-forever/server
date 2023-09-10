@@ -965,7 +965,7 @@ class Game():
         if self.host is None:
             return False
 
-        if self.state in (GameState.LAUNCHING, GameState.LIVE, GameState.ENDED):
+        if self.state is GameState.ENDED:
             return True
 
         if player == self.host or player in self._connections:
