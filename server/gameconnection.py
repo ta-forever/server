@@ -281,7 +281,7 @@ class GameConnection(GpgNetServerProtocol):
     async def handle_game_metrics(self, key, value):
         ping_table_len_changed = False
         if key == "PlayerPings" and len(value) > 0:
-            self._logger.trace("[PlayerPings] gameid=%d, playerid=%d, pings=%s", self.game.id, self.player.id, value)
+            self._logger.log(TRACE, "[PlayerPings] gameid=%d, playerid=%d, pings=%s", self.game.id, self.player.id, value)
             ping_table_size = len(self.game.player_pings)
             self.game.update_player_pings(self.player.id, value)
             ping_table_len_changed = ping_table_size != len(self.game.player_pings)
