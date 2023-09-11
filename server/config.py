@@ -95,6 +95,7 @@ class ConfigurationStore:
         self.QUEUE_POP_DESIRED_MATCHES = 4
         # How many previous queue sizes to consider
         self.QUEUE_POP_TIME_MOVING_AVG_SIZE = 5
+        self.STRICT_MAP_POOL = True
 
         self.CASE_SENSITIVE_MAP_NAMES = False
         self.TADA_API_URL = 'https://tademos.xyz'

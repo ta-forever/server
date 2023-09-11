@@ -228,7 +228,7 @@ class Game():
         """
         :return: True if given map_id is a member of the game's map pool, or if game's map pool is None
         """
-        return self.map_pool_map_ids is None or map_id in self.map_pool_map_ids
+        return map_id is not None and (self.map_pool_map_ids is None or map_id in self.map_pool_map_ids)
 
     @property
     def is_mutually_agreed_draw(self) -> bool:
@@ -749,7 +749,7 @@ class Game():
         self._launch_fut.set_result(None)
         self._logger.info("Game launched")
 
-    def find_suitable_rating_queue(self, strict_team_size: bool):
+    def find_suitable_rating_queue(self, strict_team_size: bool, strict_map_pool: bool):
         if strict_team_size:
             teams = self.get_team_sets()
             if len(teams) != 2:
@@ -768,20 +768,25 @@ class Game():
 
         # largest queue by team size such that queue_size <= team_size
         best_queue = None
+        available_ranked_map_ids = [m.id for m in self.game_service.get_available_ranked_maps()]
         for queue in self.game_service.get_available_matchmaker_queues().values():
             if queue.featured_mod == self.game_mode and queue.team_size <= team_size:
-                pool = queue.get_map_pool_for_rating(1500)
-                if pool and self.map_id not in pool.get_map_ids():
-                    self._logger.info(f"[find_suitable_rating_queue] Game {self.id}: rejecting queue {queue.name} because game's map {self.map_id} is not in the queue's map pool")
+                if strict_map_pool:
+                    pool = queue.get_map_pool_for_rating(1500)
+                    if pool and self.map_id not in pool.get_map_ids():
+                        self._logger.info(f"[find_suitable_rating_queue] Game {self.id}: rejecting queue {queue.name} because game's map {self.map_id} is not in the queue's map pool")
+                        continue
+                elif self.map_id not in available_ranked_map_ids:
+                    self._logger.info(f"[find_suitable_rating_queue] Game {self.id}: rejecting queue {queue.name} because game's map {self.map_id} is not a ranked map")
                     continue
 
                 if best_queue is None or best_queue.team_size < queue.team_size:
-                    best_queue, best_queue_pool = queue, pool
+                    best_queue = queue
 
         return best_queue
 
-    def find_suitable_rating_type(self, strict_team_size: bool):
-        queue = self.find_suitable_rating_queue(strict_team_size)
+    def find_suitable_rating_type(self, strict_team_size: bool, strict_map_pool: bool):
+        queue = self.find_suitable_rating_queue(strict_team_size, strict_map_pool)
         return queue.rating_type if queue is not None else RatingType.GLOBAL
 
     async def finalise_rating_type(self):
@@ -797,7 +802,11 @@ class Game():
             self.rating_type = self.rating_type_preferred
             return
 
-        queue = self.find_suitable_rating_queue(strict_team_size=True)
+        default_ranked_maps = self.game_service.get_available_ranked_maps()
+        default_ranked_map_ids = None if default_ranked_maps is None else set([m.id for m in default_ranked_maps])
+        self.map_pool_map_ids = default_ranked_map_ids
+
+        queue = self.find_suitable_rating_queue(strict_team_size=True, strict_map_pool=config.STRICT_MAP_POOL)
         if queue is None:
             self._logger.info(f"[finalise_rating_type] Game {self.id}: no suitable queues found. setting to global")
             self.rating_type = RatingType.GLOBAL
@@ -806,8 +815,9 @@ class Game():
             self._logger.info(f"[finalise_rating_type] Game {self.id}: selecting rating_type from queue {queue.name}")
             self.matchmaker_queue_id = queue.id
             self.rating_type = queue.rating_type
-            pool = queue.get_map_pool_for_rating(1500)
-            self.map_pool_map_ids = None if pool is None else set(id_ for id_ in pool.get_map_ids())
+            if config.STRICT_MAP_POOL:
+                pool = queue.get_map_pool_for_rating(1500)
+                self.map_pool_map_ids = default_ranked_map_ids if pool is None else set(id_ for id_ in pool.get_map_ids())
 
     async def persist_mod_stats(self):
         if len(self.mods.keys()) > 0:

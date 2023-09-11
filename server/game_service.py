@@ -28,6 +28,8 @@ from .matchmaker import MatchmakerQueue
 from .message_queue_service import MessageQueueService
 from .players import Player
 from .rating_service import RatingService
+from .types import Map
+
 
 @with_logger
 class GameService(Service):
@@ -240,6 +242,12 @@ class GameService(Service):
 
     def get_available_matchmaker_queues(self) -> Dict[str,MatchmakerQueue]:
         return self._available_matchmaker_queues
+
+    def set_available_ranked_maps(self, map_list: List[Map]):
+        self._available_ranked_maps = map_list
+
+    def get_available_ranked_maps(self) -> List[Map]:
+        return self._available_ranked_maps
 
     @property
     def dirty_games(self):

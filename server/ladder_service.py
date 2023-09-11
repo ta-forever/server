@@ -62,6 +62,7 @@ class LadderService(Service):
     async def update_data(self) -> None:
         async with self._db.acquire() as conn:
             map_pool_maps = await self.fetch_map_pools(conn)
+            all_ranked_maps = await self.fetch_all_ranked_maps(conn)
             db_queues = await self.fetch_matchmaker_queues(conn)
 
         for name, info in db_queues.items():
@@ -104,6 +105,24 @@ class LadderService(Service):
                 del self.queues[queue_name]
 
         self.game_service.set_available_matchmaker_queues(self.queues)
+        self.game_service.set_available_ranked_maps(all_ranked_maps)
+
+    async def fetch_all_ranked_maps(self, conn) -> List[Map]:
+        result = await conn.execute(
+            select(
+                map_version.c.id.label("map_id"),
+                map_version.c.filename,
+                t_map.c.display_name
+            ).select_from(
+                map_version.outerjoin(t_map)
+            ).where(
+                map_version.c.ranked == true()
+            )
+        )
+        map_list = [Map(row.map_id, row.display_name, row.filename, 1)
+                    for row in result]
+        self._logger.info("[fetch_all_ranked_maps] found %d ranked map versions", len(map_list))
+        return map_list
 
     async def fetch_map_pools(self, conn) -> Dict[int, Tuple[str, List[Map]]]:
         result = await conn.execute(
