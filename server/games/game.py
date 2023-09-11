@@ -965,7 +965,7 @@ class Game():
         if self.host is None:
             return False
 
-        if self.state is GameState.ENDED:
+        if self.state in (GameState.LAUNCHING, GameState.LIVE, GameState.ENDED):
             return True
 
         if player == self.host or player in self._connections:
@@ -984,7 +984,7 @@ class Game():
         else:
             return player.id not in self.host.foes
 
-    def update_player_pings(self, player_id: int, peer_pings_str: str) -> int:
+    def update_player_pings(self, player_id: int, peer_pings_str: str):
         current_player_ids = set([p.id for p in self.players])
         self.player_pings[player_id] = [
             [pid2, ping]
