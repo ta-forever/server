@@ -6,7 +6,7 @@ from sqlalchemy import select, text
 from server.db import FAFDatabase
 
 from .abc.base_game import GameConnectionState
-from .config import TRACE
+from .config import TRACE, config
 from .db.models import coop_leaderboard, coop_map, teamkills
 from .decorators import with_logger
 from .game_service import GameService
@@ -142,6 +142,12 @@ class GameConnection(GpgNetServerProtocol):
             try:
                 self.game.add_game_connection(self)
             except GameError as e:
+                if self.player.lobby_connection:
+                    await self.player.lobby_connection.send({
+                        "command": "notice",
+                        "style": "game_join_fail",
+                        "text": f"Sorry, you can't join this game: {e}"
+                    })
                 await self.abort(f"GameError while joining {self.game.id}: {e}")
                 return
 
@@ -288,7 +294,7 @@ class GameConnection(GpgNetServerProtocol):
 
         if self.is_host() or (ping_table_len_changed and self.game.host.id not in self.game.player_pings.keys()):
             # @TODO set pings_only=True once everyone has upgraded their clients to cope with it
-            self._mark_dirty(only_to_peers=not ping_table_len_changed, pings_only=False)
+            self._mark_dirty(only_to_peers=not ping_table_len_changed, pings_only=config.PUBLISH_GAME_INFO_WITH_PINGS_ONLY)
 
     async def handle_game_mods(self, mode, args):
         if not self.is_host():

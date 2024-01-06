@@ -393,6 +393,9 @@ class Game():
         if self.state is GameState.INITIALIZING:
             raise GameError(f"Invalid GameState: {self.state}")
 
+        if len(self._connections) >= self.max_players:
+            raise GameError("Game is full")
+
         self._logger.info("Added game connection %s", game_connection)
         self._connections[game_connection.player] = game_connection
 

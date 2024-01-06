@@ -852,16 +852,33 @@ class LobbyConnection:
             })
             return
 
-        if not game or not game.is_visible_to_player(self.player):
+        if not game:
+            await self.send({
+                "command": "notice",
+                "style": "game_join_fail",
+                "text": "Cannot join game because it doesn't exist."
+            })
+            return
+
+        if len(game.players) >= game.max_players:
+            self._logger.debug("Game %s not joinable by player %s because game is full", game, self.player)
+            await self.send({
+                "command": "notice",
+                "style": "game_join_fail",
+                "text": "Sorry, you can't join this game because it is full."
+            })
+            return
+
+        if not game.is_visible_to_player(self.player):
             self._logger.debug("Game %s not visible to player %s", game, self.player)
             await self.send({
                 "command": "notice",
                 "style": "game_join_fail",
-                "text": "Sincerest of apologies, but due to a personality conflict you cannot join this game. Please do feel free to create your own, much better, game. Or just join a different one."
+                "text": "Sorry, you can't join this game because the host doesn't want you to (you are on his/her Foes list). You can make your own game or join a different one."
             })
             return
 
-        if not game or game.state not in (GameState.STAGING, GameState.BATTLEROOM):
+        if game.state not in (GameState.STAGING, GameState.BATTLEROOM):
             self._logger.debug("Game not joinable: %s state %s", game, game.state)
             await self.send({
                 "command": "notice",

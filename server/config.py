@@ -120,6 +120,8 @@ class ConfigurationStore:
         self.GALACTIC_WAR_MANUAL_CAPTURE = ""           # capture a planet for debugging purposes. eg "Core Prime:arm;Empyrrean:arm"
         self.ENABLE_FACTION_LOOKUP_FROM_REPLAY_META = True
 
+        self.PUBLISH_GAME_INFO_WITH_PINGS_ONLY = False
+
         self._defaults = {
             key: value for key, value in vars(self).items() if key.isupper()
         }
