@@ -722,12 +722,13 @@ class Game():
         return True
 
     async def on_launching(self, player_service):
-        assert self.state is GameState.BATTLEROOM
-        self.state = GameState.LAUNCHING
-        self.launched_at = time.time()
-        self._logger.info("Game LAUNCHING")
-        for player in self.players:
-            player_service.set_player_state(player, PlayerState.PLAYING)
+        self._logger.debug(f"[on_launching] gameid={self.id}, state={self.state}")
+        if self.state is GameState.BATTLEROOM:
+            self.state = GameState.LAUNCHING
+            self.launched_at = time.time()
+            self._logger.info("Game LAUNCHING")
+            for player in self.players:
+                player_service.set_player_state(player, PlayerState.PLAYING)
 
     async def on_live(self):
         """
@@ -736,21 +737,22 @@ class Game():
         Freezes the set of active players so they are remembered if they drop.
         :return: None
         """
-        assert self.state is GameState.LAUNCHING
-        self._players = self.players
-        self._players_with_unsent_army_stats = list(self._players)
+        self._logger.debug(f"[on_live] gameid={self.id}, state={self.state}")
+        if self.state is GameState.LAUNCHING:
+            self._players = self.players
+            self._players_with_unsent_army_stats = list(self._players)
 
-        self.state = GameState.LIVE
-        self._logger.info("Game LIVE")
+            self.state = GameState.LIVE
+            self._logger.info("Game LIVE")
 
-        await self.finalise_rating_type()
-        await self.persist_game_stats()
-        await self.persist_game_player_stats()
-        await self.persist_mod_stats()
-        await self.validate_game_settings()
+            await self.finalise_rating_type()
+            await self.persist_game_stats()
+            await self.persist_game_player_stats()
+            await self.persist_mod_stats()
+            await self.validate_game_settings()
 
-        self._launch_fut.set_result(None)
-        self._logger.info("Game launched")
+            self._launch_fut.set_result(None)
+            self._logger.info("Game launched")
 
     def find_suitable_rating_queue(self, strict_team_size: bool, strict_map_pool: bool):
         if strict_team_size:
