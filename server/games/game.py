@@ -742,10 +742,11 @@ class Game():
             self._players = self.players
             self._players_with_unsent_army_stats = list(self._players)
 
+            self.assign_rating_type(strict_team_size=True)
+
             self.state = GameState.LIVE
             self._logger.info("Game LIVE")
 
-            await self.finalise_rating_type()
             await self.persist_game_stats()
             await self.persist_game_player_stats()
             await self.persist_mod_stats()
@@ -794,16 +795,22 @@ class Game():
         queue = self.find_suitable_rating_queue(strict_team_size, strict_map_pool)
         return queue.rating_type if queue is not None else RatingType.GLOBAL
 
-    async def finalise_rating_type(self):
+    def assign_rating_type(self, strict_team_size: bool):
+
+        if self.state not in (GameState.STAGING, GameState.BATTLEROOM, GameState.LAUNCHING):
+            self._logger.info(f"[assign_rating_type] Game {self.id}: leaving rating_type={self.rating_type} because state {self.state}")
+            return
+
         if self.rating_type_preferred == RatingType.GLOBAL:
-            self._logger.info(f"[finalise_rating_type] Game {self.id}: ensuring rating_type global because preferred")
+            self._logger.info(f"[assign_rating_type] Game {self.id}: ensuring rating_type global because preferred")
             self.rating_type = RatingType.GLOBAL
             self.matchmaker_queue_id = None
             self.map_pool_map_ids = None
             return
 
-        if self.matchmaker_queue_id is not None:
-            self._logger.info(f"[finalise_rating_type] Game {self.id}: respecting rating_type_preferred {self.rating_type_preferred} because a queue is already set")
+        if self.game_type == GameType.MATCHMAKER:
+            assert(self.matchmaker_queue_id is not None)
+            self._logger.info(f"[assign_rating_type] Game {self.id}: respecting rating_type_preferred {self.rating_type_preferred} because GameType.MATCHMAKER")
             self.rating_type = self.rating_type_preferred
             return
 
@@ -811,13 +818,13 @@ class Game():
         default_ranked_map_ids = None if default_ranked_maps is None else set([m.id for m in default_ranked_maps])
         self.map_pool_map_ids = default_ranked_map_ids
 
-        queue = self.find_suitable_rating_queue(strict_team_size=True, strict_map_pool=config.STRICT_MAP_POOL)
+        queue = self.find_suitable_rating_queue(strict_team_size=strict_team_size, strict_map_pool=config.STRICT_MAP_POOL)
         if queue is None:
-            self._logger.info(f"[finalise_rating_type] Game {self.id}: no suitable queues found. setting to global")
+            self._logger.info(f"[assign_rating_type] Game {self.id}: no suitable queues found. setting to global")
             self.rating_type = RatingType.GLOBAL
 
         if queue is not None:
-            self._logger.info(f"[finalise_rating_type] Game {self.id}: selecting rating_type from queue {queue.name}")
+            self._logger.info(f"[assign_rating_type] Game {self.id}: selecting rating_type from queue {queue.name}")
             self.matchmaker_queue_id = queue.id
             self.rating_type = queue.rating_type
             if config.STRICT_MAP_POOL:
@@ -1030,6 +1037,7 @@ class Game():
             "pings": self.player_pings
         }
         if not pings_only:
+            self.assign_rating_type(strict_team_size=False)
             result.update({
                 "visibility": self.visibility.value,
                 "password_protected": self.password is not None,
