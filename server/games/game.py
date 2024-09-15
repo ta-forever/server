@@ -488,7 +488,7 @@ class Game():
         pass
 
     async def process_game_results(self):
-        if not self._results:
+        if not config.NO_GAME_RESULTS_IS_LOSS_FOR_HOST and not self._results:
             await self.mark_invalid(ValidityState.UNKNOWN_RESULT)
             return
 
@@ -506,7 +506,8 @@ class Game():
         basic_info = self.get_basic_info()
         team_outcomes = [GameOutcome.UNKNOWN for _ in basic_info.teams]
 
-        if self.validity is ValidityState.VALID:
+        self._logger.debug("[resolve_game_results] validity is %s", repr(self.validity))
+        if self.validity is ValidityState.VALID and self._results:
             try:
                 team_player_partial_outcomes = [
                     {self.get_player_outcome(player) for player in team}
@@ -519,6 +520,14 @@ class Game():
                 )
             except GameResolutionError:
                 await self.mark_invalid(ValidityState.UNKNOWN_RESULT)
+
+        elif self.validity is ValidityState.VALID and config.NO_GAME_RESULTS_IS_LOSS_FOR_HOST:
+            self._logger.info("[resolve_game_results] no self._results are available.  Assigning DEFEAT for the host's team")
+            self._logger.debug("[resolve_game_results] host=%s", repr(self.host.login))
+            self._logger.debug("[resolve_game_results] teams=%s", repr([[p.login for p in team] for team in basic_info.teams]))
+            team_outcomes = [GameOutcome.DEFEAT if self.host in team else GameOutcome.VICTORY
+                             for team in basic_info.teams]
+            self._logger.debug("[resolve_game_results] team_outcomes=%s", repr(team_outcomes))
 
         try:
             commander_kills = {
@@ -798,11 +807,11 @@ class Game():
     def assign_rating_type(self, strict_team_size: bool):
 
         if self.state not in (GameState.STAGING, GameState.BATTLEROOM, GameState.LAUNCHING):
-            self._logger.info(f"[assign_rating_type] Game {self.id}: leaving rating_type={self.rating_type} because state {self.state}")
+            self._logger.debug(f"[assign_rating_type] Game {self.id}: leaving rating_type={self.rating_type} because state {self.state}")
             return
 
         if self.rating_type_preferred == RatingType.GLOBAL:
-            self._logger.info(f"[assign_rating_type] Game {self.id}: ensuring rating_type global because preferred")
+            self._logger.debug(f"[assign_rating_type] Game {self.id}: ensuring rating_type global because preferred")
             self.rating_type = RatingType.GLOBAL
             self.matchmaker_queue_id = None
             self.map_pool_map_ids = None
@@ -810,7 +819,7 @@ class Game():
 
         if self.game_type == GameType.MATCHMAKER:
             assert(self.matchmaker_queue_id is not None)
-            self._logger.info(f"[assign_rating_type] Game {self.id}: respecting rating_type_preferred {self.rating_type_preferred} because GameType.MATCHMAKER")
+            self._logger.debug(f"[assign_rating_type] Game {self.id}: respecting rating_type_preferred {self.rating_type_preferred} because GameType.MATCHMAKER")
             self.rating_type = self.rating_type_preferred
             return
 
@@ -820,11 +829,11 @@ class Game():
 
         queue = self.find_suitable_rating_queue(strict_team_size=strict_team_size, strict_map_pool=config.STRICT_MAP_POOL)
         if queue is None:
-            self._logger.info(f"[assign_rating_type] Game {self.id}: no suitable queues found. setting to global")
+            self._logger.debug(f"[assign_rating_type] Game {self.id}: no suitable queues found. setting to global")
             self.rating_type = RatingType.GLOBAL
 
         if queue is not None:
-            self._logger.info(f"[assign_rating_type] Game {self.id}: selecting rating_type from queue {queue.name}")
+            self._logger.debug(f"[assign_rating_type] Game {self.id}: selecting rating_type from queue {queue.name}")
             self.matchmaker_queue_id = queue.id
             self.rating_type = queue.rating_type
             if config.STRICT_MAP_POOL:
