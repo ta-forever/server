@@ -563,26 +563,27 @@ class LobbyConnection:
                 )
             )
 
-            conforms_policy = await self.check_policy_conformity(
-                player_id, message["unique_id"], self.session,
-                ignore_result=(
-                    steamid is not None or
-                    self.player_service.is_uniqueid_exempt(player_id)
-                )
+        conforms_policy = await self.check_policy_conformity(
+            player_id, message["unique_id"], self.session,
+            ignore_result=(
+                steamid is not None or
+                self.player_service.is_uniqueid_exempt(player_id)
             )
-            if not conforms_policy:
-                return
+        )
+        if not conforms_policy:
+            return
 
-            # Update the user's IRC registration (why the fuck is this here?!)
-            m = hashlib.md5()
-            m.update(password.encode())
-            passwordmd5 = m.hexdigest()
-            m = hashlib.md5()
-            # Since the password is hashed on the client, what we get at this point is really
-            # md5(md5(sha256(password))). This is entirely insane.
-            m.update(passwordmd5.encode())
-            irc_pass = "md5:" + str(m.hexdigest())
+        # Update the user's IRC registration (why the fuck is this here?!)
+        m = hashlib.md5()
+        m.update(password.encode())
+        passwordmd5 = m.hexdigest()
+        m = hashlib.md5()
+        # Since the password is hashed on the client, what we get at this point is really
+        # md5(md5(sha256(password))). This is entirely insane.
+        m.update(passwordmd5.encode())
+        irc_pass = "md5:" + str(m.hexdigest())
 
+        async with self._db.acquire() as conn:
             try:
                 await conn.execute(
                     "UPDATE anope.anope_db_NickCore "
