@@ -149,7 +149,7 @@ class GameService(Service):
             with open(file_path, "rb") as fp:
                 file_content = fp.read()
                 data = json.loads(file_content)
-                file_content = file_content.decode("utf-8")
+                file_content = json.dumps(data, separators=(', ', ': '))
 
             game_id = data.get("gameId")
             ta_version = "{}.{}".format(data.get("taVersionMajor"), data.get("taVersionMinor"))
