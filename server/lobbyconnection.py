@@ -468,6 +468,7 @@ class LobbyConnection:
 
     async def check_policy_conformity(self, player_id, uid_hash, session, ignore_result=False):
         if not config.USE_POLICY_SERVER:
+            self._logger.info(f"[check_policy_conformity] passing player={player_id} because USE_POLICY_SERVER is disabled in config")
             return True
 
         url = config.FAF_POLICY_SERVER_BASE_URL + "/verify"
@@ -486,51 +487,23 @@ class LobbyConnection:
                 response = await resp.json()
 
         if ignore_result:
-            self._logger.debug("[check_policy_conformity] returning True because 'ignore_result' is set")
+            self._logger.info(f"[check_policy_conformity] passing player={player_id} because ignore_result is set")
             return True
 
-        if response.get("result", "") == "vm":
-            self._logger.debug("Using VM: %d: %s", player_id, uid_hash)
-            """
-            await self.send({
-                "command": "notice",
-                "style": "error",
-                "text": (
-                    "You need to link your account to Steam in order to use "
-                    "FAF in a virtual machine. Please contact an admin or "
-                    "moderator on the forums if you feel this is a false "
-                    "positive."
-                )
-            })
-            await self.send_warning("Your computer seems to be a virtual machine.<br><br>In order to "
-                                    "log in from a VM, you have to link your account to Steam: <a href='" +
-                                    config.WWW_URL + "/account/link'>" +
-                                    config.WWW_URL + "/account/link</a>.<br>If you need an exception, please contact an "
-                                                     "admin or moderator on the forums", fatal=True)
-            """
+        warning_message = response.get("warning_message", None) # or string
+        ban_reason = response.get("ban_reason", None) # or string
+        allow_login = response.get("allow_login", True)
 
-        if response.get("result", "") == "already_associated":
-            self._logger.warning("UID hit: %d: %s", player_id, uid_hash)
-            await self.send_warning("Your computer is already associated with another FAF account.<br><br>In order to "
-                                    "log in with an additional account, you have to link it to Steam: <a href='" +
-                                    config.WWW_URL + "/account/link'>" +
-                                    config.WWW_URL + "/account/link</a>.<br>If you need an exception, please contact an "
-                                                     "admin or moderator on the forums", fatal=True)
-            return False
+        if warning_message is not None:
+            self._logger.info(f"[check_policy_conformity] notifying player:\n{warning_message}")
+            await self.send_warning(warning_message, fatal=not allow_login)
 
-        if response.get("result", "") == "fraudulent":
-            self._logger.info("Banning player %s for fraudulent looking login.", player_id)
-            await self.send_warning(
-                "Fraudulent login attempt detected. As a precautionary measure, your account has been "
-                "banned permanently. Please contact an admin or moderator on the forums if you feel this is "
-                "a false positive.",
-                fatal=True
-            )
-
+        if ban_reason is not None:
+            self._logger.info(f"[check_policy_conformity] banning player:\n{ban_reason}")
             async def insert_ban():
                 async with self._db.acquire() as conn:
                     try:
-                        ban_reason = "Auto-banned because of fraudulent login attempt"
+                        ban_reason = response.get("ban_reason")
                         ban_level = "GLOBAL"
                         await conn.execute(
                             ban.insert().values(
@@ -542,11 +515,9 @@ class LobbyConnection:
                         )
                     except DBAPIError as e:
                         self._logger.error("Banning failed for player %s: %s", player_id, e)
-
             asyncio.create_task(insert_ban())
-            return False
 
-        return response.get("result", "") == "honest"
+        return allow_login
 
     async def command_hello(self, message):
         login = message["login"].strip()
