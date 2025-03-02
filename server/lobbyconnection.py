@@ -486,10 +486,12 @@ class LobbyConnection:
                 response = await resp.json()
 
         if ignore_result:
+            self._logger.debug("[check_policy_conformity] returning True because 'ignore_result' is set")
             return True
 
         if response.get("result", "") == "vm":
             self._logger.debug("Using VM: %d: %s", player_id, uid_hash)
+            """
             await self.send({
                 "command": "notice",
                 "style": "error",
@@ -505,6 +507,7 @@ class LobbyConnection:
                                     config.WWW_URL + "/account/link'>" +
                                     config.WWW_URL + "/account/link</a>.<br>If you need an exception, please contact an "
                                                      "admin or moderator on the forums", fatal=True)
+            """
 
         if response.get("result", "") == "already_associated":
             self._logger.warning("UID hit: %d: %s", player_id, uid_hash)
@@ -517,26 +520,30 @@ class LobbyConnection:
 
         if response.get("result", "") == "fraudulent":
             self._logger.info("Banning player %s for fraudulent looking login.", player_id)
-            await self.send_warning("Fraudulent login attempt detected. As a precautionary measure, your account has been "
-                                    "banned permanently. Please contact an admin or moderator on the forums if you feel this is "
-                                    "a false positive.",
-                                    fatal=True)
+            await self.send_warning(
+                "Fraudulent login attempt detected. As a precautionary measure, your account has been "
+                "banned permanently. Please contact an admin or moderator on the forums if you feel this is "
+                "a false positive.",
+                fatal=True
+            )
 
-            async with self._db.acquire() as conn:
-                try:
-                    ban_reason = "Auto-banned because of fraudulent login attempt"
-                    ban_level = "GLOBAL"
-                    await conn.execute(
-                        ban.insert().values(
-                            player_id=player_id,
-                            author_id=player_id,
-                            reason=ban_reason,
-                            level=ban_level,
+            async def insert_ban():
+                async with self._db.acquire() as conn:
+                    try:
+                        ban_reason = "Auto-banned because of fraudulent login attempt"
+                        ban_level = "GLOBAL"
+                        await conn.execute(
+                            ban.insert().values(
+                                player_id=player_id,
+                                author_id=player_id,
+                                reason=ban_reason,
+                                level=ban_level,
+                            )
                         )
-                    )
-                except DBAPIError as e:
-                    raise ClientError("Banning failed: {}".format(e))
+                    except DBAPIError as e:
+                        self._logger.error("Banning failed for player %s: %s", player_id, e)
 
+            asyncio.create_task(insert_ban())
             return False
 
         return response.get("result", "") == "honest"
@@ -571,6 +578,7 @@ class LobbyConnection:
             )
         )
         if not conforms_policy:
+            self._logger.info("[command_hello] user %s fails policy check. aborting login", login)
             return
 
         # Update the user's IRC registration (why the fuck is this here?!)
