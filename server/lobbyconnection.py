@@ -402,6 +402,7 @@ class LobbyConnection:
                 t_login.c.password,
                 t_login.c.steamid,
                 t_login.c.create_time,
+                t_login.c.last_login,
                 lobby_ban.c.reason,
                 lobby_ban.c.expires_at
             ).select_from(t_login.outerjoin(lobby_ban))
@@ -440,9 +441,9 @@ class LobbyConnection:
                 'Unfortunately, you must currently link your account to Steam in order to play Forged Alliance Forever. You can do so on <a href="{steamlink_url}">{steamlink_url}</a>.'.format(steamlink_url=config.WWW_URL + "/account/link"),
                 recoverable=False)
 
-        self._logger.debug("Login from: %s, %s, %s", player_id, username, self.session)
+        self._logger.debug("Login from: %s, %s, %s, last_login=%s", player_id, username, self.session, row.last_login)
 
-        return player_id, real_username, steamid
+        return player_id, real_username, steamid, row.last_login
 
     def _set_user_agent_and_version(self, user_agent, version):
         metrics.user_connections.labels(str(self.user_agent), str(self.version)).dec()
@@ -528,7 +529,7 @@ class LobbyConnection:
         local_ip = message.get("local_ip", None)
 
         async with self._db.acquire() as conn:
-            player_id, login, steamid = await self.check_user_login(conn, login, password)
+            player_id, login, steamid, timestamp_last_login = await self.check_user_login(conn, login, password)
             metrics.user_logins.labels("success").inc()
 
             await conn.execute(
@@ -616,6 +617,14 @@ class LobbyConnection:
             "command": "player_info",
             "players": [player.to_dict() for player in self.player_service]
         })
+
+        # send new players a welcome message
+        if timestamp_last_login is None and config.NEW_USER_WELCOME_MESSAGE is not None:
+            await self.send({
+                "command": "notice",
+                "style": "info",
+                "text": config.NEW_USER_WELCOME_MESSAGE
+            })
 
         # Tell everyone else online about us. This must happen after all the player_info messages.
         # This ensures that no other client will perform an operation that interacts with the

@@ -122,6 +122,7 @@ class ConfigurationStore:
 
         self.PUBLISH_GAME_INFO_WITH_PINGS_ONLY = False
         self.NO_GAME_RESULTS_IS_LOSS_FOR_HOST = True
+        self.NEW_USER_WELCOME_MESSAGE = None
 
         self._defaults = {
             key: value for key, value in vars(self).items() if key.isupper()
