@@ -964,6 +964,7 @@ class LobbyConnection:
         enforce_rating_range = bool(message.get("enforce_rating_range", False))
         replay_delay_seconds = int(message.get("replay_delay_seconds", 300))
         galactic_war_planet_name = message.get("galactic_war_planet_name") or None
+        max_players = message.get("max_players") or 10
         if rating_min is not None:
             rating_min = float(rating_min)
         if rating_max is not None:
@@ -982,7 +983,8 @@ class LobbyConnection:
             displayed_rating_range=InclusiveRange(rating_min, rating_max),
             enforce_rating_range=enforce_rating_range,
             replay_delay_seconds=replay_delay_seconds,
-            galactic_war_planet_name=galactic_war_planet_name
+            galactic_war_planet_name=galactic_war_planet_name,
+            max_players=max_players
         )
         await self.launch_game(game, is_host=True)
 
@@ -1013,7 +1015,7 @@ class LobbyConnection:
         self.player.game = game
         cmd = {
             "command": "game_launch",
-            "args": ["/numgames", self.player.game_count[game.rating_type]],
+            "args": ["/players", game.max_players or 10],
             "uid": game.id,
             "mod": game.game_mode,
             # Following parameters may not be used by the client yet. They are
