@@ -4,6 +4,7 @@ import contextlib
 from sqlalchemy import select, text
 
 from server.db import FAFDatabase
+from server.rating import InclusiveRange
 
 from .abc.base_game import GameConnectionState
 from .config import TRACE, config
@@ -283,6 +284,26 @@ class GameConnection(GpgNetServerProtocol):
                 self.game.name = value
 
         self._mark_dirty()
+
+    async def handle_set_game_rating_range(self, min_rating: int, max_rating: int, enforce_rating_range: bool):
+        self._logger.info("[handle_set_game_rating_range] game_id=%d, min_rating=%d, max_rating=%d, enforce_rating=%s", self.game.id, min_rating, max_rating, enforce_rating_range)
+        self.game.displayed_rating_range = InclusiveRange(min_rating, max_rating)
+        self.game.enforce_rating_range = enforce_rating_range
+
+    async def handle_set_game_rating_min(self, min_rating: int, enforce_rating_range: bool):
+        self._logger.info("[handle_set_game_rating_min] game_id=%d, min_rating=%d, enforce_rating=%s", self.game.id, min_rating, enforce_rating_range)
+        self.game.displayed_rating_range = InclusiveRange(min_rating, None)
+        self.game.enforce_rating_range = enforce_rating_range
+
+    async def handle_set_game_rating_max(self, max_rating: int, enforce_rating_range: bool):
+        self._logger.info("[handle_set_game_rating_max] game_id=%d, max_rating=%d, enforce_rating=%s", self.game.id, max_rating, enforce_rating_range)
+        self.game.displayed_rating_range = InclusiveRange(None, max_rating)
+        self.game.enforce_rating_range = enforce_rating_range
+
+    async def handle_clear_game_rating_range(self):
+        self._logger.info("[handle_clear_game_rating_range] game_id=%d", self.game.id)
+        self.game.displayed_rating_range = InclusiveRange(None, None)
+        self.game.enforce_rating_range = False
 
     async def handle_game_metrics(self, key, value):
         ping_table_len_changed = False
@@ -620,6 +641,10 @@ COMMAND_HANDLERS = {
     "OperationComplete":    GameConnection.handle_operation_complete,
     "JsonStats":            GameConnection.handle_json_stats,
     "EnforceRating":        GameConnection.handle_enforce_rating,
+    "SetGameRatingRange":   GameConnection.handle_set_game_rating_range,
+    "SetGameRatingMin":     GameConnection.handle_set_game_rating_min,
+    "SetGameRatingMax":     GameConnection.handle_set_game_rating_max,
+    "ClearGameRatingRange": GameConnection.handle_clear_game_rating_range,
     "TeamkillReport":       GameConnection.handle_teamkill_report,
     "TeamkillHappened":     GameConnection.handle_teamkill_happened,
     "GameEnded":            GameConnection.handle_game_ended,
@@ -630,5 +655,5 @@ COMMAND_HANDLERS = {
     "IceMsg":               GameConnection.handle_ice_message,
     "Chat":                 GameConnection.handle_chat,
     "GameFull":             GameConnection.handle_game_full,
-    "GameMetrics":          GameConnection.handle_game_metrics
+    "GameMetrics":          GameConnection.handle_game_metrics,
 }

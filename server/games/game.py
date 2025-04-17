@@ -107,13 +107,13 @@ class Game():
         self.rating_type = rating_type or RatingType.GLOBAL     # NB potentially overriden to GLOBAL on game going live
         self.rating_type_preferred = self.rating_type
         self.displayed_rating_range = displayed_rating_range or InclusiveRange()
-        self.enforce_rating_range = enforce_rating_range
+        self.enforce_rating_range = enforce_rating_range        # enforce joiners meet rating requirements
+        self.enforce_rating = False                             # enforce rating updates regardless of otherwise (in)validity
         self.matchmaker_queue_id = matchmaker_queue_id
         self.state = GameState.INITIALIZING
         self.replay_delay_seconds = replay_delay_seconds
         self.galactic_war_planet_name = galactic_war_planet_name
         self._connections = {}
-        self.enforce_rating = False
         self.gameOptions = {
             "FogOfWar": "explored",
             "GameSpeed": "normal",
