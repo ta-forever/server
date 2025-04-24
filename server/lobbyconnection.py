@@ -863,7 +863,7 @@ class LobbyConnection:
             await self.send({
                 "command": "notice",
                 "style": "game_join_fail",
-                "text": "Sorry, you can't join this game because the host doesn't want you to (you are on his/her Foes list). You can make your own game or join a different one."
+                "text": "Sorry, you can't join this game due to restriction set by the host (friends-only, rating requirement, or you're a foe of the host). You can create your own game or try to join another."
             })
             return
 
