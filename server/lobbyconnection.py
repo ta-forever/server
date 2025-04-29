@@ -565,14 +565,15 @@ class LobbyConnection:
 
         async with self._db.acquire() as conn:
             try:
+                db_name = config.FAF_ANOPE_DB_NAME
                 await conn.execute(
-                    "UPDATE anope.anope_db_NickCore "
+                    f"UPDATE `{db_name}`.anope_db_NickCore "
                     "SET pass = :passwd WHERE display = :display",
                     passwd=irc_pass,
                     display=login
                 )
             except (OperationalError, ProgrammingError) as e:
-                self._logger.error("Failure updating NickServ password for %s. (Probably no entry exists to be updated for the given login)", login)
+                self._logger.exception(e)
 
         self.player = Player(
             login=str(login),

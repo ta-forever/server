@@ -44,6 +44,7 @@ class ConfigurationStore:
         self.DB_LOGIN = "root"
         self.DB_PASSWORD = "banana"
         self.DB_NAME = "faf"
+        self.FAF_ANOPE_DB_NAME = "faf-anope"
 
         self.API_CLIENT_ID = "client_id"
         self.API_CLIENT_SECRET = "banana"
