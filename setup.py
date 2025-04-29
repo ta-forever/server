@@ -5,7 +5,7 @@ from pathlib import Path
 
 from setuptools import find_packages
 
-import server
+import _version as version_info
 
 
 def get_version() -> str:
@@ -31,9 +31,9 @@ setup(
     version=get_version(),
     packages=["server"] + find_packages(),
     url="http://www.faforever.com",
-    license=server.__license__,
-    author=server.__author__,
-    author_email=server.__contact__,
+    license=version_info.__license__,
+    author=version_info.__author__,
+    author_email=version_info.__contact__,
     description="Lobby/game server project",
     include_package_data=True
 )
