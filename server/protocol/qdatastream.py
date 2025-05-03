@@ -4,10 +4,9 @@ import struct
 from typing import Tuple
 
 from server.decorators import with_logger
+from server.config import config
 
 from .protocol import Protocol, json_encoder
-
-QDATASTREAM_PROTOCOL_MAX_BLOCK_LENGTH = 65535
 
 @with_logger
 class QDataStreamProtocol(Protocol):
@@ -89,8 +88,8 @@ class QDataStreamProtocol(Protocol):
         :return dict: Parsed message
         """
         (block_length, ) = struct.unpack("!I", (await self.reader.readexactly(4)))
-        if block_length > QDATASTREAM_PROTOCOL_MAX_BLOCK_LENGTH:
-            raise ValueError(f"block_length={block_length} exceeds maximum {QDATASTREAM_PROTOCOL_MAX_BLOCK_LENGTH}")
+        if block_length > config.QDATASTREAM_PROTOCOL_MAX_BLOCK_LENGTH:
+            raise ValueError(f"block_length={block_length} exceeds maximum {config.QDATASTREAM_PROTOCOL_MAX_BLOCK_LENGTH}")
         block = await self.reader.readexactly(block_length)
         # FIXME: New protocol will remove the need for this
 
