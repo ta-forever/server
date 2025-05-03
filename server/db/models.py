@@ -111,7 +111,8 @@ game_featuredMods = Table(
     Column("git_url",        String),
     Column("git_branch",     String),
     Column("file_extension", String),
-    Column("allow_override", Boolean)
+    Column("allow_override", Boolean),
+    Column("trueskill_env", String)
 )
 
 game_player_stats = Table(

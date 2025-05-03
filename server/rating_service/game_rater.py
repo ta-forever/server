@@ -20,7 +20,15 @@ class GameRater:
     @classmethod
     def compute_rating(cls,
                        player_data: List[EndedGamePlayerSummary],
-                       ratings: Dict[PlayerID, Rating]) -> Tuple[Dict[PlayerID, Rating], Dict[TeamID, OutcomeLikelihoods]]:
+                       ratings: Dict[PlayerID, Rating],
+                       env: Dict[str, float]) -> Tuple[Dict[PlayerID, Rating], Dict[TeamID, OutcomeLikelihoods]]:
+
+        try:
+            env = trueskill.TrueSkill(**env)
+        except:
+            cls._logger.exception("[compute_rating] Unable to construct trueskill environment")
+            env = trueskill.global_env()
+        cls._logger.debug(f"[compute_rating] {env}")
 
         rating_groups = {team_id:{pd.player_id: ratings[pd.player_id] for pd in player_data if pd.team_id == team_id}
                          for team_id in dict.fromkeys([pd.team_id for pd in player_data])}
@@ -39,7 +47,7 @@ class GameRater:
         else:
             raise GameRatingError("Sorry multiteam/ffa not implemented")
 
-        new_rating_groups: List[Dict[PlayerID, Rating]] = trueskill.rate(list(rating_groups.values()), ranks)
+        new_rating_groups: List[Dict[PlayerID, Rating]] = env.rate(list(rating_groups.values()), ranks)
         new_ratings = {
             player_id: new_rating
             for team in new_rating_groups
@@ -68,9 +76,9 @@ class GameRater:
 
         team_outcome_likelihoods = {
             team_id: OutcomeLikelihoods(
-                GameRater.likelihood_win_1v1(agg_team_rating, agg_original_team_ratings[other_team_id(team_id)]),
-                GameRater.likelihood_draw_1v1(agg_team_rating, agg_original_team_ratings[other_team_id(team_id)]),
-                GameRater.likelihood_lose_1v1(agg_team_rating, agg_original_team_ratings[other_team_id(team_id)]))
+                GameRater.likelihood_win_1v1(agg_team_rating, agg_original_team_ratings[other_team_id(team_id)], env),
+                GameRater.likelihood_draw_1v1(agg_team_rating, agg_original_team_ratings[other_team_id(team_id)], env),
+                GameRater.likelihood_lose_1v1(agg_team_rating, agg_original_team_ratings[other_team_id(team_id)], env))
             for team_id, agg_team_rating in agg_original_team_ratings.items()
         }
 

@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from typing import Dict, Callable, Coroutine, Awaitable, List, Set
 
 import aiocron
+import json
 from sqlalchemy import and_, case, func, select
 from trueskill import Rating
 
@@ -13,7 +14,8 @@ from server.db.models import (
     game_player_stats,
     leaderboard,
     leaderboard_rating,
-    leaderboard_rating_journal
+    leaderboard_rating_journal,
+    game_featuredMods
 )
 from server.decorators import with_logger
 from server.games.game_results import GameOutcome
@@ -89,11 +91,25 @@ class RatingService(Service):
             )
             result = await conn.execute(sql)
             rows = result.fetchall()
+            self._rating_type_ids = RatingTypeMap(
+                None,
+                ((row.technical_name, row.id) for row in rows)
+            )
 
-        self._rating_type_ids = RatingTypeMap(
-            None,
-            ((row.technical_name, row.id) for row in rows)
-        )
+            sql = select(
+                game_featuredMods.c.gamemod,
+                game_featuredMods.c.trueskill_env
+            ).select_from(game_featuredMods)
+            result = await conn.execute(sql)
+            rows = result.fetchall()
+            envs = {}
+            for row in rows:
+                try:
+                    self._logger.debug(f"[update_data] got trueskill env for {row.gamemod}: {row.trueskill_env}")
+                    envs[row.gamemod] = json.loads(row.trueskill_env)
+                except:
+                    self._logger.exception(f"[update_data] Error updating trueskill environment for {row.gamemod}")
+            self._trueskill_envs_by_mod_name = envs
 
     async def enqueue(self, game_info: EndedGameInfo) -> None:
         if not self._accept_input:
@@ -135,10 +151,13 @@ class RatingService(Service):
         self._logger.debug("RatingService stopped.")
 
     async def _rate(self, game_info: EndedGameInfo) -> None:
+
         player_id_set = set([player_info.player_id for player_info in game_info.ended_game_player_summary])
         _old_ratings: Dict[PlayerID, RankedRating] = await self._get_player_ratings(player_id_set, game_info.rating_type)
         old_ratings: Dict[PlayerID, Rating] = {pid: r.rating for pid, r in _old_ratings.items()}
-        new_ratings, team_outcome_likelihoods = GameRater.compute_rating(game_info.ended_game_player_summary, old_ratings)
+
+        env = self._trueskill_envs_by_mod_name.get(game_info.game_mode, None)
+        new_ratings, team_outcome_likelihoods = GameRater.compute_rating(game_info.ended_game_player_summary, old_ratings, env)
 
         for f in self._game_rating_callbacks:
             await f(game_info, _old_ratings, new_ratings, team_outcome_likelihoods)
