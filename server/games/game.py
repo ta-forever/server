@@ -5,6 +5,7 @@ import time
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Set, Tuple, Iterable
 
+import aiohttp
 import sqlalchemy
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy import and_, bindparam, text
@@ -502,6 +503,7 @@ class Game():
             raise GameError("Cannot rate game that has not gone live.")
 
         await self._run_pre_rate_validity_checks()
+        await self._validate_launch_codes()
 
         basic_info = self.get_basic_info()
         team_outcomes = [GameOutcome.UNKNOWN for _ in basic_info.teams]
@@ -729,6 +731,65 @@ class Game():
                     await self.mark_invalid(validity_state)
                     return False
         return True
+
+    async def _validate_launch_codes(self):
+        if not config.RUN_VALIDATE_LAUNCH_CODES:
+            return
+
+        async with self._db.acquire() as conn:
+            result = await conn.execute(
+                text("""
+                    SELECT login_id, game_id, data, create_time
+                    FROM game_launch_verifier
+                    WHERE game_id = :game_id
+                      AND login_id IN :login_ids
+                """),
+                {"game_id": self.id, "login_ids": tuple(p.id for p in self.players)}
+            )
+            rows = result.mappings().all()
+
+        # Pick the most recent row per player_id
+        latest_by_player = {}
+        for row in rows:
+            pid = row["login_id"]
+            if pid not in latest_by_player or row["create_time"] > latest_by_player[pid]["create_time"]:
+                latest_by_player[pid] = row
+
+        url = config.FAF_POLICY_SERVER_BASE_URL + "/verify"
+        new_validity = None
+        for player in self.players:
+            if player.id not in latest_by_player:
+                self._logger.info("[_validate_launch_codes] game_id=%s player=%s(%s): no launch codes found", player.login, player.id, self.id)
+                new_validity = ValidityState.OTHER_UNRANK
+                continue
+
+            row = latest_by_player[player.id]
+            payload = {
+                "player_id": row["login_id"],
+                "uid_hash": "launch_codes:" + row["data"],
+                "session": self.id
+            }
+            headers = {
+                "content-type": "application/json",
+                "cache-control": "no-cache"
+            }
+
+            async with aiohttp.ClientSession(raise_for_status=True) as session:
+                async with session.post(url, json=payload, headers=headers) as resp:
+                    response = await resp.json()
+
+            warning_message = response.get("warning_message", None)
+            allow_launch = response.get("allow_launch", True)
+            if not allow_launch:
+                self._logger.info(
+                    "[_validate_launch_codes] game_id=%s player=%s(%s): %s",
+                    self.id, player.login, player.id, warning_message
+                )
+                new_validity = ValidityState.BAD_MOD
+
+        if config.UNRANK_ON_INVALID_LAUNCH_CODES and new_validity is not None:
+            await self.mark_invalid(new_validity_state=new_validity)
+
 
     async def on_launching(self, player_service):
         self._logger.debug(f"[on_launching] gameid={self.id}, state={self.state}")
@@ -967,8 +1028,7 @@ class Game():
         if self.state not in (GameState.LAUNCHING, GameState.LIVE):
             return
 
-        # Currently, we can only end up here if a game desynced or was a custom game that terminated
-        # too quickly.
+        # we end up here when called by _run_pre_rate_validity_checks or _validate_launch_codes
         async with self._db.acquire() as conn:
             await conn.execute(
                 game_stats.update().where(
