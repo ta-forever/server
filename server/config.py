@@ -127,6 +127,7 @@ class ConfigurationStore:
         self.QDATASTREAM_PROTOCOL_MAX_BLOCK_LENGTH = 65535
         self.RUN_VALIDATE_LAUNCH_CODES = False
         self.UNRANK_ON_INVALID_LAUNCH_CODES = False
+        self.NOTIFY_USERS_ON_INVALID_LAUNCH_CODES = False
 
         self._defaults = {
             key: value for key, value in vars(self).items() if key.isupper()

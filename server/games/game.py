@@ -757,9 +757,11 @@ class Game():
 
         url = config.FAF_POLICY_SERVER_BASE_URL + "/verify"
         new_validity = None
+        fail_reasons = []
         for player in self.players:
             if player.id not in latest_by_player:
-                self._logger.info("[_validate_launch_codes] game_id=%s player=%s(%s): no launch codes found", player.login, player.id, self.id)
+                fail_reasons.append(f"player={player.login} did not submit any launch codes")
+                self._logger.info("[_validate_launch_codes] Game %s was unranked because %s", self.id, fail_reasons[-1])
                 new_validity = ValidityState.OTHER_UNRANK
                 continue
 
@@ -781,15 +783,22 @@ class Game():
             warning_message = response.get("warning_message", None)
             allow_launch = response.get("allow_launch", True)
             if not allow_launch:
-                self._logger.info(
-                    "[_validate_launch_codes] game_id=%s player=%s(%s): %s",
-                    self.id, player.login, player.id, warning_message
-                )
+                fail_reasons.append(f"player={player.login} {warning_message}")
+                self._logger.info("[_validate_launch_codes] Game %s was unranked because %s", self.id, fail_reasons[-1])
                 new_validity = ValidityState.BAD_MOD
 
-        if config.UNRANK_ON_INVALID_LAUNCH_CODES and new_validity is not None:
-            await self.mark_invalid(new_validity_state=new_validity)
+        if self.validity is ValidityState.VALID and new_validity is not None:
+            if config.NOTIFY_USERS_ON_INVALID_LAUNCH_CODES:
+                fail_reasons = '; '.join(fail_reasons)
+                for player in self.players:
+                    await player.lobby_connection.send({
+                        "command": "notice",
+                        "style": "error",
+                        "text": f"Game {self.id} invalid because {fail_reasons}"
+                    })
 
+            if config.UNRANK_ON_INVALID_LAUNCH_CODES:
+                await self.mark_invalid(new_validity_state=new_validity)
 
     async def on_launching(self, player_service):
         self._logger.debug(f"[on_launching] gameid={self.id}, state={self.state}")
