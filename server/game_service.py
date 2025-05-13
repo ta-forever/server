@@ -118,19 +118,36 @@ class GameService(Service):
 
     async def archive_new_replays(self):
         """
-        looks for /content/replays/mmnnooppqq.tad and archive them into /content/replays/mm/nn/oo/pp/mmnnooppqq.tad
+        Looks for /content/replays/mmnnooppqq.tad and archives them into
+        /content/replays/mm/nn/oo/pp/mmnnooppqq.zip. If the zip already exists,
+        archive to dups/<game_id>.zip instead.
         """
         replays_path = "/content/replays"
+        dups_path = os.path.join(replays_path, "dups")
+        os.makedirs(dups_path, exist_ok=True)
+
         for file_path in glob.glob(f"{replays_path}/*.tad"):
             file_name = os.path.basename(file_path)
             game_id = int(os.path.splitext(file_name)[0])
             archive_dir = self.get_archive_dir_for_game_id(game_id)
+            archive_path = os.path.join(archive_dir, f"{game_id}.zip")
 
-            self._logger.info("[archive_new_replays] archiving replay %s to %s", file_path, archive_dir)
-            os.makedirs(archive_dir, exist_ok=True)
-            shutil.make_archive(os.path.join(archive_dir, str(game_id)), "zip", replays_path, f"{game_id}.tad")
+            if os.path.exists(archive_path):
+                self._logger.warning("[archive_new_replays] archive already exists for game_id=%s, saving to dups/", game_id)
+                archive_path = os.path.join(dups_path, f"{game_id}.zip")
+
+                if os.path.exists(archive_path):
+                    self._logger.info("[archive_new_replays] duplicate archive for game_id=%s already exists in dups/, overwriting", game_id)
+            else:
+                os.makedirs(archive_dir, exist_ok=True)
+
+            # Create the zip archive
+            shutil.make_archive(os.path.splitext(archive_path)[0], "zip", replays_path, f"{game_id}.tad")
+
+            # Delete original file
             os.remove(file_path)
 
+            # Mark replay as available in the DB
             async with self._db.acquire() as conn:
                 await conn.execute(sqlalchemy.sql.text(
                     "UPDATE `game_stats` SET `game_stats`.`replay_available` = 1 WHERE `game_stats`.`id` = :game_id"),
@@ -193,8 +210,8 @@ class GameService(Service):
                         continue
 
                 await conn.execute(sqlalchemy.sql.text(
-                    "UPDATE `game_stats` SET replay_meta = :replay_meta WHERE id = :game_id"),
-                    replay_meta=file_content, game_id=game_id)
+                    "UPDATE game_stats SET replay_meta = :replay_meta WHERE id = :game_id AND replay_meta IS NULL"
+                ), replay_meta=file_content, game_id=game_id)
 
                 os.remove(file_path)
                 if row[1] is None:
