@@ -681,7 +681,7 @@ class Game():
                 await self.mark_invalid(ValidityState.BAD_MOD)
                 return
 
-        if self.has_ai:
+        if len(self.AIs) > config.RANKED_MAX_NUMBER_OF_AI:
             await self.mark_invalid(ValidityState.HAS_AI_PLAYERS)
             return
         if self.is_multi_team:
@@ -691,7 +691,6 @@ class Game():
             await self.mark_invalid(ValidityState.FFA_NOT_RANKED)
             return
         valid_options = {
-            "AIReplacement": (FA.FALSE, ValidityState.HAS_AI_PLAYERS),
             "FogOfWar": ("explored", ValidityState.NO_FOG_OF_WAR),
             "CheatsEnabled": (FA.FALSE, ValidityState.CHEATS_ENABLED),
             "PrebuiltUnits": (FA.FALSE, ValidityState.PREBUILT_ENABLED),
@@ -699,6 +698,8 @@ class Game():
             "RestrictedCategories": (0, ValidityState.BAD_UNIT_RESTRICTIONS),
             "TeamLock": ("locked", ValidityState.UNLOCKED_TEAMS)
         }
+        if len(self.AIs) > config.RANKED_MAX_NUMBER_OF_AI:
+            valid_options["AIReplacement"] = (FA.FALSE, ValidityState.HAS_AI_PLAYERS)
         if await self._validate_game_options(valid_options) is False:
             return
 
