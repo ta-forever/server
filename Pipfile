@@ -31,6 +31,7 @@ networkx = "*"
 pygmlparser = "*"
 pathlib = "*"
 scipy = "*"
+ircrobots = "*"
 
 [dev-packages]
 pytest = "*"
@@ -44,4 +45,4 @@ hypothesis = "<=6.47.1"
 pdoc3 = "*"
 
 [requires]
-python_version = "3.11"
+python_version = "3.12"

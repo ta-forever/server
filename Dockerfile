@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 # Need git for installing aiomysql
 RUN apt-get update
@@ -12,6 +12,7 @@ COPY Pipfile.lock Pipfile.lock
 COPY Pipfile Pipfile
 
 RUN python3 -m pip install pipenv
+#RUN pipenv lock
 RUN pipenv install --ignore-pipfile --system --deploy
 
 ADD . /code/
