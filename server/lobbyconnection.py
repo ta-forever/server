@@ -24,7 +24,8 @@ from .db.models import (
     ban,
     coop_map,
     friends_and_foes,
-    lobby_ban
+    lobby_ban,
+    chat_ban
 )
 from .db.models import login as t_login
 from .decorators import timed, with_logger
@@ -36,6 +37,7 @@ from .games import FeaturedModType, GameState, VisibilityState, CustomGame
 from .geoip_service import GeoIpService
 from .ice_servers.coturn import CoturnHMAC
 from .ice_servers.nts import TwilioNTS
+from .irc_service import IrcService
 from .ladder_service import LadderService
 from .party_service import PartyService
 from .player_service import PlayerService
@@ -58,11 +60,13 @@ class LobbyConnection:
         geoip: GeoIpService,
         ladder_service: LadderService,
         party_service: PartyService,
-        tada_service: TadaService
+        tada_service: TadaService,
+        irc_service: IrcService,
     ):
         self._db = database
         self.geoip_service = geoip
         self.game_service = game_service
+        self.irc_service = irc_service
         self.player_service = players
         self.nts_client = nts_client
         self.coturn_generator = CoturnHMAC(config.COTURN_HOSTS, config.COTURN_KEYS)
@@ -403,11 +407,32 @@ class LobbyConnection:
                 t_login.c.steamid,
                 t_login.c.create_time,
                 t_login.c.last_login,
-                lobby_ban.c.reason,
-                lobby_ban.c.expires_at
-            ).select_from(t_login.outerjoin(lobby_ban))
+                select(lobby_ban.c.reason)
+                    .where(lobby_ban.c.idUser == t_login.c.id)
+                    .order_by(lobby_ban.c.expires_at.desc())
+                    .limit(1)
+                    .scalar_subquery()
+                    .label("lobby_ban_reason"),
+                select(lobby_ban.c.expires_at)
+                    .where(lobby_ban.c.idUser == t_login.c.id)
+                    .order_by(lobby_ban.c.expires_at.desc())
+                    .limit(1)
+                    .scalar_subquery()
+                    .label("lobby_ban_expires_at"),
+                select(chat_ban.c.reason)
+                    .where(chat_ban.c.idUser == t_login.c.id)
+                    .order_by(chat_ban.c.expires_at.desc())
+                    .limit(1)
+                    .scalar_subquery()
+                    .label("chat_ban_reason"),
+                select(chat_ban.c.expires_at)
+                    .where(chat_ban.c.idUser == t_login.c.id)
+                    .order_by(chat_ban.c.expires_at.desc())
+                    .limit(1)
+                    .scalar_subquery()
+                    .label("chat_ban_expires_at"),
+                )
             .where(t_login.c.login == username)
-            .order_by(lobby_ban.c.expires_at.desc())
         )
         auth_error_message = "Login not found or password incorrect. They are case sensitive."
         row = result.fetchone()
@@ -420,21 +445,41 @@ class LobbyConnection:
         dbPassword = row.password
         steamid = row.steamid
         create_time = row.create_time
-        ban_reason = row.reason
-        ban_expiry = row.expires_at
+        lobby_ban_reason = row.lobby_ban_reason
+        lobby_ban_expiry = row.lobby_ban_expires_at
+        chat_ban_reason = row.chat_ban_reason
+        chat_ban_expiry = row.chat_ban_expires_at
 
         if dbPassword != password:
             metrics.user_logins.labels("failure").inc()
             raise AuthenticationError(auth_error_message)
 
         now = datetime.utcnow()
-        if ban_reason is not None and now < ban_expiry:
+        if lobby_ban_reason is not None and now < lobby_ban_expiry:
             self._logger.debug("Rejected login from banned user: %s, %s, %s",
                                player_id, username, self.session)
-            raise BanError(ban_expiry, ban_reason)
+            raise BanError(lobby_ban_expiry, lobby_ban_reason)
+
+        if chat_ban_reason is not None and now < chat_ban_expiry:
+            self._logger.debug("User is chat banned: %s, %s, %s",
+                               player_id, username, self.session)
+            duration_seconds = int((chat_ban_expiry - now).total_seconds())
+            if duration_seconds < 100 * 365 * 24 * 2600:
+                expiry_string = chat_ban_expiry.strftime('%b %d %Y %H:%M UTC')
+            else:
+                expiry_string = "forever"
+
+            await self.irc_service.add_gline(f"{row.id}@*", duration_seconds, chat_ban_reason)
+            await self.send({
+                "command": "chat_ban_notice",
+                "is_banned": True,
+                "expiry": expiry_string,
+                "reason": chat_ban_reason
+            })
+        else:
+            await self.irc_service.del_gline(f"{row.id}@*")
 
         # New accounts are prevented from playing if they didn't link to steam
-
         if config.FORCE_STEAM_LINK and not steamid and create_time.timestamp() > config.FORCE_STEAM_LINK_AFTER_DATE:
             self._logger.debug("Rejected login from new user: %s, %s, %s", player_id, username, self.session)
             raise ClientError(

@@ -121,6 +121,14 @@ class ConfigurationStore:
         self.GALACTIC_WAR_MANUAL_CAPTURE = ""           # capture a planet for debugging purposes. eg "Core Prime:arm;Empyrrean:arm"
         self.ENABLE_FACTION_LOOKUP_FROM_REPLAY_META = True
 
+        self.IRC_HOSTSTRING = "taf-ircd:~8167"
+        self.IRC_RECONNECT_DELAY = 1
+        self.IRC_NICK = "taf-server"
+        self.IRC_USER = "taf-server"
+        self.IRC_PASS = "b4n4n4"
+        self.IRC_OPER_NAME = "taf-server"
+        self.IRC_OPER_PASS = "b4n4n4"
+
         self.PUBLISH_GAME_INFO_WITH_PINGS_ONLY = False
         self.NO_GAME_RESULTS_IS_LOSS_FOR_HOST = True
         self.NEW_USER_WELCOME_MESSAGE = None

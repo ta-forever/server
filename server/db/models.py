@@ -242,6 +242,14 @@ lobby_ban = Table(
     Column("expires_at",    DateTime)
 )
 
+# This is actually a view into the `ban` table with proper handling of ban
+# expiration and revocation
+chat_ban = Table(
+    "chat_ban", metadata,
+    Column("idUser",        Integer,    ForeignKey("login.id"), primary_key=True),
+    Column("reason",        Text,       nullable=False),
+    Column("expires_at",    DateTime)
+)
 
 map = Table(
     "map", metadata,

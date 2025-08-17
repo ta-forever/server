@@ -27,6 +27,7 @@ from .gameconnection import GameConnection
 from .games import GameState
 from .geoip_service import GeoIpService
 from .ice_servers.nts import TwilioNTS
+from .irc_service import IrcService
 from .ladder_service import LadderService
 from .lobbyconnection import LobbyConnection
 from .message_queue_service import MessageQueueService
@@ -51,10 +52,10 @@ __all__ = (
     "GameService",
     "GameStatsService",
     "GeoIpService",
+    "IrcService",
     "LadderService",
     "MessageQueueService",
     "PartyService",
-    "RatingService",
     "RatingService",
     "ServerInstance",
     "abc",
@@ -116,7 +117,8 @@ class ServerInstance(object):
             players=self.services["player_service"],
             ladder_service=self.services["ladder_service"],
             party_service=self.services["party_service"],
-            tada_service=self.services["tada_service"]
+            tada_service=self.services["tada_service"],
+            irc_service=self.services["irc_service"]
         )
 
     def write_broadcast(self, message, predicate=lambda conn: conn.authenticated):
