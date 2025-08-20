@@ -5,7 +5,7 @@ import json
 import random
 import urllib.parse
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import wraps
 from typing import Optional
 
@@ -359,10 +359,65 @@ class LobbyConnection:
                 if target_player and target_player.lobby_connection is not None:
                     self._logger.info(
                         "Administrative action: %s closed client for %s",
-                        self.player, target_player
+                        self.player.login, target_player.login
                     )
                     with contextlib.suppress(DisconnectedError):
                         await target_player.lobby_connection.kick()
+
+        elif action == "chatban":
+            if await self.player_service.has_permission_role(
+                    self.player, "ADMIN_ACCOUNT_BAN"
+            ):
+                target_player = self.player_service[message["user_id"]]
+                if target_player and target_player.lobby_connection is not None:
+                    self._logger.info(
+                        "Administrative action: %s issued chat ban for %s",
+                        self.player.login, target_player.login
+                    )
+
+                    ban_msg = message.get("ban", {})
+                    duration = int(ban_msg.get("duration"))
+                    period = ban_msg.get("period")
+                    reason = ban_msg.get("reason", "Chat ban issued by administrator")
+                    self._logger.debug(
+                        "duration=%d, period=%s, reason=%s",
+                        duration, period, reason
+                    )
+
+                    duration_td = None
+                    expires_at = None
+                    expiry_string = "forever"
+                    if duration is not None and period is not None:
+                        if period == "SECOND":
+                            duration_td = timedelta(seconds=duration)
+                        elif period == "DAY":
+                            duration_td = timedelta(days=duration)
+                        elif period == "WEEK":
+                            duration_td = timedelta(weeks=duration)
+                        elif period == "MONTH":
+                            duration_td = timedelta(days=duration * 30)  # Approximate month as 30 days
+                        expires_at = datetime.now() + duration_td
+                        expiry_string = expires_at.strftime('%b %d %Y %H:%M UTC')
+                    self._logger.debug(f"duration_td={duration_td}, expires_at={expires_at}, expiry_string={expiry_string}")
+
+                    await target_player.lobby_connection.send({
+                        "command": "chat_ban_notice",
+                        "is_banned": True,
+                        "expiry": expiry_string,
+                        "reason": reason
+                    })
+
+                    stmt = ban.insert().values(
+                        player_id=target_player.id,
+                        author_id=self.player.id,
+                        reason=reason,
+                        expires_at=expires_at,
+                        level="CHAT"
+                    )
+                    async with self._db.acquire() as conn:
+                        await conn.execute(stmt)
+
+                    await self.irc_service.add_gline(f"{target_player.id}@*", f"{duration_td.total_seconds()}", reason)
 
         elif action == "broadcast":
             message_text = message.get("message")
@@ -382,6 +437,7 @@ class LobbyConnection:
                     "%s broadcasting message to all players: %s",
                     self.player.login, message_text
                 )
+
         elif action == "join_channel":
             if await self.player_service.has_permission_role(
                 self.player, "ADMIN_JOIN_CHANNEL"
@@ -464,7 +520,7 @@ class LobbyConnection:
             self._logger.debug("User is chat banned: %s, %s, %s",
                                player_id, username, self.session)
             duration_seconds = int((chat_ban_expiry - now).total_seconds())
-            if duration_seconds < 100 * 365 * 24 * 2600:
+            if duration_seconds < 100 * 365 * 24 * 3600:
                 expiry_string = chat_ban_expiry.strftime('%b %d %Y %H:%M UTC')
             else:
                 expiry_string = "forever"
