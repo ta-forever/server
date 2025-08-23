@@ -98,7 +98,7 @@ class IrcService(Service):
                 self._bot = IRCBot(self)
                 params = ConnectionParams.from_hoststring(config.IRC_NICK, config.IRC_HOSTSTRING)
                 params.sasl = SASLUserPass(config.IRC_NICK, config.IRC_PASS) if config.IRC_PASS else None
-                params.reconnect = False
+                params.reconnect = config.IRC_RECONNECT_DELAY
 
                 await self._bot.add_server("irc_server", params)
                 await self._bot.run()
