@@ -81,6 +81,7 @@ class LobbyConnection:
         self.protocol: Protocol = None
         self.user_agent = None
         self.version = None
+        self.chat_ban = None    # assigned on login iff theres an active chat ban on the user
 
         self._attempted_connectivity_test = False
 
@@ -398,7 +399,8 @@ class LobbyConnection:
                             duration_td = timedelta(days=duration * 30)  # Approximate month as 30 days
                         expires_at = datetime.now() + duration_td
                         expiry_string = expires_at.strftime('%b %d %Y %H:%M UTC')
-                    self._logger.debug(f"duration_td={duration_td}, expires_at={expires_at}, expiry_string={expiry_string}")
+                        if target_player.lobby_connection is not None:
+                            target_player.lobby_connection.chat_ban = reason, expires_at
 
                     await target_player.lobby_connection.send({
                         "command": "chat_ban_notice",
@@ -519,6 +521,7 @@ class LobbyConnection:
         if chat_ban_reason is not None and now < chat_ban_expiry:
             self._logger.debug("User is chat banned: %s, %s, %s",
                                player_id, username, self.session)
+            self.chat_ban = chat_ban_reason, chat_ban_expiry
             duration_seconds = int((chat_ban_expiry - now).total_seconds())
             if duration_seconds < 100 * 365 * 24 * 3600:
                 expiry_string = chat_ban_expiry.strftime('%b %d %Y %H:%M UTC')
@@ -533,6 +536,7 @@ class LobbyConnection:
                 "reason": chat_ban_reason
             })
         else:
+            self.chat_ban = None
             await self.irc_service.del_gline(f"{row.id}@*")
 
         # New accounts are prevented from playing if they didn't link to steam
@@ -1051,7 +1055,12 @@ class LobbyConnection:
         await self.abort_connection_if_banned()
 
         visibility = VisibilityState(message["visibility"])
-        title = message.get("title") or f"{self.player.login}'s game"
+        title = message.get("title") or f"{self.player.login}'s Game"
+        if self.chat_ban is not None:
+            chat_ban_reason, chat_ban_expiry = self.chat_ban
+            if datetime.utcnow() < chat_ban_expiry:
+                title = f"{self.player.login}'s Game"
+
         if not title.isascii():
             raise ClientError("Title must contain only ascii characters.")
 
