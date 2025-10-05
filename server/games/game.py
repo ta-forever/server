@@ -104,7 +104,7 @@ class Game():
         self.desyncs = 0
         self.validity = ValidityState.VALID
         self.game_mode = game_mode
-        self.mod_version = mod_version
+        self.mod_version = mod_version                          # git branch/hash
         self.rating_type = rating_type or RatingType.GLOBAL     # NB potentially overriden to GLOBAL on game going live
         self.rating_type_preferred = self.rating_type
         self.displayed_rating_range = displayed_rating_range or InclusiveRange()
@@ -128,6 +128,7 @@ class Game():
         }
         self.player_pings = {}
         self.mods = {}
+        self.replay_meta = None     # updated by game_service once .json file left by the demo compiler is found
 
         self.map_pool_map_ids = None
         if map_pool_map_ids is not None:
@@ -1148,6 +1149,11 @@ class Game():
                     if len(v)>0     # only teams with members
                 }
             })
+            if self.replay_meta is not None:
+                for key in ['unitsHash', 'taMapHash', 'taVersionMajor', 'taVersionMinor']:
+                    if key in self.replay_meta:
+                        result[key] = self.replay_meta[key]
+
         return result
 
     @property

@@ -182,18 +182,21 @@ class GameService(Service):
                 except KeyError as e:
                     self._logger.warn(f"[process_replay_metadata] unable to update 'cheatsEnabled' from replay meta: {str(e)}")
 
-            if config.ENABLE_FACTION_LOOKUP_FROM_REPLAY_META and game_id in self._games:
-                try:
-                    game = self._games[game_id]
-                    for game_player in game.players:
-                        for replay_player in data["players"]:
-                            if game_player.alias == replay_player["name"]:
-                                self._logger.info(f"[process_replay_metadata] updating {game_player.alias}({game_player.id}) for game {game_id} to faction={replay_player['side']}")
-                                game_player.faction = Faction.from_value(replay_player["side"])
-                                break
+            if game_id in self._games:
+                game = self._games[game_id]
+                game.replay_meta = data
 
-                except (KeyError, ValueError) as e:
-                    self._logger.warn(f"[process_replay_metadata] unable to update player faction from replay meta: {str(e)}")
+                if config.ENABLE_FACTION_LOOKUP_FROM_REPLAY_META:
+                    try:
+                        for game_player in game.players:
+                            for replay_player in data["players"]:
+                                if game_player.alias == replay_player["name"]:
+                                    self._logger.info(f"[process_replay_metadata] updating {game_player.alias}({game_player.id}) for game {game_id} to faction={replay_player['side']}")
+                                    game_player.faction = Faction.from_value(replay_player["side"])
+                                    break
+
+                    except (KeyError, ValueError) as e:
+                        self._logger.warn(f"[process_replay_metadata] unable to update player faction from replay meta: {str(e)}")
 
             async with self._db.acquire() as conn:
                 result = await conn.execute(sqlalchemy.sql.text(
