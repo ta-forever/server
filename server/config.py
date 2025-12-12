@@ -102,6 +102,7 @@ class ConfigurationStore:
         self.TADA_API_URL = 'https://tademos.xyz'
         self.TADA_UPLOAD_ENABLE = True
         self.TADA_UPLOAD_MAX_SIZE_MB = 164
+        self.TADA_AUTO_UPLOAD_LEADERBOARD_IDS = []
 
         self.GALACTIC_WAR_STATE_FILE = "/content/galactic_war/galactic_war.json"
         self.GALACTIC_WAR_SCENARIO_PATH = "/content/galactic_war/scenarios"

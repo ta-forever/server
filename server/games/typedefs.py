@@ -7,7 +7,7 @@ from server.factions import Faction
 from server.games.game_results import GameOutcome
 from server.players import Player
 
-ReplayInfo = namedtuple('ReplayInfo', ['tada_available', 'replay_meta'])
+ReplayInfo = namedtuple('ReplayInfo', ['tada_available', 'replay_meta', 'leaderboard_id', 'replay_hidden'])
 
 @unique
 class GameState(Enum):

@@ -28,6 +28,7 @@ from .matchmaker import MatchmakerQueue
 from .message_queue_service import MessageQueueService
 from .players import Player
 from .rating_service import RatingService
+from .tada_service import TadaService
 from .types import Map
 
 
@@ -43,7 +44,8 @@ class GameService(Service):
             player_service,
             game_stats_service,
             rating_service: RatingService,
-            message_queue_service: MessageQueueService
+            message_queue_service: MessageQueueService,
+            tada_service: TadaService
     ):
         self._db = database
         self._dirty_games = set()
@@ -52,6 +54,7 @@ class GameService(Service):
         self.game_stats_service = game_stats_service
         self._rating_service = rating_service
         self._message_queue_service = message_queue_service
+        self._tada_service = tada_service
         self.game_id_counter = 0
         self._available_matchmaker_queues: Dict[str,MatchmakerQueue] = {} # updated by ladder_service
 
@@ -147,11 +150,27 @@ class GameService(Service):
             # Delete original file
             os.remove(file_path)
 
-            # Mark replay as available in the DB
             async with self._db.acquire() as conn:
+                # see if we want to auto upload to TADA
+                replay_info = await self.get_replay_info(conn, game_id)
+
+                tada_upload = (not replay_info.tada_available) and \
+                              (not replay_info.replay_hidden) and \
+                              (replay_info.leaderboard_id in config.TADA_AUTO_UPLOAD_LEADERBOARD_IDS)
+
+                # Update DB
                 await conn.execute(sqlalchemy.sql.text(
-                    "UPDATE `game_stats` SET `game_stats`.`replay_available` = 1 WHERE `game_stats`.`id` = :game_id"),
-                    game_id=game_id)
+                    """
+                    UPDATE `game_stats`
+                    SET
+                        `replay_available` = 1,
+                        `tada_available` = :tada_available
+                    WHERE `id` = :game_id
+                    """
+                ), tada_available=tada_upload, game_id=game_id)
+
+            if tada_upload:
+                await self._tada_service.upload(game_id, replay_info.replay_meta, archive_path, 2)
 
     async def process_replay_metadata(self):
         """
@@ -239,10 +258,13 @@ class GameService(Service):
 
     async def get_replay_info(self, db_connection, game_id: int):
         result = await db_connection.execute(sqlalchemy.sql.text("""
-            SELECT replay_meta, tada_available, startTime, game_featuredMods.file_extension
-            FROM `game_stats`
-            JOIN `game_featuredMods` on game_featuredMods.id = game_stats.gameMod
-            WHERE game_stats.id = :game_id
+            SELECT replay_meta, tada_available, startTime, gfm.file_extension, lrj.leaderboard_id, replay_hidden
+            FROM `game_stats` gs
+            JOIN `game_featuredMods` gfm on gfm.id = gs.gameMod
+            JOIN `game_player_stats` gps on gps.gameId = gs.id
+            JOIN `leaderboard_rating_journal` lrj on lrj.game_player_stats_id = gps.id
+            WHERE gs.id = :game_id
+            limit 1
             """), game_id=game_id)
         row = result.fetchone()
         if row is None:
@@ -250,7 +272,7 @@ class GameService(Service):
         replay_meta = json.loads(row[0]) if row[0] is not None else None
         replay_meta["datestamp"] = row[2].date().isoformat()
         replay_meta["file_extension"] = row[3]
-        return ReplayInfo(replay_meta=replay_meta, tada_available=row[1])
+        return ReplayInfo(tada_available=row[1], replay_meta=replay_meta, leaderboard_id=row[4], replay_hidden=row[5])
 
     async def set_game_tada_available(self, db_connection, game_id: int, available: bool):
         available = 1 if available else 0
