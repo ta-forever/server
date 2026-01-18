@@ -158,3 +158,11 @@ class IrcService(Service):
 
     async def del_gline(self, mask: str):
         await self.enqueue(f"GLINE -{mask}")
+
+    async def add_ban(self, mask: str, duration: int, reason: str):
+        command = config.IRC_ADD_BAN.format(mask=mask, duration=duration, reason=reason)
+        await self.enqueue(command)
+
+    async def del_ban(self, mask: str):
+        command = config.IRC_DEL_BAN.format(mask=mask)
+        await self.enqueue(command)

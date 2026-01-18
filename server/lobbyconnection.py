@@ -406,7 +406,8 @@ class LobbyConnection:
                         "command": "chat_ban_notice",
                         "is_banned": True,
                         "expiry": expiry_string,
-                        "reason": reason
+                        "reason": reason,
+                        "channels": config.IRC_CHAT_BAN_CHANNELS
                     })
 
                     stmt = ban.insert().values(
@@ -419,7 +420,7 @@ class LobbyConnection:
                     async with self._db.acquire() as conn:
                         await conn.execute(stmt)
 
-                    await self.irc_service.add_gline(f"{target_player.id}@*", f"{duration_td.total_seconds()}", reason)
+                    await self.irc_service.add_ban(f"{target_player.id}@*", f"{duration_td.total_seconds()}", reason)
 
         elif action == "broadcast":
             message_text = message.get("message")
@@ -528,16 +529,17 @@ class LobbyConnection:
             else:
                 expiry_string = "forever"
 
-            await self.irc_service.add_gline(f"{row.id}@*", duration_seconds, chat_ban_reason)
+            await self.irc_service.add_ban(f"{row.id}@*", duration_seconds, chat_ban_reason)
             await self.send({
                 "command": "chat_ban_notice",
                 "is_banned": True,
                 "expiry": expiry_string,
-                "reason": chat_ban_reason
+                "reason": chat_ban_reason,
+                "channels": config.IRC_CHAT_BAN_CHANNELS
             })
         else:
             self.chat_ban = None
-            await self.irc_service.del_gline(f"{row.id}@*")
+            await self.irc_service.del_ban(f"{row.id}@*")
 
         # New accounts are prevented from playing if they didn't link to steam
         if config.FORCE_STEAM_LINK and not steamid and create_time.timestamp() > config.FORCE_STEAM_LINK_AFTER_DATE:
