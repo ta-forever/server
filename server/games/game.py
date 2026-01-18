@@ -100,6 +100,7 @@ class Game():
         self.map_ranked = False
         self.password = None
         self._players = []
+        self.banned_players = set([])                           # player ids who have been booted from this game
         self.AIs = {}
         self.desyncs = 0
         self.validity = ValidityState.VALID

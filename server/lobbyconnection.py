@@ -336,6 +336,7 @@ class LobbyConnection:
                 if target_game:
                     for g in target_game:
                         self._logger.info("Host %s closed game for %s", self.player, target_player)
+                        g.banned_players.add(target_player.id)
                         with contextlib.suppress(DisconnectedError):
                             await target_player.send_message({
                                 "command": "notice",
@@ -380,9 +381,11 @@ class LobbyConnection:
                     duration = int(ban_msg.get("duration"))
                     period = ban_msg.get("period")
                     reason = ban_msg.get("reason", "Chat ban issued by administrator")
+                    channels = "" if reason.lower().endswith(config.IRC_CHAT_BAN_REASON_IDENTIFIER) else config.IRC_CHANNEL_BAN_CHANNELS
+
                     self._logger.debug(
-                        "duration=%d, period=%s, reason=%s",
-                        duration, period, reason
+                        "duration=%d, period=%s, reason=%s, channels=%s",
+                        duration, period, reason, channels
                     )
 
                     duration_td = None
@@ -407,7 +410,7 @@ class LobbyConnection:
                         "is_banned": True,
                         "expiry": expiry_string,
                         "reason": reason,
-                        "channels": config.IRC_CHAT_BAN_CHANNELS
+                        "channels": channels
                     })
 
                     stmt = ban.insert().values(
@@ -420,7 +423,10 @@ class LobbyConnection:
                     async with self._db.acquire() as conn:
                         await conn.execute(stmt)
 
-                    await self.irc_service.add_ban(f"{target_player.id}@*", f"{duration_td.total_seconds()}", reason)
+                    if len(channels) == 0:
+                        await self.irc_service.add_chat_ban(f"{target_player.id}@*", f"{duration_td.total_seconds()}", reason)
+                    else:
+                        await self.irc_service.add_channel_ban(f"{target_player.id}@*", f"{duration_td.total_seconds()}", reason)
 
         elif action == "broadcast":
             message_text = message.get("message")
@@ -520,6 +526,8 @@ class LobbyConnection:
             raise BanError(lobby_ban_expiry, lobby_ban_reason)
 
         if chat_ban_reason is not None and now < chat_ban_expiry:
+            channels = "" if chat_ban_reason.lower().endswith(config.IRC_CHAT_BAN_REASON_IDENTIFIER) else config.IRC_CHANNEL_BAN_CHANNELS
+
             self._logger.debug("User is chat banned: %s, %s, %s",
                                player_id, username, self.session)
             self.chat_ban = chat_ban_reason, chat_ban_expiry
@@ -529,17 +537,25 @@ class LobbyConnection:
             else:
                 expiry_string = "forever"
 
-            await self.irc_service.add_ban(f"{row.id}@*", duration_seconds, chat_ban_reason)
+            if len(channels) == 0:
+                await self.irc_service.del_channel_ban(f"{row.id}@*")
+                await self.irc_service.add_chat_ban(f"{row.id}@*", str(duration_seconds), chat_ban_reason)
+            else:
+                await self.irc_service.del_chat_ban(f"{row.id}@*")
+                await self.irc_service.add_channel_ban(f"{row.id}@*", str(duration_seconds), chat_ban_reason)
+
             await self.send({
                 "command": "chat_ban_notice",
                 "is_banned": True,
                 "expiry": expiry_string,
                 "reason": chat_ban_reason,
-                "channels": config.IRC_CHAT_BAN_CHANNELS
+                "channels": channels
             })
         else:
             self.chat_ban = None
-            await self.irc_service.del_ban(f"{row.id}@*")
+            await self.irc_service.del_chat_ban(f"{row.id}@*")
+            await self.irc_service.del_channel_ban(f"{row.id}@*")
+
 
         # New accounts are prevented from playing if they didn't link to steam
         if config.FORCE_STEAM_LINK and not steamid and create_time.timestamp() > config.FORCE_STEAM_LINK_AFTER_DATE:
@@ -954,6 +970,14 @@ class LobbyConnection:
                 "command": "notice",
                 "style": "game_join_fail",
                 "text": "Cannot join game because it doesn't exist."
+            })
+            return
+
+        if self.player.id in game.banned_players:
+            await self.send({
+                "command": "notice",
+                "style": "game_join_fail",
+                "text": "You cannot join this game because the host previously kicked you from it"
             })
             return
 

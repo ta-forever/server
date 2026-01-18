@@ -147,22 +147,18 @@ class IrcService(Service):
         self._logger.info("IrcService shut down cleanly")
 
     # === High-level ban helpers ===
-    async def add_akill(self, mask: str, duration: str, reason: str):
-        await self.enqueue(f"OS AKILL ADD {mask} {duration} :{reason}")
-
-    async def del_akill(self, mask: str):
-        await self.enqueue(f"OS AKILL DEL {mask}")
-
-    async def add_gline(self, mask: str, duration: str, reason: str):
-        await self.enqueue(f"GLINE {mask} {duration} :{reason}")
-
-    async def del_gline(self, mask: str):
-        await self.enqueue(f"GLINE -{mask}")
-
-    async def add_ban(self, mask: str, duration: int, reason: str):
-        command = config.IRC_ADD_BAN.format(mask=mask, duration=duration, reason=reason)
+    async def add_chat_ban(self, mask: str, duration: str, reason: str):
+        command = config.IRC_ADD_CHAT_BAN.format(mask=mask, duration=duration, reason=reason)
         await self.enqueue(command)
 
-    async def del_ban(self, mask: str):
-        command = config.IRC_DEL_BAN.format(mask=mask)
+    async def del_chat_ban(self, mask: str):
+        command = config.IRC_DEL_CHAT_BAN.format(mask=mask)
+        await self.enqueue(command)
+
+    async def add_channel_ban(self, mask: str, duration: str, reason: str):
+        command = config.IRC_ADD_CHANNEL_BAN.format(mask=mask, duration=duration, reason=reason)
+        await self.enqueue(command)
+
+    async def del_channel_ban(self, mask: str):
+        command = config.IRC_DEL_CHANNEL_BAN.format(mask=mask)
         await self.enqueue(command)

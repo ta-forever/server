@@ -129,12 +129,14 @@ class ConfigurationStore:
         self.IRC_PASS = "b4n4n4"
         self.IRC_OPER_NAME = "taf-python-server"
         self.IRC_OPER_PASS = "b4n4n4"
-        self.IRC_ADD_BAN = "GLINE {mask} {duration} :{reason}"
-        self.IRC_DEL_BAN = "GLINE -{mask}"
-        #self.IRC_ADD_BAN = "SAMODE #coreprime +b {mask}"
-        #self.IRC_DEL_BAN = "SAMODE #coreprime -b {mask}"
-        self.IRC_CHAT_BAN_CHANNELS = "#coreprime"   # only for purpose of informing client which channels they've been banned for.
-                                                    # empty string to indicate gline or all channels
+
+        self.IRC_CHAT_BAN_REASON_IDENTIFIER = "all chats"   # ban reasons ending with this string will select CHAT_BAN
+        self.IRC_ADD_CHAT_BAN = "GLINE {mask} {duration} :{reason}"
+        self.IRC_DEL_CHAT_BAN = "GLINE -{mask}"
+
+        self.IRC_CHANNEL_BAN_CHANNELS = "#coreprime"   # only for purpose of informing clients in which channels they're banned
+        self.IRC_ADD_CHANNEL_BAN = "SAMODE #coreprime +b {mask}"
+        self.IRC_DEL_CHANNEL_BAN = "SAMODE #coreprime -b {mask}"
 
         self.PUBLISH_GAME_INFO_WITH_PINGS_ONLY = False
         self.NO_GAME_RESULTS_IS_LOSS_FOR_HOST = True
