@@ -138,6 +138,8 @@ class ConfigurationStore:
         self.IRC_ADD_CHANNEL_BAN = "SAMODE #coreprime +b {mask}"
         self.IRC_DEL_CHANNEL_BAN = "SAMODE #coreprime -b {mask}"
 
+        self.GAME_TITLE_BADWORDS = []
+
         self.PUBLISH_GAME_INFO_WITH_PINGS_ONLY = False
         self.NO_GAME_RESULTS_IS_LOSS_FOR_HOST = True
         self.NEW_USER_WELCOME_MESSAGE = None

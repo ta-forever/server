@@ -3,6 +3,7 @@ import contextlib
 import hashlib
 import json
 import random
+import re
 import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta
@@ -1082,10 +1083,20 @@ class LobbyConnection:
 
         visibility = VisibilityState(message["visibility"])
         title = message.get("title") or f"{self.player.login}'s Game"
+
+        is_badword_title = any(
+            re.search(badwordregex, title, re.IGNORECASE)
+            for badwordregex in config.GAME_TITLE_BADWORDS
+        )
+
+        is_current_chat_ban = False
         if self.chat_ban is not None:
             chat_ban_reason, chat_ban_expiry = self.chat_ban
             if datetime.utcnow() < chat_ban_expiry:
-                title = f"{self.player.login}'s Game"
+                is_current_chat_ban = True
+
+        if is_badword_title or is_current_chat_ban:
+            title = f"{self.player.login}'s Game"
 
         if not title.isascii():
             raise ClientError("Title must contain only ascii characters.")
