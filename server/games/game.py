@@ -108,6 +108,7 @@ class Game():
         self.mod_version = mod_version                          # git branch/hash
         self.rating_type = rating_type or RatingType.GLOBAL     # NB potentially overriden to GLOBAL on game going live
         self.rating_type_preferred = self.rating_type
+
         self.displayed_rating_range = displayed_rating_range or InclusiveRange()
         self.enforce_rating_range = enforce_rating_range        # enforce joiners meet rating requirements
         self.enforce_rating = False                             # enforce rating updates regardless of otherwise (in)validity
@@ -134,6 +135,9 @@ class Game():
         self.map_pool_map_ids = None
         if map_pool_map_ids is not None:
             self.map_pool_map_ids = set(id_ for id_ in map_pool_map_ids)
+
+        expected_queue = self.find_suitable_rating_queue(False, False, (1+max_players)//2)
+        self.rating_type_expected = expected_queue.rating_type if expected_queue is not None else RatingType.GLOBAL
 
         # @todo maintenance hazard. consider storing GameState itself in the future instead of boolean?
         self._is_hosted_staging = asyncio.Future()
@@ -837,22 +841,23 @@ class Game():
             self._launch_fut.set_result(None)
             self._logger.info("Game launched")
 
-    def find_suitable_rating_queue(self, strict_team_size: bool, strict_map_pool: bool):
-        if strict_team_size:
-            teams = self.get_team_sets()
-            if len(teams) != 2:
-                self._logger.info(f"[find_suitable_rating_queue] Game {self.id}: no suitable queue because len(teams)={len(teams)}!=2")
-                return None
+    def find_suitable_rating_queue(self, strict_team_size: bool, strict_map_pool: bool, team_size: int = None):
+        if team_size is None:
+            if strict_team_size:
+                teams = self.get_team_sets()
+                if len(teams) != 2:
+                    self._logger.info(f"[find_suitable_rating_queue] Game {self.id}: no suitable queue because len(teams)={len(teams)}!=2")
+                    return None
 
-            team_size = [len(players) for players in teams]
-            if team_size[0] != team_size[1]:
-                self._logger.info(f"[find_suitable_rating_queue] Game {self.id}: no suitable queue because team_sizes {team_size} are not equal")
-                return None
-            team_size = team_size[0]
+                team_size = [len(players) for players in teams]
+                if team_size[0] != team_size[1]:
+                    self._logger.info(f"[find_suitable_rating_queue] Game {self.id}: no suitable queue because team_sizes {team_size} are not equal")
+                    return None
+                team_size = team_size[0]
 
-        else:
-            player_count = sum([len(players) for players in self.get_team_sets()])
-            team_size = (1+player_count)//2
+            else:
+                player_count = sum([len(players) for players in self.get_team_sets()])
+                team_size = (1+player_count)//2
 
         # largest queue by team size such that queue_size <= team_size
         best_queue = None
@@ -864,7 +869,7 @@ class Game():
                     if pool and self.map_id not in pool.get_map_ids():
                         self._logger.info(f"[find_suitable_rating_queue] Game {self.id}: rejecting queue {queue.name} because game's map {self.map_id} is not in the queue's map pool")
                         continue
-                elif self.map_id not in available_ranked_map_ids:
+                elif self.map_id is not None and self.map_id not in available_ranked_map_ids:
                     self._logger.info(f"[find_suitable_rating_queue] Game {self.id}: rejecting queue {queue.name} because game's map {self.map_id} is not a ranked map")
                     continue
 
@@ -886,6 +891,7 @@ class Game():
         if self.rating_type_preferred == RatingType.GLOBAL:
             self._logger.debug(f"[assign_rating_type] Game {self.id}: ensuring rating_type global because preferred")
             self.rating_type = RatingType.GLOBAL
+            self.rating_type_expected = RatingType.GLOBAL
             self.matchmaker_queue_id = None
             self.map_pool_map_ids = None
             return
@@ -894,6 +900,7 @@ class Game():
             assert(self.matchmaker_queue_id is not None)
             self._logger.debug(f"[assign_rating_type] Game {self.id}: respecting rating_type_preferred {self.rating_type_preferred} because GameType.MATCHMAKER")
             self.rating_type = self.rating_type_preferred
+            self.rating_type_expected = self.rating_type_preferred
             return
 
         default_ranked_maps = self.game_service.get_available_ranked_maps()
@@ -904,6 +911,7 @@ class Game():
         if queue is None:
             self._logger.debug(f"[assign_rating_type] Game {self.id}: no suitable queues found. setting to global")
             self.rating_type = RatingType.GLOBAL
+            self.rating_type_expected = RatingType.GLOBAL
 
         if queue is not None:
             self._logger.debug(f"[assign_rating_type] Game {self.id}: selecting rating_type from queue {queue.name}")
@@ -912,6 +920,10 @@ class Game():
             if config.STRICT_MAP_POOL:
                 pool = queue.get_map_pool_for_rating(1500)
                 self.map_pool_map_ids = default_ranked_map_ids if pool is None else set(id_ for id_ in pool.get_map_ids())
+
+            expected_queue = self.find_suitable_rating_queue(False, False, (1+self.max_players)//2)
+            self.rating_type_expected = expected_queue.rating_type if expected_queue is not None else RatingType.GLOBAL
+
 
     async def persist_mod_stats(self):
         if len(self.mods.keys()) > 0:
@@ -1074,8 +1086,9 @@ class Game():
         if player == self.host or player in self._connections:
             return True
 
-        mean, dev = player.ratings[self.rating_type]
+        mean, dev = player.ratings[self.rating_type_expected]
         displayed_rating = mean - 3 * dev
+        self._logger.debug(f"[is_visible_to_player] rating_type_expected={self.rating_type_expected}, displayed_rating={displayed_rating}, enforce_rating_range={self.enforce_rating_range}")
         if (
             self.enforce_rating_range
             and displayed_rating not in self.displayed_rating_range
