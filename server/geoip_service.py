@@ -94,7 +94,7 @@ class GeoIpService(Service):
                 await self.download_geoip_db()
         except FileNotFoundError:    # pragma: no cover
             self._logger.warning("Geoip database is missing...")
-            #await self.download_geoip_db()     # this just causes server to crash and restart
+            await self.download_geoip_db()
         except asyncio.TimeoutError:    # pragma: no cover
             self._logger.warning(
                 "Failed to download database file! "
