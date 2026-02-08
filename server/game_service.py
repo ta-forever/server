@@ -66,6 +66,7 @@ class GameService(Service):
 
         # The set of active games
         self._games: Dict[int, Game] = dict()
+        self._available_ranked_maps = []
 
     def get_archive_dir_for_game_id(self, replay_id: int):
         replays_path = "/content/replays"

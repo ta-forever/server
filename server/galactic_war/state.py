@@ -1,10 +1,14 @@
+import random
+
 from trueskill import Rating
 
 from .planet import Planet
 from collections import defaultdict
 import networkx
+import re
 from typing import List, Dict
 
+from .typedefs import GwPlayerScore
 from .. import config
 from ..decorators import with_logger
 from ..factions import Faction
@@ -16,6 +20,9 @@ from ..rating_service.typedefs import PlayerID, TeamID, RankedRating
 
 import scipy.stats
 
+from ..types import Map
+
+
 class InvalidGalacticWarGame(Exception):
     """ raised by validate_game when illegal game settings are found """
 
@@ -25,6 +32,9 @@ class GalacticWarState(object):
     def __init__(self, data, default_scenario_name: str = None):
         if default_scenario_name is not None and ("label" not in data or len(data["label"]) == 0):
             data["label"] = default_scenario_name
+
+        if not "players" in data.keys():
+            data["players"] = {}
 
         self._data = data
         self._planets_by_id = {p.get_id(): p for p in [Planet(v) for v in data["node"]]}
@@ -133,6 +143,33 @@ class GalacticWarState(object):
 
             planet.set_score(player_info.faction, planet.get_score(player_info.faction) + planet_adjustment)
             planet.adjust_belligerent(player_info.player_id, player_info.faction, belligerent_attribution_adjustment)
+            self._adjust_player(player_info.player_id, player_info.faction.name, belligerent_attribution_adjustment)
+
+    def get_player_score(self, pid: int, faction: Faction) -> GwPlayerScore:
+        if not pid in self._data["players"]:
+            return GwPlayerScore()
+
+        player_data = self._data["players"][pid]
+        if not faction.name in player_data:
+            return GwPlayerScore()
+
+        return player_data[faction.name]
+
+    def _adjust_player(self, pid: int, faction_name: str, score_adj: float):
+        if not pid in self._data["players"]:
+            self._data["players"][pid] = {}
+
+        player_data = self._data["players"][pid]
+        if not faction_name in player_data:
+            player_data[faction_name] = GwPlayerScore()
+
+        player_scores = player_data[faction_name]
+        if score_adj > 0.:
+            player_scores.wins += 1
+            player_scores.cum_winning_scores += score_adj
+        elif score_adj < 0.:
+            player_scores.losses += 1
+            player_scores.cum_losing_scores += score_adj
 
     def _calculate_stakes_from_rating(self,
                                       game_info: EndedGameInfo,
@@ -317,8 +354,8 @@ class GalacticWarState(object):
                     planet.set_controlled_by(None)
                     planet.reset_scores()
 
-    def ensure_ranked_maps(self, matchmaker_queues: Dict[str, MatchmakerQueue]):
-        self._logger.info(f"[ensure_ranked_maps] queues={matchmaker_queues.keys()}")
+    def ensure_maps_by_map_pool(self, matchmaker_queues: Dict[str, MatchmakerQueue]):
+        self._logger.info(f"[ensure_maps_by_map_pool] queues={matchmaker_queues.keys()}")
         chosen_maps = list(set([planet.get_map() for planet in self._planets_by_name.values()]))
         map_pool_map_names = {}
         for planet in self._planets_by_name.values():
@@ -329,12 +366,43 @@ class GalacticWarState(object):
                         map_pool_map_names[map_pool.name] = set([m.name for m in map_pool.maps.values()])
                     if planet.get_map() not in map_pool_map_names[map_pool.name]:
                         random_map = map_pool.choose_map(chosen_maps)
-                        self._logger.info(f"[ensure_ranked_maps] planet:{planet.get_name()}, mod:{planet.get_mod()}, "
+                        self._logger.info(f"[ensure_maps_by_map_pool] planet:{planet.get_name()}, mod:{planet.get_mod()}, "
                                           f"map:{planet.get_map()}. Map not found in map pool.  Reassigning to map:"
                                           f"{random_map.name}")
                         chosen_maps += [random_map.id]
                         planet.set_map(random_map.name)
                     break
+    def ensure_maps_by_regex(self, all_maps: List[Map]):
+        self._logger.info("[ensure_maps_by_regex] len(all_maps)=%d", len(all_maps))
+        if not all_maps:
+            return
+
+        all_map_names = set(m.name for m in all_maps)
+
+        regexes = []
+        for pair in config.GALACTIC_WAR_INITIALISE_MAPS_BY_REGEX.split(';'):
+            if ':' not in pair:
+                continue
+            key, pattern = pair.split(':', 1)
+            try:
+                regexes.append((key.strip(), re.compile(pattern.strip())))
+            except re.error as e:
+                self._logger.warning("[ensure_maps_by_regex] Invalid regex for %s: %s (%s)", key, pattern, e)
+
+        filtered_map_names = {mod.upper(): set() for mod, _ in regexes}
+        for mod_name, regex in regexes:
+            filtered_map_names[mod_name.upper()].update(mn for mn in all_map_names if regex.search(mn))
+
+        for planet in self._planets_by_name.values():
+            mod = planet.get_mod().upper()
+            allowed_map_names = filtered_map_names.get(mod, all_map_names)
+
+            if not allowed_map_names:
+                self._logger.warning("[ensure_maps_by_regex] No maps matched for mod %s, falling back to all maps", mod)
+                allowed_map_names = all_map_names
+
+            if planet.get_map() not in allowed_map_names:
+                planet.set_map(random.choice(tuple(allowed_map_names)))
 
     def _get_planets_by_controlling_faction(self):
         planets_by_faction = defaultdict(list)

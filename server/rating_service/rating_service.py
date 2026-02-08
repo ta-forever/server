@@ -159,6 +159,7 @@ class RatingService(Service):
         env = self._trueskill_envs_by_mod_name.get(game_info.game_mode, None)
         new_ratings, team_outcome_likelihoods = GameRater.compute_rating(game_info.ended_game_player_summary, old_ratings, env)
 
+        self._logger.debug(f"[_rate] self._game_rating_callbacks={self._game_rating_callbacks}")
         for f in self._game_rating_callbacks:
             await f(game_info, _old_ratings, new_ratings, team_outcome_likelihoods)
 

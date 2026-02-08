@@ -42,7 +42,7 @@ async def galactic_war_service(rating_service, player_service, mock_ladder_servi
     config.GALACTIC_WAR_SCENARIO_PATH = "tests/data/gw_scenarios"
     config.GALACTIC_WAR_INITIAL_SCENARIO = "scenario_0.gml"
     config.GALACTIC_WAR_UPDATE_CRONTAB = ""
-    config.GALACTIC_WAR_INITIALISE_ENSURE_RANKED_MAPS = False
+    config.GALACTIC_WAR_INITIALISE_MAPS_BY_MAP_POOL = False
     config.GALACTIC_WAR_MAX_SCORE = 20.
     try:
         Path(config.GALACTIC_WAR_STATE_FILE).unlink()
@@ -61,7 +61,7 @@ async def reloaded_galactic_war_service(rating_service, player_service, mock_lad
     config.GALACTIC_WAR_SCENARIO_PATH = "tests/data/gw_scenarios"
     config.GALACTIC_WAR_INITIAL_SCENARIO = "scenario_0.gml"
     config.GALACTIC_WAR_UPDATE_CRONTAB = ""
-    config.GALACTIC_WAR_INITIALISE_ENSURE_RANKED_MAPS = False
+    config.GALACTIC_WAR_INITIALISE_MAPS_BY_MAP_POOL = False
     config.GALACTIC_WAR_MAX_SCORE = 20.
     service = GalacticWarService(rating_service, player_service, mock_ladder_service)
     await service.initialize()
@@ -75,7 +75,7 @@ async def periodic_update_galactic_war_service(rating_service, player_service, m
     config.GALACTIC_WAR_SCENARIO_PATH = "tests/data/gw_scenarios"
     config.GALACTIC_WAR_INITIAL_SCENARIO = "scenario_0.gml"
     config.GALACTIC_WAR_UPDATE_CRONTAB = "* * * * * *"
-    config.GALACTIC_WAR_INITIALISE_ENSURE_RANKED_MAPS = False
+    config.GALACTIC_WAR_INITIALISE_MAPS_BY_MAP_POOL = False
     config.GALACTIC_WAR_MAX_SCORE = 20.
     try:
         Path(config.GALACTIC_WAR_STATE_FILE).unlink()
@@ -557,7 +557,7 @@ async def test_distribute_empty_planets(ladder_service):
     assert(len(state.get_uncontested_planets()) == 2)
     state.distribute_planets_to_factions()
     state.seperate_abutting_factions()
-    state.ensure_ranked_maps(ladder_service.queues)
+    state.ensure_maps_by_map_pool(ladder_service.queues)
     state = GalacticWarState(state.get_data())
 
     def xor(a, b):

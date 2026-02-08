@@ -117,9 +117,15 @@ class ConfigurationStore:
         self.GALACTIC_WAR_UPDATE_CRONTAB = "*/10 * * * *"   # periods at which to process state updates. Or empty string to update immediately after each game
         self.GALACTIC_WAR_REQUIRE_CORRECT_MOD = True        # require games to be played on the correct mod
         self.GALACTIC_WAR_INITIALISE_DEFAULT_MOD = "tacc:100" # initialise planets' mods.  <modname>:<likelihood>;<modname>:<likelihood> ...
-        self.GALACTIC_WAR_INITIALISE_ENSURE_RANKED_MAPS = True
+        self.GALACTIC_WAR_INITIALISE_MAPS_BY_MAP_POOL = False
+        self.GALACTIC_WAR_INITIALISE_MAPS_BY_REGEX = "tacc:.*" # don't look at matchmaker queue map pools, just select maps using a regex
         self.GALACTIC_WAR_DEFAULT_PLANET_SIZE = 100
         self.GALACTIC_WAR_MANUAL_CAPTURE = ""           # capture a planet for debugging purposes. eg "Core Prime:arm;Empyrrean:arm"
+        self.GALACTIC_WAR_MANUAL_ATTACK = ""            # record an attack on a planet for debugging puroses.  eg:"Academica Cromyona;<pid1(winner)>;arm;<rank1>;<pid2(loser);core;<rank2>;pwin"
+        self.GALACTIC_WAR_RANK_THRESHOLDS = [60, 150, 300, 600, 1200, 2400, 4800, 9600] # for avatar grant. need to keep in sync with dfc-config.json :(
+        self.GALACTIC_WAR_RANK_AVATAR_IDS = "arm:21,22,23,24,25,26,27,28,29;core:30,31,32,33,34,35,36,37,38"
+        self.GALACTIC_WAR_RANK_AVATAR_AUTO_SELECT = True    # auto select user's new rank avatar when its granted
+
         self.ENABLE_FACTION_LOOKUP_FROM_REPLAY_META = True
 
         self.IRC_HOSTSTRING = "taf-ircd:~8167"

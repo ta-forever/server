@@ -2,6 +2,7 @@ import random
 from typing import Dict, Union, List
 from server.config import config
 from server.factions import Faction
+from server.galactic_war.typedefs import GwPlayerScore
 from server.rating_service.typedefs import PlayerID
 
 random.seed()
@@ -10,43 +11,75 @@ LATIN_NOUNS = []
 with open("latin_nouns.txt", "r") as fp:
     for line in fp:
         LATIN_NOUNS += [line.strip().capitalize()]
-    LATIN_NOUNS = random.sample(LATIN_NOUNS, len(LATIN_NOUNS))
-
 
 LATIN_ADJECTIVES = []
 with open("latin_adjectives.txt", "r") as fp:
     for line in fp:
         LATIN_ADJECTIVES += [line.strip().capitalize()]
-    LATIN_ADJECTIVES = random.sample(LATIN_ADJECTIVES, len(LATIN_ADJECTIVES))
 
 
 def get_random_noun():
-    idx = 0
-    while True:
-        yield LATIN_NOUNS[idx % len(LATIN_NOUNS)]
-        idx += 1
+    nouns = LATIN_NOUNS.copy()
+    random.shuffle(nouns)
+    for noun in nouns:
+        yield noun
 
 
 def get_random_adjective():
-    idx = 0
-    while True:
-        yield LATIN_ADJECTIVES[idx % len(LATIN_ADJECTIVES)]
-        idx += 1
+    adjs = LATIN_ADJECTIVES.copy()
+    random.shuffle(adjs)
+    for adj in adjs:
+        yield adj
+
+
+_random_noun_gen = get_random_noun()
+_random_adj_gen = get_random_adjective()
+
+
+def _reset_random_nouns():
+    global _random_noun_gen
+    _random_noun_gen = get_random_noun()
+
+
+def _reset_random_adjs():
+    global _random_adj_gen
+    _random_adj_gen = get_random_adjective()
 
 
 def get_random_name():
-    return get_random_noun()
+    try:
+        noun = next(_random_noun_gen)
+    except StopIteration:
+        _reset_random_nouns()
+        noun = next(_random_noun_gen)
 
+    try:
+        adj = next(_random_noun_gen)
+    except StopIteration:
+        _reset_random_nouns()
+        adj = next(_random_noun_gen)
+
+    return f"{noun} {adj}"
+
+
+class WeightedShuffleBag:
+    def __init__(self, spec: str):
+        self._items = []
+        for pair in spec.split(';'):
+            mod, weight = pair.split(':', 1)
+            self._items.extend([mod] * int(weight))
+        self._bag = []
+
+    def next(self):
+        if not self._bag:
+            self._bag = self._items.copy()
+            random.shuffle(self._bag)
+        return self._bag.pop()
+
+MOD_BAG = WeightedShuffleBag(config.GALACTIC_WAR_INITIALISE_DEFAULT_MOD)
 
 def get_random_mod():
-    mod_list = [mod.split(':') for mod in config.GALACTIC_WAR_INITIALISE_DEFAULT_MOD.split(';')]
-    mod_list = [[m[0], int(m[1])] for m in mod_list]
-    for n in range(1, len(mod_list)):
-        mod_list[n][1] += mod_list[n-1][1]
-    x = random.randint(0, mod_list[-1][1]-1)
-    for mod, threshold in mod_list:
-        if x <= threshold:
-            return mod
+    return MOD_BAG.next()
 
 
 def is_number(s: str):
@@ -77,7 +110,7 @@ class Planet(object):
 
         default_data = {
             "label": get_random_name(),
-            "map": "SHERWOOD",
+            "map": "<invalid map>",
             "mod": get_random_mod(),
             "size": config.GALACTIC_WAR_DEFAULT_PLANET_SIZE,
             "score": {
@@ -184,10 +217,22 @@ class Planet(object):
     def get_belligerents(self) -> List[PlayerID]:
         return [pid for pid in self._data["belligerents"].keys()]
 
-    def get_belligerent_score(self, player_id: PlayerID, faction: Faction) -> float:
-        return self._data["belligerents"].get(player_id, {}).get(faction.capitalized, 0.0)
+    def get_belligerent_score(self, player_id: PlayerID, faction: Faction) -> GwPlayerScore:
+        score = self._data["belligerents"].get(player_id, {}).get(faction.capitalized)
+        default_score = GwPlayerScore()
 
-    def set_belligerent_score(self, player_id: PlayerID, faction: Faction, score: float):
+        if score is None:
+            self.set_belligerent_score(player_id, faction, default_score)
+            return default_score
+
+        if isinstance(score, GwPlayerScore):
+            return score
+
+        score = GwPlayerScore(**score)
+        self.set_belligerent_score(player_id, faction, score)
+        return score
+
+    def set_belligerent_score(self, player_id: PlayerID, faction: Faction, score: GwPlayerScore):
         if player_id not in self._data["belligerents"]:
             self._data["belligerents"][player_id] = {faction.capitalized: score}
         else:
@@ -195,4 +240,9 @@ class Planet(object):
 
     def adjust_belligerent(self, player_id: PlayerID, faction: Faction, score_change: float):
         score = self.get_belligerent_score(player_id, faction)
-        self.set_belligerent_score(player_id, faction, score + score_change)
+        if score_change > 0.:
+            score.wins += 1
+            score.cum_winning_scores += score_change
+        elif score_change < 0.:
+            score.losses += 1
+            score.cum_losing_scores += score_change
