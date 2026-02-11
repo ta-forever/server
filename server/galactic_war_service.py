@@ -81,7 +81,7 @@ class GalacticWarService(Service):
             self.set_dirty(True)
 
         except Exception as e:
-            self._logger.warn(f"unable to capture planet: {e}")
+            self._logger.exception(e)
 
     async def manual_attack(self):
         try:
@@ -124,7 +124,7 @@ class GalacticWarService(Service):
             await self.on_game_rating(game_info, old_ratings, None, team_outcome_likelihoods)
 
         except Exception as e:
-            self._logger.warn(f"unable to capture planet: {e}")
+            self._logger.exception(e)
 
     async def shutdown(self):
         if self._update_state_cron is not None:

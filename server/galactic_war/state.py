@@ -36,6 +36,14 @@ class GalacticWarState(object):
         if not "players" in data.keys():
             data["players"] = {}
 
+        data["players"] = {
+            int(pid_string): {
+                faction_name: player_scores if isinstance(player_scores, GwPlayerScore) else GwPlayerScore.from_dict(player_scores)
+                for faction_name, player_scores in v.items()
+            }
+            for pid_string, v in data["players"].items()
+        }
+
         self._data = data
         self._planets_by_id = {p.get_id(): p for p in [Planet(v) for v in data["node"]]}
         self._planets_by_name = {p.get_name(): p for p in [Planet(v) for v in data["node"]]}
