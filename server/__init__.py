@@ -21,6 +21,7 @@ from .config import TRACE, config
 from .configuration_service import ConfigurationService
 from .control import run_control_server
 from .core import Service, create_services
+from .core.service import ServiceMeta
 from .db import FAFDatabase
 from .game_service import GameService
 from .gameconnection import GameConnection
@@ -36,6 +37,7 @@ from .player_service import PlayerService
 from .protocol import Protocol, QDataStreamProtocol
 from .rating_service.rating_service import RatingService
 from .servercontext import ServerContext
+from .stats.achievement_service import AchievementService
 from .stats.game_stats_service import GameStatsService
 from .tada_service import TadaService
 from .galactic_war_service import GalacticWarService
@@ -60,6 +62,7 @@ __all__ = (
     "ServerInstance",
     "abc",
     "control",
+    "AchievementService",
     "game_service",
     "protocol",
     "run_control_server",
@@ -155,15 +158,16 @@ class ServerInstance(object):
             dirty_queues = game_service.dirty_queues
             dirty_players = player_service.dirty_players
             dirty_replay_uploads = tada_service.dirty_uploads
-            dirty_galactic_war = galactic_war_service.get_dirty()
+            dirty_galactic_war = galactic_war_service.get_dirties()
             game_service.clear_dirty()
             player_service.clear_dirty()
             tada_service.clear_dirty()
-            galactic_war_service.set_dirty(False)
+            galactic_war_service.clear_dirties()
 
             if dirty_galactic_war:
                 self.write_broadcast({
-                    "command": "galactic_war_update"
+                    "command": "galactic_war_update",
+                    "mod_technical_name": [mod for mod in dirty_galactic_war]
                 })
 
             if dirty_queues:

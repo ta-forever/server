@@ -1,23 +1,25 @@
+import math
 import random
 
+import sqlalchemy
 from trueskill import Rating
 
 from .planet import Planet
 from collections import defaultdict
 import networkx
 import re
-from typing import List, Dict
+from typing import List, Dict, Tuple
 
-from .typedefs import GwPlayerScore
-from .. import config
+from .roman_planet_name import roman_planet_name
+from .typedefs import GwPlayerScore, GwGalaxyConfig
+from .. import config, FAFDatabase
 from ..decorators import with_logger
 from ..factions import Faction
 from ..games.game_results import GameOutcome
-from ..games.typedefs import EndedGameInfo, ValidityState, OutcomeLikelihoods
+from ..games.typedefs import EndedGameInfo, ValidityState, OutcomeLikelihoods, EndedGamePlayerSummary
 from ..matchmaker import MatchmakerQueue
 from ..rating import RatingType
 from ..rating_service.typedefs import PlayerID, TeamID, RankedRating
-
 import scipy.stats
 
 from ..types import Map
@@ -29,7 +31,14 @@ class InvalidGalacticWarGame(Exception):
 @with_logger
 class GalacticWarState(object):
 
-    def __init__(self, data, default_scenario_name: str = None):
+    def __init__(self, data, galaxy_config: GwGalaxyConfig, default_scenario_name: str = None):
+
+        data["technical_name"] = galaxy_config.technical_name
+        data["display_name"] = galaxy_config.display_name
+        data["rank_thresholds"] = config.GALACTIC_WAR_RANK_THRESHOLDS
+        data["dominance_threshold"] = config.GALACTIC_WAR_DOMINANCE_THRESHOLD
+        data["factions"] = [k.name for k in galaxy_config.rank_avatar_ids.keys()]
+
         if default_scenario_name is not None and ("label" not in data or len(data["label"]) == 0):
             data["label"] = default_scenario_name
 
@@ -45,8 +54,17 @@ class GalacticWarState(object):
         }
 
         self._data = data
-        self._planets_by_id = {p.get_id(): p for p in [Planet(v) for v in data["node"]]}
-        self._planets_by_name = {p.get_name(): p for p in [Planet(v) for v in data["node"]]}
+
+        mod_names = [cfg.technical_name for cfg in galaxy_config.mods]
+        n_planets = len(data["node"])
+        n_dup = int(math.ceil(n_planets / len(mod_names)))
+        mod_names = [x for x in mod_names for _ in range(n_dup)]
+        random.shuffle(mod_names)
+
+        planets = [Planet(v, mod_name) for v, mod_name in zip(data["node"], mod_names)]
+
+        self._planets_by_id = {p.get_id(): p for p in planets}
+        self._planets_by_name = {p.get_name(): p for p in planets}
         self._jump_gates = [(edge["source"], edge["target"]) for edge in data["edge"]]
         self._capitals_by_faction = {planet.get_capital_of(): planet
                                      for planet in self._planets_by_id.values()
@@ -72,26 +90,35 @@ class GalacticWarState(object):
             raise InvalidGalacticWarGame(f"'{game_info.galactic_war_planet_name}' is not part of the current Galactic War scenario")
 
         if planet.get_map() != game_info.map_name:
-            raise InvalidGalacticWarGame(f"'{planet.get_name()}' should be played on map '{planet.get_map()}', not '{game_info.map_name}'")
+            raise InvalidGalacticWarGame(f"'{planet.get_name()}' must be played on map '{planet.get_map()}', not '{game_info.map_name}'")
 
         if config.GALACTIC_WAR_REQUIRE_CORRECT_MOD and planet.get_mod() != game_info.game_mode:
-            raise InvalidGalacticWarGame(f"'{planet.get_name()}' should be played with mod '{planet.get_mod()}', not '{game_info.game_mode}'")
+            raise InvalidGalacticWarGame(f"'{planet.get_name()}' must be played with mod '{planet.get_mod()}', not '{game_info.game_mode}'")
 
         factions_by_team = defaultdict(list)
         for player_info in game_info.ended_game_player_summary:
-            factions_by_team[player_info.team_id] += [player_info.faction]
-            if factions_by_team[player_info.team_id][0] != player_info.faction:
-                raise InvalidGalacticWarGame(f"Galactic War should be played one faction versus another")
+            factions_by_team[player_info.team_id].append(player_info.faction)
 
         if len(factions_by_team) != 2:
-            raise InvalidGalacticWarGame("Galactic War should be played with exactly two teams")
+            raise InvalidGalacticWarGame("Galactic War must be played with exactly two teams")
 
-        team_factions = [factions[0] for factions in factions_by_team.values()]
-        if team_factions[0] == team_factions[1]:
-            raise InvalidGalacticWarGame("Galactic War should be played with opposing factions")
+        for team_id, factions in factions_by_team.items():
+            unique_factions = set(factions)
+            if len(unique_factions) > 1:
+                raise InvalidGalacticWarGame(f"For Galactic War, each team must use a single faction")
+
+        team_factions = {factions[0] for factions in factions_by_team.values()}
+        if len(team_factions) != 2:
+            raise InvalidGalacticWarGame("Galactic War must be played with opposing factions")
+
+        for player_info in game_info.ended_game_player_summary:
+            player_scores_by_faction = [(f, self.get_player_score(player_info.player_id, f)) for f in Faction]
+            best_faction, best_score = max(player_scores_by_faction, key=lambda item: item[1].cum_winning_scores)
+            if best_score.cum_winning_scores > 0. and best_faction != player_info.faction:
+                raise InvalidGalacticWarGame(f"Galactic War must be played for one side only. You previously played with {best_faction.name}")
 
         if game_info.rating_type is None or game_info.rating_type == RatingType.GLOBAL:
-            raise InvalidGalacticWarGame("Galactic War should be played with ranked settings")
+            raise InvalidGalacticWarGame("Galactic War must be played with ranked settings")
 
         if game_info.validity != ValidityState.VALID:
             raise InvalidGalacticWarGame(game_info.validity.name)
@@ -115,11 +142,11 @@ class GalacticWarState(object):
 
         # each player stakes an amount proportional to their team's win likelihood
         if config.GALACTIC_WAR_STAKES_STRATEGY == "rank":
-            stakes = self._calculate_stakes_from_rank(game_info, old_ratings)
+            stakes = self._calculate_stakes_from_rank(game_info.ended_game_player_summary)
         elif config.GALACTIC_WAR_STAKES_STRATEGY == "rating":
-            stakes = self._calculate_stakes_from_rating(game_info, team_outcome_likelihoods)
+            stakes = self._calculate_stakes_from_rating(game_info.ended_game_player_summary, team_outcome_likelihoods)
         else:
-            stakes = self._calculate_stakes_from_rating(game_info, team_outcome_likelihoods)
+            stakes = self._calculate_stakes_from_rating(game_info.ended_game_player_summary, team_outcome_likelihoods)
 
         # players stakes are returned depending on outcome
         returned_stakes = {player_info.player_id: {
@@ -179,60 +206,99 @@ class GalacticWarState(object):
             player_scores.losses += 1
             player_scores.cum_losing_scores += score_adj
 
+    def _get_leaderboard(self) -> List[Tuple[int, GwPlayerScore]]:
+        return sorted(
+            (
+                (pid, max(scores.values(), key=lambda s: (
+                    s.cum_winning_scores,
+                    s.cum_losing_scores,
+                    s.wins,
+                    -s.losses
+                )))
+                for pid, scores in self._data["players"].items()
+            ),
+            key=lambda item: (
+                item[1].cum_winning_scores,
+                item[1].cum_losing_scores,
+                item[1].wins,
+                -item[1].losses,
+            ),
+            reverse=True
+        )
+
     def _calculate_stakes_from_rating(self,
-                                      game_info: EndedGameInfo,
+                                      ended_game_player_summary: List[EndedGamePlayerSummary],
                                       team_outcome_likelihoods: Dict[TeamID, OutcomeLikelihoods]) -> Dict[PlayerID, float]:
 
         return {player_info.player_id: team_outcome_likelihoods[player_info.team_id].pwin * config.GALACTIC_WAR_MAX_SCORE
-                  for player_info in game_info.ended_game_player_summary}
+                  for player_info in ended_game_player_summary}
 
 
-    def _calculate_stakes_from_rank(self,
-                                    game_info: EndedGameInfo,
-                                    old_ratings: Dict[PlayerID, RankedRating]) -> Dict[PlayerID, float]:
+    def _calculate_stakes_from_rank(self, ended_game_player_summary: List[EndedGamePlayerSummary]) -> Dict[PlayerID, float]:
 
-        team_ids = list({player_info.team_id for player_info in game_info.ended_game_player_summary})
+        team_ids = list({player_info.team_id for player_info in ended_game_player_summary})
         assert(len(team_ids) == 2)
 
         player_ids_by_team = {
-            tid: [player_info.player_id for player_info in game_info.ended_game_player_summary if player_info.team_id == tid]
+            tid: [player_info.player_id for player_info in ended_game_player_summary if player_info.team_id == tid]
             for tid in team_ids
         }
 
-        team_size = len(game_info.ended_game_player_summary) // 2
-        max_stake_per_opponent = config.GALACTIC_WAR_MAX_SCORE / team_size
-        stakes = {player_info.player_id: 0. for player_info in game_info.ended_game_player_summary}
-        for pid1 in player_ids_by_team[team_ids[0]]:
-            for pid2 in player_ids_by_team[team_ids[1]]:
-                if old_ratings[pid1].leaderboard_size < 10:
-                    stakes[pid1] += max_stake_per_opponent / 2.
-                    stakes[pid2] += max_stake_per_opponent / 2.
+        leaderboard = self._get_leaderboard()
+        rank_by_pid = {pid: n for n, (pid, score) in enumerate(leaderboard)}
 
-                elif abs(old_ratings[pid1].penis_points - old_ratings[pid2].penis_points) < 1.:
+        team_size = len(ended_game_player_summary) // 2
+        max_stake_per_opponent = config.GALACTIC_WAR_MAX_SCORE / team_size
+        stakes = {player_info.player_id: 0. for player_info in ended_game_player_summary}
+        for pid1 in player_ids_by_team[team_ids[0]]:
+            rank1 = rank_by_pid[pid1] if pid1 in rank_by_pid else len(leaderboard) // 2
+            for pid2 in player_ids_by_team[team_ids[1]]:
+                rank2 = rank_by_pid[pid2] if pid2 in rank_by_pid else len(leaderboard) // 2
+                if len(leaderboard) < 10:
                     stakes[pid1] += max_stake_per_opponent / 2.
                     stakes[pid2] += max_stake_per_opponent / 2.
 
                 else:
-                    rank_difference = (old_ratings[pid2].rank - old_ratings[pid1].rank) / old_ratings[pid1].leaderboard_size
+                    rank_difference = (rank2 - rank1) / len(leaderboard)
                     stakes[pid1] += scipy.stats.norm.cdf(rank_difference / config.GALACTIC_WAR_STAKES_RANK_FACTOR) * max_stake_per_opponent
                     stakes[pid2] += scipy.stats.norm.cdf(-rank_difference / config.GALACTIC_WAR_STAKES_RANK_FACTOR) * max_stake_per_opponent
 
         return stakes
 
+    async def _get_player_name(self, database: FAFDatabase, player_id) -> str:
+        async with database.acquire() as conn:
+            result = await conn.execute(sqlalchemy.sql.text(
+                "SELECT login from login WHERE id = :player_id"), player_id=player_id)
+            row = result.fetchone()
+            return row[0] if row else None
 
-    def update_front_lines(self, planet=None):
+    async def update_front_lines(self, database: FAFDatabase, planet=None):
         changes_made = 0
         if planet is None:
-            # do planets with higher scores first so if theres a conflict, the higher-scored planet gets precedence
+            # do planets with higher scores first so if there's a conflict, the higher-scored planet gets precedence
             contested_planets = [p for pid, p in self._planets_by_id.items() if p.get_controlled_by() is None]
             contested_planets.sort(key=lambda p: max(p.get_ro_scores().values()), reverse=True)
-            return sum([self.update_front_lines(p) for p in contested_planets])
+            return sum([await self.update_front_lines(database, planet=p) for p in contested_planets])
 
         else:
             dominant_faction = planet.get_dominant_faction()
             if dominant_faction is not None:
                 self._logger.info(f"[update_front_lines] capturing {planet.get_name()} for {dominant_faction.name} because is dominating")
                 planet.set_controlled_by(dominant_faction)
+
+                heroic_player_id, cum_winning_score = max(((pid, planet.get_belligerent_score(pid, dominant_faction).cum_winning_scores)
+                                                           for pid in planet.get_belligerents()),
+                                                          key=lambda item: item[1])
+                if cum_winning_score > 0:
+                    heroic_player_name = await self._get_player_name(database, heroic_player_id)
+                    if heroic_player_name:
+                        old_planet_name = planet.get_name()
+                        new_planet_name = roman_planet_name(heroic_player_name, self._planets_by_name.keys())
+                        self._logger.info(f"[update_front_lines] renaming from {old_planet_name} to {new_planet_name} to honour {heroic_player_name}")
+                        planet.set_name(new_planet_name)
+                        self._planets_by_name[new_planet_name] = self._planets_by_name.pop(old_planet_name)
+                        self._neighbours_by_name[new_planet_name] = self._neighbours_by_name.pop(old_planet_name)
+
                 for p in self._neighbours_by_name[planet.get_name()]:
                     f = p.get_dominant_faction()
                     c = p.get_controlled_by()
@@ -355,7 +421,7 @@ class GalacticWarState(object):
                 closest_capital_planet = self._planets_by_id[distance_to_capitals[0][0]]
                 self._planets_by_id[planet_id].set_controlled_by(closest_capital_planet.get_controlled_by())
 
-    def seperate_abutting_factions(self):
+    def separate_abutting_factions(self):
         for name, planet in self._planets_by_name.items():
             for neighbour in self._neighbours_by_name[name]:
                 if planet.get_controlled_by() is not None and neighbour.get_controlled_by() is not None and planet.get_controlled_by() != neighbour.get_controlled_by():
@@ -380,7 +446,7 @@ class GalacticWarState(object):
                         chosen_maps += [random_map.id]
                         planet.set_map(random_map.name)
                     break
-    def ensure_maps_by_regex(self, all_maps: List[Map]):
+    def ensure_maps_by_regex(self, galaxy_config: GwGalaxyConfig, all_maps: List[Map]):
         self._logger.info("[ensure_maps_by_regex] len(all_maps)=%d", len(all_maps))
         if not all_maps:
             return
@@ -388,14 +454,13 @@ class GalacticWarState(object):
         all_map_names = set(m.name for m in all_maps)
 
         regexes = []
-        for pair in config.GALACTIC_WAR_INITIALISE_MAPS_BY_REGEX.split(';'):
-            if ':' not in pair:
-                continue
-            key, pattern = pair.split(':', 1)
-            try:
-                regexes.append((key.strip(), re.compile(pattern.strip())))
-            except re.error as e:
-                self._logger.warning("[ensure_maps_by_regex] Invalid regex for %s: %s (%s)", key, pattern, e)
+        for mod_config in galaxy_config.mods:
+            for pattern in mod_config.map_select_regexes:
+                try:
+                    regexes.append((mod_config.technical_name, re.compile(pattern)))
+                except re.error as e:
+                    self._logger.warning("[ensure_maps_by_regex] Invalid regex for %s/%s: %s (%s)",
+                                         galaxy_config.technical_name, mod_config.technical_name, pattern, e)
 
         filtered_map_names = {mod.upper(): set() for mod, _ in regexes}
         for mod_name, regex in regexes:

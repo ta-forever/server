@@ -7,8 +7,9 @@ import aiocron
 import aiofiles
 from trueskill import Rating
 
-from . import PlayerService, LadderService, GameService
+from . import PlayerService, LadderService, GameService, FAFDatabase
 from .factions import Faction
+from .galactic_war.typedefs import GwGalaxyConfig, GwMapSelectStrategy
 from .games.game_results import GameOutcome
 from .rating_service import RatingService
 from .config import config
@@ -22,25 +23,29 @@ from typing import Dict, List
 from .galactic_war.planet import Planet
 from .games.typedefs import EndedGameInfo, OutcomeLikelihoods, ValidityState, EndedGamePlayerSummary
 from .rating_service.typedefs import PlayerID, TeamID, RankedRating
+from .stats.achievement_service import AchievementService
 
 
 @with_logger
 class GalacticWarService(Service):
 
-    def __init__(self, rating_service: RatingService, player_service: PlayerService, ladder_service: LadderService, game_service: GameService):
+    def __init__(self, rating_service: RatingService, player_service: PlayerService, ladder_service: LadderService,
+                 achievement_service: AchievementService, game_service: GameService, database: FAFDatabase):
         rating_service.add_game_rating_callback(self.on_game_rating)
         self.player_service = player_service
         self.ladder_service = ladder_service
+        self.achievement_service = achievement_service
         self.game_service = game_service
-        self._state = None
-        self._dirty = False
+        self.db = database
+        self._state = {}        # keyed by mod technical name
+        self._dirty = set()     # mod technical names that are dirty
         self._update_state_cron = None
 
     async def initialize(self):
-        await self._load_state()
-        self.set_dirty(True)
+        await self.reload_state()
         self.set_crontab()
         config.register_callback("GALACTIC_WAR_UPDATE_CRONTAB", self.set_crontab)
+        config.register_callback("GALACTIC_WAR_GALAXIES", self.reload_state)
         config.register_callback("GALACTIC_WAR_RELOAD_STATE", self.reload_state)
         config.register_callback("GALACTIC_WAR_RESET", self.reset)
         config.register_callback("GALACTIC_WAR_MANUAL_CAPTURE", self.manual_capture)
@@ -57,41 +62,74 @@ class GalacticWarService(Service):
 
     async def reload_state(self):
         self._logger.info("[reload_state] reloading state from file ...")
-        await self._load_state()
-        self.set_dirty(True)
+        self._logger.info("   GALACTIC_WAR_GALAXIES:")
+        self._logger.info(config.GALACTIC_WAR_GALAXIES)
+        for galaxy_config in GwGalaxyConfig.from_dict_list(config.GALACTIC_WAR_GALAXIES):
+            await self._load_state(galaxy_config)
+            self.set_dirty(galaxy_config.technical_name, True)
 
     async def reset(self):
         self._logger.info(f"[reset] resetting ...")
-        try:
-            Path(config.GALACTIC_WAR_STATE_FILE).unlink()
-        except FileNotFoundError:
-            pass
-        await self._load_state()
-        self.set_dirty(True)
+        for galaxy_config in GwGalaxyConfig.from_dict_list(config.GALACTIC_WAR_GALAXIES):
+            try:
+                Path(galaxy_config.state_file).unlink()
+            except FileNotFoundError:
+                pass
+            await self._load_state(galaxy_config)
+            self.set_dirty(galaxy_config.technical_name, True)
 
     async def manual_capture(self):
+        if not config.GALACTIC_WAR_MANUAL_CAPTURE:
+            return
+
         try:
-            for capture in config.GALACTIC_WAR_MANUAL_CAPTURE.split(";"):
-                planet_name, faction_name = capture.split(':')
-                self._logger.info(f"[manual_capture] capturing {planet_name} for {faction_name}")
-                planet = self._state._planets_by_name[planet_name]
-                for faction in planet.get_ro_scores().keys():
-                    planet.set_score(faction, 100.0 if faction.name.lower() == faction_name.lower() else 0.0)
-            await self._save_state()
-            self.set_dirty(True)
+            galaxy_name = config.GALACTIC_WAR_MANUAL_CAPTURE["galaxy"]
+            planet_name = config.GALACTIC_WAR_MANUAL_CAPTURE["planet"]
+            faction_name = config.GALACTIC_WAR_MANUAL_CAPTURE["faction"]
+
+            planet = None
+            state = self._state[galaxy_name]
+            if planet_name in state._planets_by_name.keys():
+                planet = state._planets_by_name[planet_name]
+
+            if planet is None:
+                raise ValueError(f"unknown planet {galaxy_name}/{planet_name}")
+            self._logger.info(f"[manual_capture] on {galaxy_name}/{planet_name} for {faction_name}")
+
+            for faction in planet.get_ro_scores().keys():
+                planet.set_score(faction, 100.0 if faction.name.lower() == faction_name.lower() else 0.0)
+
+            galaxy_config = [cfg for cfg in GwGalaxyConfig.from_dict_list(config.GALACTIC_WAR_GALAXIES)
+                             if cfg.technical_name == galaxy_name]
+            await self._save_state(galaxy_config[0])
+            self.set_dirty(planet.get_mod(), True)
 
         except Exception as e:
             self._logger.exception(e)
 
     async def manual_attack(self):
+        if not config.GALACTIC_WAR_MANUAL_ATTACK:
+            return
+
         try:
-            planet_name, pid1, fac1, rank1, pid2, fac2, rank2, pwin = config.GALACTIC_WAR_MANUAL_ATTACK.split(';')
+            galaxy_name, planet_name, pid1, fac1, rank1, pid2, fac2, rank2, pwin = [
+                config.GALACTIC_WAR_MANUAL_ATTACK[k]
+                for k in ["galaxy", "planet", "pid1", "faction1", "rank1", "pid2", "faction2", "rank2", "pwin"]
+            ]
             pid1, pid2 = int(pid1), int(pid2)
             fac1, fac2 = Faction.from_string(fac1), Faction.from_string(fac2)
             rank1, rank2 = int(rank1), int(rank2)
             pwin = float(pwin)
 
-            planet = self._state._planets_by_name[planet_name]
+            planet = None
+            state = self._state[galaxy_name]
+            if planet_name in state._planets_by_name.keys():
+                planet = state._planets_by_name[planet_name]
+
+            if planet is None:
+                raise ValueError(f"unknown planet {galaxy_name}/{planet_name}")
+            self._logger.info(f"[manual_attack] on planet={galaxy_name}/{planet_name}")
+
             game_outcome_1 = GameOutcome.VICTORY
             game_outcome_2 = GameOutcome.DEFEAT
 
@@ -101,7 +139,7 @@ class GalacticWarService(Service):
                 map_id=0,
                 map_name=planet.get_map(),
                 game_mode=planet.get_mod(),
-                galactic_war_planet_name=planet_name,
+                galactic_war_planet_name=f"{galaxy_name}/{planet_name}",
                 mods=[],
                 commander_kills={},
                 validity=ValidityState.VALID,
@@ -136,11 +174,20 @@ class GalacticWarService(Service):
             self._update_state_cron.stop()
             self._update_state_cron = None
 
-    def get_dirty(self):
-        return self._dirty
+    def get_dirty(self, galaxy_name: str) -> bool:
+        return galaxy_name in self._dirty
 
-    def set_dirty(self, dirty):
-        self._dirty = dirty
+    def get_dirties(self) -> set[str]:
+        return set(self._dirty)
+
+    def set_dirty(self, galaxy_name: str, dirty: bool):
+        if dirty:
+            self._dirty.add(galaxy_name)
+        else:
+            self._dirty.remove(galaxy_name)
+
+    def clear_dirties(self):
+        self._dirty.clear()
 
     async def on_game_rating(self, game_info: EndedGameInfo,
                              old_ratings: Dict[PlayerID, RankedRating],
@@ -148,24 +195,46 @@ class GalacticWarService(Service):
                              team_outcome_likelihoods: Dict[TeamID, OutcomeLikelihoods]):
 
         if game_info.galactic_war_planet_name is not None:
-            self._logger.info(f"[on_game_rating] game_id={game_info.game_id}, planet={game_info.galactic_war_planet_name}")
+
+            planet_name = game_info.galactic_war_planet_name
+            if '/' in planet_name:
+                galaxy_name, planet_name = planet_name.split('/')
+            else:
+                galaxy_name = None
+                for galaxy_name, state in self._state.items():
+                    if planet_name in state._planets_by_name.keys():
+                        break
+
+            galaxy_config = [cfg for cfg in GwGalaxyConfig.from_dict_list(config.GALACTIC_WAR_GALAXIES)
+                             if cfg.technical_name == galaxy_name]
+            if len(galaxy_config) == 0:
+                self._logger.error(f"[on_game_rating] unable to locate galaxy. planet={game_info.galactic_war_planet_name.lower()}")
+                return
+            galaxy_config = galaxy_config[0]
+            game_info = game_info._replace(galactic_war_planet_name=planet_name)
+
+            self._logger.info(f"[on_game_rating] game_id={game_info.game_id}, galaxy_name={galaxy_name}, planet={game_info.galactic_war_planet_name}")
             try:
-                self._state.validate_game(game_info)
-                self._logger.info(f"[on_game_rating] game_id={game_info.game_id} validated OK")
+                state = self._state[galaxy_name]
+                state.validate_game(game_info)
+                self._logger.info(f"[on_game_rating]   validated OK")
 
-                old_scores = self._state._planets_by_name[game_info.galactic_war_planet_name].get_ro_scores()
-                self._state.update_scores(game_info, old_ratings, new_ratings, team_outcome_likelihoods)
-                new_scores = self._state._planets_by_name[game_info.galactic_war_planet_name].get_ro_scores()
-                self._logger.info(f"[update_scores] game_id={game_info.game_id}, planet={game_info.galactic_war_planet_name}, old_scores={old_scores}, new_scores={new_scores}")
+                old_scores = state._planets_by_name[game_info.galactic_war_planet_name].get_ro_scores()
+                state.update_scores(game_info, old_ratings, new_ratings, team_outcome_likelihoods)
+                new_scores = state._planets_by_name[game_info.galactic_war_planet_name].get_ro_scores()
+                self._logger.info(f"[on_game_rating]    old_scores={old_scores}, new_scores={new_scores}")
 
-                if config.GALACTIC_WAR_RANK_THRESHOLDS and config.GALACTIC_WAR_RANK_AVATAR_IDS:
-                    await self._grant_avatars(game_info)
+                if config.GALACTIC_WAR_RANK_THRESHOLDS:
+                    if galaxy_config.rank_avatar_ids:
+                        await self._grant_avatars(galaxy_config.rank_avatar_ids, game_info, state)
+                    if galaxy_config.rank_achievement_ids:
+                        await self._grant_achievements(galaxy_config.rank_achievement_ids, game_info, state)
 
                 if self._update_state_cron is None:
-                    await self.update_state()
+                    await self.update_state(galaxy_config)
 
-                await self._save_state()
-                self.set_dirty(True)
+                await self._save_state(galaxy_config)
+                self.set_dirty(galaxy_name, True)
 
             except InvalidGalacticWarGame as e:
                 self._logger.error(f"[on_game_rating] {e}")
@@ -178,35 +247,37 @@ class GalacticWarService(Service):
                             "text": f"Game {game_info.game_id} did not count towards Galactic War because: {str(e)}"})
 
     async def scheduled_update_state(self):
-        changes_made = await self.update_state()
-        if changes_made > 0:
-            await self._save_state()
-            self.set_dirty(True)
+        for galaxy_config in GwGalaxyConfig.from_dict_list(config.GALACTIC_WAR_GALAXIES):
+            changes_made = await self.update_state(galaxy_config)
+            if changes_made > 0:
+                await self._save_state(galaxy_config)
+                self.set_dirty(galaxy_config.technical_name, True)
 
-    async def update_state(self):
-        self._logger.info(f"[update_state] processing ...")
-        front_line_changes = self._state.update_front_lines()
+    async def update_state(self, galaxy_config: GwGalaxyConfig):
+        self._logger.info(f"[update_state] updating {galaxy_config.technical_name} ...")
+        state = self._state[galaxy_config.technical_name]
+
+        state._data["dominance_threshold"] = config.GALACTIC_WAR_DOMINANCE_THRESHOLD
+
+        front_line_changes = await state.update_front_lines(self.db)
         other_changes_made = 1
         while other_changes_made > 0:
-            other_changes_made = self._state.capture_isolated_planets() + \
-                                 self._state.capture_uncontested_planets()
+            other_changes_made = state.capture_isolated_planets() + \
+                                 state.capture_uncontested_planets()
 
-        uncaptured_capitals: List[Planet] = self._state.get_capitals(standing=True, contested=True, captured=False)
+        uncaptured_capitals: List[Planet] = state.get_capitals(standing=True, contested=True, captured=False)
         if len(uncaptured_capitals) < 2:
             self._logger.info("[update_state] the galaxy is captured by {}. starting a new scenario".format(
                 uncaptured_capitals[0].get_capital_of().name if len(uncaptured_capitals) > 0 else "no one"))
-            await self._load_state(path=str(self._get_next_scenario()))
-            self._initialise_scenario()
+            await self._load_state(galaxy_config, path=str(self._get_next_scenario(state.get_label())))
+            self._initialise_scenario(galaxy_config)
             other_changes_made += 1
 
         return front_line_changes + other_changes_made
 
-    async def _grant_avatars(self, game_info: EndedGameInfo):
-        avatar_ids = [id_set.split(':') for id_set in config.GALACTIC_WAR_RANK_AVATAR_IDS.split(';')]
-        avatar_ids = {Faction.from_string(faction): [int(id) for id in ids.split(',')] for faction, ids in avatar_ids}
-
+    async def _grant_avatars(self, avatar_ids: Dict[Faction, List[int]], game_info: EndedGameInfo, state: GalacticWarState):
         for player_info in game_info.ended_game_player_summary:
-            player_score = self._state.get_player_score(player_info.player_id, player_info.faction)
+            player_score = state.get_player_score(player_info.player_id, player_info.faction)
             metric = player_score.cum_winning_scores
             rank_tier = bisect.bisect_right(config.GALACTIC_WAR_RANK_THRESHOLDS, metric)
             try:
@@ -214,67 +285,85 @@ class GalacticWarService(Service):
             except KeyError:
                 self._logger.warn(f"[_grant_avatars] unable to find avatar_id for faction={player_info.faction} rank_tier={rank_tier} for player_id={player_info.player_id}")
                 self._logger.debug(f"[_grant_avatars] GALACTIC_WAR_RANK_THRESHOLDS={config.GALACTIC_WAR_RANK_THRESHOLDS}")
-                self._logger.debug(f"[_grant_avatars] GALACTIC_WAR_RANK_AVATAR_IDS={config.GALACTIC_WAR_RANK_AVATAR_IDS}")
                 self._logger.debug(f"[_grant_avatars] avatar_ids={avatar_ids}")
                 continue
+
             await self.ladder_service.grant_avatar(player_info.player_id, avatar_id, config.GALACTIC_WAR_RANK_AVATAR_AUTO_SELECT)
 
-    def _initialise_scenario(self):
-        changes_made = 0
+    async def _grant_achievements(self, achievement_ids: Dict[Faction, List[str]],
+                                  game_info: EndedGameInfo, state: GalacticWarState):
 
-        if len(self._state.get_capitals()) == 0:
-            self._state.assign_two_capitals()
-            self._state = GalacticWarState(self._state.get_data())
-            changes_made += 1
+        for player_info in game_info.ended_game_player_summary:
+            player_score = state.get_player_score(player_info.player_id, player_info.faction)
+            metric = player_score.cum_winning_scores
+            rank_tier = bisect.bisect_right(config.GALACTIC_WAR_RANK_THRESHOLDS, metric)
+            try:
+                achievement_id = achievement_ids[player_info.faction][rank_tier]
+            except KeyError:
+                self._logger.warn(f"[_grant_avatars] unable to find achievement_id for faction={player_info.faction} rank_tier={rank_tier} for player_id={player_info.player_id}")
+                self._logger.debug(f"[_grant_avatars] GALACTIC_WAR_RANK_THRESHOLDS={config.GALACTIC_WAR_RANK_THRESHOLDS}")
+                self._logger.debug(f"[_grant_avatars] avatar_ids={achievement_ids}")
+                continue
+            queue = []
+            self.achievement_service.unlock(achievement_id, queue)
+            await self.achievement_service.execute_batch_update(player_info.player_id, queue)
 
-        if len(self._state.get_uncontested_planets()) == 2:
+    def _initialise_scenario(self, galaxy_config: GwGalaxyConfig):
+        state = self._state[galaxy_config.technical_name]
+        if len(state.get_capitals()) == 0:
+            state.assign_two_capitals()
+            state = GalacticWarState(state.get_data(), galaxy_config)
+            self._state[galaxy_config.technical_name] = state
+
+        if len(state.get_uncontested_planets()) == 2:
             self._logger.info("distributing planets")
-            self._state.distribute_planets_to_factions()
-            changes_made += 1
+            state.distribute_planets_to_factions()
 
-        self._state.seperate_abutting_factions()
-        self._state.capture_uncontested_planets()
-        if config.GALACTIC_WAR_INITIALISE_MAPS_BY_MAP_POOL:
-            self._state.ensure_maps_by_map_pool(self.ladder_service.queues)
-        elif len(config.GALACTIC_WAR_INITIALISE_MAPS_BY_REGEX) > 0:
-            self._state.ensure_maps_by_regex(self.game_service.get_available_ranked_maps())
+        state.separate_abutting_factions()
+        state.capture_uncontested_planets()
+        if galaxy_config.map_select_strategy == GwMapSelectStrategy.MAP_POOL:
+            state.ensure_maps_by_map_pool(self.ladder_service.queues)
+        elif galaxy_config.map_select_strategy == GwMapSelectStrategy.REGEX:
+            state.ensure_maps_by_regex(galaxy_config, self.game_service.get_available_ranked_maps())
+        else:
+            raise ValueError(f"Unrecognised map_selection_strategy {galaxy_config.map_select_strategy}")
 
-        return changes_made
-
-    def _get_next_scenario(self) -> Path:
+    @staticmethod
+    def _get_next_scenario(current_scenario_label: str) -> Path:
         scenario_root = Path(config.GALACTIC_WAR_SCENARIO_PATH)
         scenario_files = sorted(filter(lambda path: path.suffix in [".gml", ".json"], scenario_root.glob('*')))
-        idx_scenario = [i for i, file in enumerate(scenario_files) if file == scenario_root / self._state.get_label()]
+        idx_scenario = [i for i, file in enumerate(scenario_files) if file == scenario_root / current_scenario_label]
         if len(idx_scenario) == 0:
             return scenario_root / config.GALACTIC_WAR_INITIAL_SCENARIO
 
         idx_scenario = (idx_scenario[0] + 1) % len(scenario_files)
         return scenario_files[idx_scenario]
 
-    async def _load_state(self, path: str = None) -> None:
+    async def _load_state(self, galaxy_config: GwGalaxyConfig, path: str = None):
         if path is None:
-            state_path = Path(config.GALACTIC_WAR_STATE_FILE)
+            state_path = Path(galaxy_config.state_file)
         else:
             state_path = Path(path)
 
         if state_path.exists():
-            self._logger.info(f"[_load_state] existing state: {state_path}")
-            self._state = await self._do_load_state(state_path)
+            self._logger.info(f"[_load_state] galaxy={galaxy_config.technical_name}. Loading existing state:{state_path}")
+            self._state[galaxy_config.technical_name] = await self._do_load_state(galaxy_config, state_path)
 
         else:
             new_scenario_path = Path(config.GALACTIC_WAR_SCENARIO_PATH) / config.GALACTIC_WAR_INITIAL_SCENARIO
-            self._logger.info(f"[_load_state] initial scenario: {new_scenario_path}")
-            self._state = await self._do_load_state(new_scenario_path)
-            self._initialise_scenario()
-            await self._save_state()
+            self._logger.info(f"[_load_state] galaxy={galaxy_config.technical_name}. Loading scenario: {new_scenario_path}")
+            self._state[galaxy_config.technical_name] = await self._do_load_state(galaxy_config, new_scenario_path)
+            self._logger.info(f"[_load_state] galaxy={galaxy_config.technical_name}. Initialising scenario")
+            self._initialise_scenario(galaxy_config)
+            await self._save_state(galaxy_config)
 
-    async def _save_state(self):
-        state_path = Path(config.GALACTIC_WAR_STATE_FILE)
-        self._logger.info(f"[_save_state] scenario={self._state.get_label()}, {state_path}")
-        await self._do_save_state(state_path, self._state)
+    async def _save_state(self, galaxy_config: GwGalaxyConfig):
+        state_path = Path(galaxy_config.state_file)
+        self._logger.info(f"[_save_state] scenario={self._state[galaxy_config.technical_name].get_label()}, {state_path}")
+        await self._do_save_state(state_path, self._state[galaxy_config.technical_name])
 
     @staticmethod
-    async def _do_load_state(path: Path) -> GalacticWarState:
+    async def _do_load_state(galaxy_config: GwGalaxyConfig, path: Path) -> GalacticWarState:
         if path.suffix == ".gml":
             async with aiofiles.open(path, "rb") as fp:
                 contents = await fp.read()
@@ -289,7 +378,7 @@ class GalacticWarService(Service):
         else:
             raise ValueError(f"Unsupported Galactic War file type: {path}")
 
-        return GalacticWarState(data, Path(path).name)
+        return GalacticWarState(data, galaxy_config, Path(path).name)
 
     @staticmethod
     async def _do_save_state(path: Path, state: GalacticWarState):

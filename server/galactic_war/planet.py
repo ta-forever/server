@@ -1,6 +1,7 @@
 import random
 from typing import Dict, Union, List
 from server.config import config
+from server.decorators import with_logger
 from server.factions import Faction
 from server.galactic_war.typedefs import GwPlayerScore
 from server.rating_service.typedefs import PlayerID
@@ -62,26 +63,6 @@ def get_random_name():
     return f"{noun} {adj}"
 
 
-class WeightedShuffleBag:
-    def __init__(self, spec: str):
-        self._items = []
-        for pair in spec.split(';'):
-            mod, weight = pair.split(':', 1)
-            self._items.extend([mod] * int(weight))
-        self._bag = []
-
-    def next(self):
-        if not self._bag:
-            self._bag = self._items.copy()
-            random.shuffle(self._bag)
-        return self._bag.pop()
-
-MOD_BAG = WeightedShuffleBag(config.GALACTIC_WAR_INITIALISE_DEFAULT_MOD)
-
-def get_random_mod():
-    return MOD_BAG.next()
-
-
 def is_number(s: str):
     try:
         x = float(s)
@@ -90,12 +71,13 @@ def is_number(s: str):
         return False
 
 
+@with_logger
 class Planet(object):
     """
     :brief wrapper around a dictionary containing Galactic War planet attributes
     """
 
-    def __init__(self, _data: Dict):
+    def __init__(self, _data: Dict, default_mod: str):
         try:
             if len(_data["label"]) == 0:
                 _data.pop("label")
@@ -111,7 +93,7 @@ class Planet(object):
         default_data = {
             "label": get_random_name(),
             "map": "<invalid map>",
-            "mod": get_random_mod(),
+            "mod": default_mod,
             "size": config.GALACTIC_WAR_DEFAULT_PLANET_SIZE,
             "score": {
                 Faction.arm.capitalized: config.GALACTIC_WAR_DEFAULT_PLANET_SIZE,
@@ -137,6 +119,9 @@ class Planet(object):
 
     def get_name(self) -> str:
         return self._data["label"]
+
+    def set_name(self, new_name):
+        self._data["label"] = new_name
 
     def get_map(self) -> str:
         return self._data["map"]
@@ -178,6 +163,7 @@ class Planet(object):
         if faction is None:
             if "controlled_by" in self._data:
                 self._data.pop("controlled_by")
+                self._data["belligerents"].clear()
         else:
             self._data["controlled_by"] = faction.capitalized
 
@@ -206,7 +192,7 @@ class Planet(object):
         min_score = min(scores.values())
         max_faction = max(scores, key=scores.get)
         max_score = scores[max_faction]
-        if max_score > config.GALACTIC_WAR_REQUIRED_DOMINANCE_RATIO * min_score:
+        if max_score > config.GALACTIC_WAR_DOMINANCE_THRESHOLD * min_score:
             try:
                 return Faction.from_value(max_faction)
             except KeyError:

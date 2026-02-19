@@ -556,7 +556,7 @@ async def test_distribute_empty_planets(ladder_service):
     state = GalacticWarState(data)
     assert(len(state.get_uncontested_planets()) == 2)
     state.distribute_planets_to_factions()
-    state.seperate_abutting_factions()
+    state.separate_abutting_factions()
     state.ensure_maps_by_map_pool(ladder_service.queues)
     state = GalacticWarState(state.get_data())
 
