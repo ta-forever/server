@@ -121,7 +121,8 @@ class ServerInstance(object):
             ladder_service=self.services["ladder_service"],
             party_service=self.services["party_service"],
             tada_service=self.services["tada_service"],
-            irc_service=self.services["irc_service"]
+            irc_service=self.services["irc_service"],
+            galactic_war_service=self.services["galactic_war_service"]
         )
 
     def write_broadcast(self, message, predicate=lambda conn: conn.authenticated):

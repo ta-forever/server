@@ -33,7 +33,7 @@ class GwGalaxyConfig:
     display_name: str
     state_file: str
     map_select_strategy: GwMapSelectStrategy
-    mods: List[GwModConfig]
+    mods: Dict[str, GwModConfig]
     rank_avatar_ids: Dict[Faction, List[int]]
     rank_achievement_ids: Dict[Faction, List[str]]
 
@@ -44,14 +44,14 @@ class GwGalaxyConfig:
             display_name=d["display_name"],
             state_file=d["state_file"],
             map_select_strategy=GwMapSelectStrategy(d["map_select_strategy"]),
-            mods=[GwModConfig.from_dict(c) for c in d["mods"]],
+            mods={c["technical_name"]:GwModConfig.from_dict(c) for c in d["mods"]},
             rank_avatar_ids={Faction.from_string(k): [int(_id) for _id in v] for k, v in d["rank_avatar_ids"].items()},
             rank_achievement_ids={Faction.from_string(k): v for k, v in d["rank_achievement_ids"].items()}
         )
 
     @classmethod
-    def from_dict_list(cls, dl: List[Dict]) -> List["GwGalaxyConfig"]:
-        return [GwGalaxyConfig.from_dict(d) for d in dl]
+    def from_dict_list(cls, dl: List[Dict]) -> Dict[str, "GwGalaxyConfig"]:
+        return {d["technical_name"]:GwGalaxyConfig.from_dict(d) for d in dl}
 
 
 @dataclass

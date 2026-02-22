@@ -232,3 +232,15 @@ class Planet(object):
         elif score_change < 0.:
             score.losses += 1
             score.cum_losing_scores += score_change
+
+    def get_most_heroic_player(self, faction: Faction):
+        belligerents = self.get_belligerents()
+        if not belligerents:
+            return None, None
+
+        heroic_player_id, cum_winning_score = max((
+            (pid, self.get_belligerent_score(pid, faction).cum_winning_scores)
+            for pid in self.get_belligerents()
+        ), key=lambda item: item[1])
+
+        return heroic_player_id, cum_winning_score

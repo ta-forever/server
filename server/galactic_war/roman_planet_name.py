@@ -141,8 +141,3 @@ def to_roman(num):
             result += s
             num -= v
     return result
-
-
-pn = roman_planet_name("TheArmCommander")
-print(pn)
-

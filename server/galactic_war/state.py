@@ -1,5 +1,6 @@
 import math
 import random
+from itertools import cycle
 
 import sqlalchemy
 from trueskill import Rating
@@ -8,10 +9,10 @@ from .planet import Planet
 from collections import defaultdict
 import networkx
 import re
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Set
 
 from .roman_planet_name import roman_planet_name
-from .typedefs import GwPlayerScore, GwGalaxyConfig
+from .typedefs import GwPlayerScore, GwGalaxyConfig, GwMapSelectStrategy
 from .. import config, FAFDatabase
 from ..decorators import with_logger
 from ..factions import Faction
@@ -37,6 +38,15 @@ class GalacticWarState(object):
         data["display_name"] = galaxy_config.display_name
         data["rank_thresholds"] = config.GALACTIC_WAR_RANK_THRESHOLDS
         data["dominance_threshold"] = config.GALACTIC_WAR_DOMINANCE_THRESHOLD
+
+        if galaxy_config.map_select_strategy == GwMapSelectStrategy.REGEX:
+            data["map_select_strategy"] = "REGEX"
+            data["map_select_regexes"] = {k: v.map_select_regexes for k, v in galaxy_config.mods.items()}
+
+        else: # GwMapSelectStrategy.MAP_POOL
+            data["map_select_strategy"] = "MAP_POOL"
+            data["map_select_map_pool_id"] = {k: v.map_select_map_pool_id for k, v in galaxy_config.mods.items()}
+
         data["factions"] = [k.name for k in galaxy_config.rank_avatar_ids.keys()]
 
         if default_scenario_name is not None and ("label" not in data or len(data["label"]) == 0):
@@ -55,7 +65,7 @@ class GalacticWarState(object):
 
         self._data = data
 
-        mod_names = [cfg.technical_name for cfg in galaxy_config.mods]
+        mod_names = [cfg.technical_name for cfg in galaxy_config.mods.values()]
         n_planets = len(data["node"])
         n_dup = int(math.ceil(n_planets / len(mod_names)))
         mod_names = [x for x in mod_names for _ in range(n_dup)]
@@ -286,9 +296,7 @@ class GalacticWarState(object):
                 self._logger.info(f"[update_front_lines] capturing {planet.get_name()} for {dominant_faction.name} because is dominating")
                 planet.set_controlled_by(dominant_faction)
 
-                heroic_player_id, cum_winning_score = max(((pid, planet.get_belligerent_score(pid, dominant_faction).cum_winning_scores)
-                                                           for pid in planet.get_belligerents()),
-                                                          key=lambda item: item[1])
+                heroic_player_id, cum_winning_score = planet.get_most_heroic_player(dominant_faction)
                 if cum_winning_score > 0:
                     heroic_player_name = await self._get_player_name(database, heroic_player_id)
                     if heroic_player_name:
@@ -428,54 +436,96 @@ class GalacticWarState(object):
                     planet.set_controlled_by(None)
                     planet.reset_scores()
 
-    def ensure_maps_by_map_pool(self, matchmaker_queues: Dict[str, MatchmakerQueue]):
-        self._logger.info(f"[ensure_maps_by_map_pool] queues={matchmaker_queues.keys()}")
-        chosen_maps = list(set([planet.get_map() for planet in self._planets_by_name.values()]))
-        map_pool_map_names = {}
-        for planet in self._planets_by_name.values():
-            for queue in matchmaker_queues.values():
-                if queue.featured_mod == planet.get_mod() and queue.team_size == 1:
+    def get_map_pool(self,
+                     mod_technical_name: str,
+                     matchmaker_queues: List[MatchmakerQueue],
+                     all_ranked_maps: List[Map]) -> Set[str]:
+
+        galaxy_config = GwGalaxyConfig.from_dict_list(config.GALACTIC_WAR_GALAXIES).get(self._data["technical_name"], None)
+        if galaxy_config is None:
+            raise ValueError(f"Galaxy {self._data["technical_name"]} not found")
+
+        if galaxy_config.map_select_strategy == GwMapSelectStrategy.MAP_POOL:
+            for queue in matchmaker_queues:
+                if queue.featured_mod == mod_technical_name and queue.team_size == 1:
                     map_pool = queue.get_map_pool_for_rating(1500)
-                    if map_pool.name not in map_pool_map_names.keys():
-                        map_pool_map_names[map_pool.name] = set([m.name for m in map_pool.maps.values()])
-                    if planet.get_map() not in map_pool_map_names[map_pool.name]:
-                        random_map = map_pool.choose_map(chosen_maps)
-                        self._logger.info(f"[ensure_maps_by_map_pool] planet:{planet.get_name()}, mod:{planet.get_mod()}, "
-                                          f"map:{planet.get_map()}. Map not found in map pool.  Reassigning to map:"
-                                          f"{random_map.name}")
-                        chosen_maps += [random_map.id]
-                        planet.set_map(random_map.name)
-                    break
-    def ensure_maps_by_regex(self, galaxy_config: GwGalaxyConfig, all_maps: List[Map]):
-        self._logger.info("[ensure_maps_by_regex] len(all_maps)=%d", len(all_maps))
-        if not all_maps:
+                    return set([m.name for m in map_pool.maps.values()])
+
+        # else GwMapSelectStrategy.REGEX
+        all_map_names = set(m.name for m in all_ranked_maps)
+        regexes = []
+        mod_config = galaxy_config.mods[mod_technical_name]
+        for pattern in mod_config.map_select_regexes:
+            try:
+                regexes.append(re.compile(pattern))
+            except re.error as e:
+                self._logger.warning("[get_map_pool] Invalid regex for %s/%s: %s (%s)",
+                                     galaxy_config.technical_name, mod_config.technical_name, pattern, e)
+
+        filtered_map_names = set()
+        for regex in regexes:
+            filtered_map_names.update(mn for mn in all_map_names if regex.search(mn))
+
+        return filtered_map_names
+
+    def ensure_allowed_maps(self, allowed_map_names_by_mod: Dict[str, Set[str]]):
+        self._logger.info(
+            "[ensure_allowed_maps] len(allowed_map_names)=%d",
+            len(allowed_map_names_by_mod)
+        )
+
+        if not allowed_map_names_by_mod:
             return
 
-        all_map_names = set(m.name for m in all_maps)
+        normalized_allowed = {
+            mod.upper(): set(map_names)
+            for mod, map_names in allowed_map_names_by_mod.items()
+        }
 
-        regexes = []
-        for mod_config in galaxy_config.mods:
-            for pattern in mod_config.map_select_regexes:
-                try:
-                    regexes.append((mod_config.technical_name, re.compile(pattern)))
-                except re.error as e:
-                    self._logger.warning("[ensure_maps_by_regex] Invalid regex for %s/%s: %s (%s)",
-                                         galaxy_config.technical_name, mod_config.technical_name, pattern, e)
-
-        filtered_map_names = {mod.upper(): set() for mod, _ in regexes}
-        for mod_name, regex in regexes:
-            filtered_map_names[mod_name.upper()].update(mn for mn in all_map_names if regex.search(mn))
+        shuffled_cycles_by_mod = {
+            mod: cycle(random.sample(sorted(map_names), len(map_names)))
+            for mod, map_names in normalized_allowed.items()
+            if map_names
+        }
 
         for planet in self._planets_by_name.values():
             mod = planet.get_mod().upper()
-            allowed_map_names = filtered_map_names.get(mod, all_map_names)
+            allowed_map_names = normalized_allowed.get(mod)
 
             if not allowed_map_names:
-                self._logger.warning("[ensure_maps_by_regex] No maps matched for mod %s, falling back to all maps", mod)
-                allowed_map_names = all_map_names
+                self._logger.warning(
+                    "[ensure_allowed_maps] No maps matched for mod %s on planet %s",
+                    mod,
+                    planet.get_name()
+                )
+                continue
 
             if planet.get_map() not in allowed_map_names:
-                planet.set_map(random.choice(tuple(allowed_map_names)))
+                new_map_name = next(shuffled_cycles_by_mod[mod])
+
+                self._logger.info(
+                    "[ensure_allowed_maps] setting map for mod %s on planet %s to %s",
+                    mod,
+                    planet.get_name(),
+                    new_map_name
+                )
+
+                planet.set_map(new_map_name)
+
+    def on_command_set_map(self, player_id: int, planet_name: str, map_name: str, allowed_maps_by_mod: Dict[str, Set[str]]):
+        planet = self._planets_by_name[planet_name]
+        controlling_faction = planet.get_controlled_by()
+        if controlling_faction is None:
+            raise ValueError(f"You cannot change the map for {planet_name} because it is currently contested!")
+
+        heroic_player_id, _ = planet.get_most_heroic_player(controlling_faction)
+        if player_id != heroic_player_id:
+            raise ValueError(f"You cannot change the map for {planet_name} because you did not personally conquer it!")
+
+        if map_name not in allowed_maps_by_mod[planet.get_mod()]:
+            raise ValueError(f"Map '{map_name}' is not allowed for this planet")
+
+        planet.set_map(map_name)
 
     def _get_planets_by_controlling_faction(self):
         planets_by_faction = defaultdict(list)

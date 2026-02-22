@@ -16,6 +16,7 @@ from sqlalchemy.exc import DBAPIError, OperationalError, ProgrammingError
 
 import server.metrics as metrics
 from server.db import FAFDatabase
+from .galactic_war_service import GalacticWarService
 
 from .abc.base_game import GameConnectionState, InitMode
 from .config import TRACE, config
@@ -63,11 +64,13 @@ class LobbyConnection:
         party_service: PartyService,
         tada_service: TadaService,
         irc_service: IrcService,
+        galactic_war_service: GalacticWarService
     ):
         self._db = database
         self.geoip_service = geoip
         self.game_service = game_service
         self.irc_service = irc_service
+        self.galactic_war_service = galactic_war_service
         self.player_service = players
         self.nts_client = nts_client
         self.coturn_generator = CoturnHMAC(config.COTURN_HOSTS, config.COTURN_KEYS)
@@ -1333,6 +1336,19 @@ class LobbyConnection:
                 crc = message["crc"]
                 await game.fetch_map_file_path(hpi_archive, map_name, crc)
                 self.game_connection._mark_dirty()
+
+    async def command_galactic_war_set_map(self, message):
+        try:
+            galaxy_technical_name = message["galaxy_technical_name"]
+            planet_name = message["planet_name"]
+            map_name = message["map_name"]
+        except KeyError as e:
+            raise ClientError(f"Missing key from command: galactic_war_set_map: {e}")
+
+        try:
+            await self.galactic_war_service.on_command_set_map(self.player.id, galaxy_technical_name, planet_name, map_name)
+        except (KeyError, ValueError) as e:
+            raise ClientError(f"Unable to set planet name: {e}")
 
     async def send_warning(self, message: str, fatal: bool = False):
         """

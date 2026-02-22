@@ -7,9 +7,12 @@ import aiocron
 import aiofiles
 from trueskill import Rating
 
-from . import PlayerService, LadderService, GameService, FAFDatabase
+from .player_service import PlayerService
+from .ladder_service import LadderService
+from .game_service import GameService
+from .db import FAFDatabase
 from .factions import Faction
-from .galactic_war.typedefs import GwGalaxyConfig, GwMapSelectStrategy
+from .galactic_war.typedefs import GwGalaxyConfig
 from .games.game_results import GameOutcome
 from .rating_service import RatingService
 from .config import config
@@ -64,13 +67,13 @@ class GalacticWarService(Service):
         self._logger.info("[reload_state] reloading state from file ...")
         self._logger.info("   GALACTIC_WAR_GALAXIES:")
         self._logger.info(config.GALACTIC_WAR_GALAXIES)
-        for galaxy_config in GwGalaxyConfig.from_dict_list(config.GALACTIC_WAR_GALAXIES):
+        for galaxy_config in GwGalaxyConfig.from_dict_list(config.GALACTIC_WAR_GALAXIES).values():
             await self._load_state(galaxy_config)
             self.set_dirty(galaxy_config.technical_name, True)
 
     async def reset(self):
         self._logger.info(f"[reset] resetting ...")
-        for galaxy_config in GwGalaxyConfig.from_dict_list(config.GALACTIC_WAR_GALAXIES):
+        for galaxy_config in GwGalaxyConfig.from_dict_list(config.GALACTIC_WAR_GALAXIES).values():
             try:
                 Path(galaxy_config.state_file).unlink()
             except FileNotFoundError:
@@ -99,9 +102,11 @@ class GalacticWarService(Service):
             for faction in planet.get_ro_scores().keys():
                 planet.set_score(faction, 100.0 if faction.name.lower() == faction_name.lower() else 0.0)
 
-            galaxy_config = [cfg for cfg in GwGalaxyConfig.from_dict_list(config.GALACTIC_WAR_GALAXIES)
-                             if cfg.technical_name == galaxy_name]
-            await self._save_state(galaxy_config[0])
+            galaxy_config = GwGalaxyConfig.from_dict_list(config.GALACTIC_WAR_GALAXIES).get(galaxy_name, None)
+            if galaxy_config is None:
+                self._logger.error(f"[manual_capture] unknown galaxy {galaxy_name}")
+
+            await self._save_state(galaxy_config)
             self.set_dirty(planet.get_mod(), True)
 
         except Exception as e:
@@ -205,12 +210,10 @@ class GalacticWarService(Service):
                     if planet_name in state._planets_by_name.keys():
                         break
 
-            galaxy_config = [cfg for cfg in GwGalaxyConfig.from_dict_list(config.GALACTIC_WAR_GALAXIES)
-                             if cfg.technical_name == galaxy_name]
-            if len(galaxy_config) == 0:
+            galaxy_config = GwGalaxyConfig.from_dict_list(config.GALACTIC_WAR_GALAXIES).get(galaxy_name, None)
+            if galaxy_config is None:
                 self._logger.error(f"[on_game_rating] unable to locate galaxy. planet={game_info.galactic_war_planet_name.lower()}")
                 return
-            galaxy_config = galaxy_config[0]
             game_info = game_info._replace(galactic_war_planet_name=planet_name)
 
             self._logger.info(f"[on_game_rating] game_id={game_info.game_id}, galaxy_name={galaxy_name}, planet={game_info.galactic_war_planet_name}")
@@ -247,7 +250,7 @@ class GalacticWarService(Service):
                             "text": f"Game {game_info.game_id} did not count towards Galactic War because: {str(e)}"})
 
     async def scheduled_update_state(self):
-        for galaxy_config in GwGalaxyConfig.from_dict_list(config.GALACTIC_WAR_GALAXIES):
+        for galaxy_config in GwGalaxyConfig.from_dict_list(config.GALACTIC_WAR_GALAXIES).values():
             changes_made = await self.update_state(galaxy_config)
             if changes_made > 0:
                 await self._save_state(galaxy_config)
@@ -274,6 +277,23 @@ class GalacticWarService(Service):
             other_changes_made += 1
 
         return front_line_changes + other_changes_made
+
+    async def on_command_set_map(self, player_id: int, galaxy_technical_name: str, planet_name: str, map_name: str):
+        self._logger.info(f"[on_command_set_map] player_id={player_id} galaxy='{galaxy_technical_name}' planet='{planet_name}' map='{map_name}'")
+        state = self._state[galaxy_technical_name]
+        gw_config = GwGalaxyConfig.from_dict_list(config.GALACTIC_WAR_GALAXIES).get(galaxy_technical_name, None)
+        if gw_config is None:
+            raise ValueError(f"Galaxy {galaxy_technical_name} not found")
+
+        allowed_maps_by_mod = {
+            mod_name: state.get_map_pool(mod_name,
+                                         self.ladder_service.queues,
+                                         self.game_service.get_available_ranked_maps())
+            for mod_name in gw_config.mods.keys()
+        }
+        state.on_command_set_map(player_id, planet_name, map_name, allowed_maps_by_mod)
+        await self._save_state(gw_config)
+        self.set_dirty(galaxy_technical_name, True)
 
     async def _grant_avatars(self, avatar_ids: Dict[Faction, List[int]], game_info: EndedGameInfo, state: GalacticWarState):
         for player_info in game_info.ended_game_player_summary:
@@ -321,12 +341,14 @@ class GalacticWarService(Service):
 
         state.separate_abutting_factions()
         state.capture_uncontested_planets()
-        if galaxy_config.map_select_strategy == GwMapSelectStrategy.MAP_POOL:
-            state.ensure_maps_by_map_pool(self.ladder_service.queues)
-        elif galaxy_config.map_select_strategy == GwMapSelectStrategy.REGEX:
-            state.ensure_maps_by_regex(galaxy_config, self.game_service.get_available_ranked_maps())
-        else:
-            raise ValueError(f"Unrecognised map_selection_strategy {galaxy_config.map_select_strategy}")
+
+        allowed_maps_by_mod = {
+            mod_name: state.get_map_pool(mod_name,
+                                         self.ladder_service.queues,
+                                         self.game_service.get_available_ranked_maps())
+            for mod_name in galaxy_config.mods.keys()
+        }
+        state.ensure_allowed_maps(allowed_maps_by_mod)
 
     @staticmethod
     def _get_next_scenario(current_scenario_label: str) -> Path:
