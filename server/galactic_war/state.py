@@ -1,3 +1,4 @@
+import bisect
 import math
 import random
 from itertools import cycle
@@ -152,11 +153,11 @@ class GalacticWarState(object):
 
         # each player stakes an amount proportional to their team's win likelihood
         if config.GALACTIC_WAR_STAKES_STRATEGY == "rank":
-            stakes = self._calculate_stakes_from_rank(game_info.ended_game_player_summary)
+            stakes, PLANET_ADJ = self._calculate_stakes_from_rank_tier(game_info.ended_game_player_summary)
         elif config.GALACTIC_WAR_STAKES_STRATEGY == "rating":
-            stakes = self._calculate_stakes_from_rating(game_info.ended_game_player_summary, team_outcome_likelihoods)
+            stakes, PLANET_ADJ = self._calculate_stakes_from_rating(game_info.ended_game_player_summary, team_outcome_likelihoods)
         else:
-            stakes = self._calculate_stakes_from_rating(game_info.ended_game_player_summary, team_outcome_likelihoods)
+            stakes, PLANET_ADJ = self._calculate_stakes_from_rating(game_info.ended_game_player_summary, team_outcome_likelihoods)
 
         # players stakes are returned depending on outcome
         returned_stakes = {player_info.player_id: {
@@ -178,10 +179,9 @@ class GalacticWarState(object):
         for player_info in game_info.ended_game_player_summary:
             pid = player_info.player_id
             belligerent_attribution_adjustment = winners_gains[pid] + returned_stakes[pid] - stakes[pid]
-            if config.GALACTIC_WAR_WINNER_TAKES_THE_POT:
-                planet_adjustment = winners_gains[pid] + returned_stakes[pid] - stakes[pid]
-            else:
-                planet_adjustment = returned_stakes[pid] - stakes[pid]
+            planet_adjustment = returned_stakes[pid] - stakes[pid]
+            if planet_adjustment < 0. and PLANET_ADJ is not None:
+                planet_adjustment = -PLANET_ADJ
 
             self._logger.info("[update_scores] player %d of %s. stake=%.1f, returned=%.1f, winnings=%.1f, planet_adj=%.1f, belligerent_adj=%.1f",
                               pid, player_info.faction.name, stakes[pid], returned_stakes[pid], winners_gains[pid], planet_adjustment, belligerent_attribution_adjustment)
@@ -238,13 +238,56 @@ class GalacticWarState(object):
 
     def _calculate_stakes_from_rating(self,
                                       ended_game_player_summary: List[EndedGamePlayerSummary],
-                                      team_outcome_likelihoods: Dict[TeamID, OutcomeLikelihoods]) -> Dict[PlayerID, float]:
+                                      team_outcome_likelihoods: Dict[TeamID, OutcomeLikelihoods]) \
+            -> Tuple[Dict[PlayerID, float], None]:
 
+        planet_adj = None  # revert to the loser's stakes
         return {player_info.player_id: team_outcome_likelihoods[player_info.team_id].pwin * config.GALACTIC_WAR_MAX_SCORE
-                  for player_info in ended_game_player_summary}
+                  for player_info in ended_game_player_summary}, planet_adj
 
 
-    def _calculate_stakes_from_rank(self, ended_game_player_summary: List[EndedGamePlayerSummary]) -> Dict[PlayerID, float]:
+    def _calculate_stakes_from_rank_tier(self, ended_game_player_summary: List[EndedGamePlayerSummary]) \
+            -> Tuple[Dict[PlayerID, float], float]:
+
+        team_ids = list({player_info.team_id for player_info in ended_game_player_summary})
+        assert(len(team_ids) == 2)
+
+        player_ids_by_team = {
+            tid: [player_info.player_id for player_info in ended_game_player_summary if player_info.team_id == tid]
+            for tid in team_ids
+        }
+
+        def rank_tier_for_score(score: GwPlayerScore):
+            return bisect.bisect_right(config.GALACTIC_WAR_RANK_THRESHOLDS, score.cum_winning_scores)
+
+        leaderboard = self._get_leaderboard()
+        rank_by_pid = {pid: rank_tier_for_score(score) for pid, score in leaderboard}
+        NUM_RANK_TIERS = 1 + len(config.GALACTIC_WAR_RANK_THRESHOLDS)
+
+        team_size = len(ended_game_player_summary) // 2
+        max_stake_per_opponent = config.GALACTIC_WAR_MAX_SCORE / team_size
+
+        def sigmoid(diff: float):
+            return max_stake_per_opponent / (1. + math.exp(-diff/config.GALACTIC_WAR_STAKES_RANK_FACTOR))
+
+        stakes = {player_info.player_id: 0. for player_info in ended_game_player_summary}
+        for pid1 in player_ids_by_team[team_ids[0]]:
+            rank1 = rank_by_pid.get(pid1, 0)
+            for pid2 in player_ids_by_team[team_ids[1]]:
+                rank2 = rank_by_pid.get(pid2, 0)
+                rank_difference = (rank1 - rank2)
+                stakes[pid1] += sigmoid(rank_difference)
+                stakes[pid2] += sigmoid(-rank_difference)
+
+        min_rank_in_game = min(rank_by_pid.values()) if len(rank_by_pid) > 0 else 0
+        min_adj, max_adj = config.GALACTIC_WAR_MIN_MAX_PLANET_ADJ
+        planet_adj = min_adj + (max_adj - min_adj) * min_rank_in_game / max(1, (NUM_RANK_TIERS - 1))
+        planet_adj = min(planet_adj, config.GALACTIC_WAR_MAX_SCORE)
+
+        return stakes, planet_adj
+
+    def _calculate_stakes_from_leaderboard_position(self, ended_game_player_summary: List[EndedGamePlayerSummary]) \
+            -> Tuple[Dict[PlayerID, float], float]:
 
         team_ids = list({player_info.team_id for player_info in ended_game_player_summary})
         assert(len(team_ids) == 2)
@@ -256,24 +299,24 @@ class GalacticWarState(object):
 
         leaderboard = self._get_leaderboard()
         rank_by_pid = {pid: n for n, (pid, score) in enumerate(leaderboard)}
+        NUM_RANKS = len(leaderboard)
 
         team_size = len(ended_game_player_summary) // 2
         max_stake_per_opponent = config.GALACTIC_WAR_MAX_SCORE / team_size
         stakes = {player_info.player_id: 0. for player_info in ended_game_player_summary}
         for pid1 in player_ids_by_team[team_ids[0]]:
-            rank1 = rank_by_pid[pid1] if pid1 in rank_by_pid else len(leaderboard) // 2
+            rank1 = rank_by_pid.get(pid1, NUM_RANKS // 2)
             for pid2 in player_ids_by_team[team_ids[1]]:
-                rank2 = rank_by_pid[pid2] if pid2 in rank_by_pid else len(leaderboard) // 2
-                if len(leaderboard) < 10:
-                    stakes[pid1] += max_stake_per_opponent / 2.
-                    stakes[pid2] += max_stake_per_opponent / 2.
+                rank2 = rank_by_pid.get(pid2, NUM_RANKS // 2)
+                rank_difference = (rank2 - rank1) / NUM_RANKS if NUM_RANKS >= 10 else 0
+                stakes[pid1] += scipy.stats.norm.cdf(rank_difference / config.GALACTIC_WAR_STAKES_RANK_FACTOR) * max_stake_per_opponent
+                stakes[pid2] += scipy.stats.norm.cdf(-rank_difference / config.GALACTIC_WAR_STAKES_RANK_FACTOR) * max_stake_per_opponent
 
-                else:
-                    rank_difference = (rank2 - rank1) / len(leaderboard)
-                    stakes[pid1] += scipy.stats.norm.cdf(rank_difference / config.GALACTIC_WAR_STAKES_RANK_FACTOR) * max_stake_per_opponent
-                    stakes[pid2] += scipy.stats.norm.cdf(-rank_difference / config.GALACTIC_WAR_STAKES_RANK_FACTOR) * max_stake_per_opponent
+        min_rank_in_game = min(rank_by_pid.values())
+        min_adj, max_adj = config.GALACTIC_WAR_MIN_MAX_PLANET_ADJ
+        planet_adj = min_adj + (max_adj - min_adj) * min_rank_in_game / max(1, (NUM_RANKS-1))
 
-        return stakes
+        return stakes, planet_adj
 
     async def _get_player_name(self, database: FAFDatabase, player_id) -> str:
         async with database.acquire() as conn:
