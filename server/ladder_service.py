@@ -5,7 +5,7 @@ from collections import defaultdict
 from typing import Dict, List, Optional, Set, Tuple
 
 import aiocron
-from sqlalchemy import and_, func, select, text, true, insert, update
+from sqlalchemy import and_, func, select, text, true
 
 from .abc.base_game import InitMode
 from .config import config
@@ -15,7 +15,7 @@ from .db.models import (
     game_featuredMods,
     game_player_stats,
     game_stats,
-    leaderboard, avatars
+    leaderboard
 )
 from .db.models import map as t_map
 from .db.models import (
@@ -106,6 +106,7 @@ class LadderService(Service):
 
         self.game_service.set_available_matchmaker_queues(self.queues)
         self.game_service.set_available_ranked_maps(all_ranked_maps)
+        self.game_service.set_available_map_pool_maps(map_pool_maps)
 
     async def fetch_all_ranked_maps(self, conn) -> List[Map]:
         result = await conn.execute(
@@ -207,58 +208,6 @@ class LadderService(Service):
                 row.max_rating
             ))
         return matchmaker_queues
-
-    async def grant_avatar(self, id_user: int, id_avatar: int, select_if_granted: bool):
-        async with self._db.acquire() as conn:
-            result = await conn.execute(
-                insert(avatars).values(
-                    idUser=id_user,
-                    idAvatar=id_avatar,
-                    selected=False
-                )
-                .prefix_with("IGNORE"))
-            if result.rowcount == 1:
-                self._logger.info(f"[grant_avatar] avatar={id_avatar} granted to user={id_user}")
-            else:
-                self._logger.debug(f"[grant_avatar] not granted avatar={id_avatar} to user={id_user} because already granted")
-                return
-
-            if select_if_granted:
-                await conn.execute(
-                    update(avatars)
-                    .values(
-                        selected=(avatars.c.idAvatar == id_avatar)
-                    )
-                    .where(avatars.c.idUser == id_user)
-                )
-
-            await conn.commit()
-
-    async def grant_avatar(self, id_user: int, id_avatar: int, select_if_granted: bool):
-        async with self._db.acquire() as conn:
-            result = await conn.execute(
-                insert(avatars).values(
-                    idUser=id_user,
-                    idAvatar=id_avatar,
-                    selected=False
-                )
-                .prefix_with("IGNORE"))
-            if result.rowcount == 1:
-                self._logger.info(f"[grant_avatar] avatar={id_avatar} granted to user={id_user}")
-            else:
-                self._logger.debug(f"[grant_avatar] not granted avatar={id_avatar} to user={id_user} because already granted")
-                return
-
-            if select_if_granted:
-                await conn.execute(
-                    update(avatars)
-                    .values(
-                        selected=(avatars.c.idAvatar == id_avatar)
-                    )
-                    .where(avatars.c.idUser == id_user)
-                )
-
-            await conn.commit()
 
     def start_search(
         self,

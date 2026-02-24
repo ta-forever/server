@@ -1,5 +1,9 @@
+from sqlalchemy import insert, update
+
+from server import FAFDatabase
 from server.api.api_accessor import ApiAccessor
 from server.core import Service
+from server.db.models import avatars
 from server.decorators import with_logger
 
 ACH_NOVICE = "c6e6039f-c543-424e-ab5f-b34df1336e81"
@@ -63,8 +67,9 @@ ACH_DONT_MESS_WITH_ME = "2103e0de-1c87-4fba-bc1b-0bba66669607"
 
 @with_logger
 class AchievementService(Service):
-    def __init__(self, api_accessor: ApiAccessor):
+    def __init__(self, database: FAFDatabase, api_accessor: ApiAccessor):
         self.api_accessor = api_accessor
+        self.db = database
 
     async def execute_batch_update(self, player_id, queue):
         """
@@ -119,6 +124,32 @@ class AchievementService(Service):
 
             return achievements_data
         return None
+
+    async def grant_avatar(self, id_user: int, id_avatar: int, select_if_granted: bool):
+        async with self.db.acquire() as conn:
+            result = await conn.execute(
+                insert(avatars).values(
+                    idUser=id_user,
+                    idAvatar=id_avatar,
+                    selected=False
+                )
+                .prefix_with("IGNORE"))
+            if result.rowcount == 1:
+                self._logger.info(f"[grant_avatar] avatar={id_avatar} granted to user={id_user}")
+            else:
+                self._logger.debug(f"[grant_avatar] not granted avatar={id_avatar} to user={id_user} because already granted")
+                return
+
+            if select_if_granted:
+                await conn.execute(
+                    update(avatars)
+                    .values(
+                        selected=(avatars.c.idAvatar == id_avatar)
+                    )
+                    .where(avatars.c.idUser == id_user)
+                )
+
+            await conn.commit()
 
     def unlock(self, achievement_id, queue):
         """

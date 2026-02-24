@@ -1,5 +1,5 @@
 from collections import Counter
-from typing import Dict, List, Optional, Type, Union, ValuesView
+from typing import Dict, List, Optional, Type, Union, ValuesView, Tuple
 
 import aiocron
 import glob
@@ -55,7 +55,8 @@ class GameService(Service):
         self._message_queue_service = message_queue_service
         self._tada_service = tada_service
         self.game_id_counter = 0
-        self._available_matchmaker_queues: Dict[str,MatchmakerQueue] = {} # updated by ladder_service
+        self._available_matchmaker_queues: Dict[str,MatchmakerQueue] = {}       # updated by ladder_service
+        self._available_map_pool_maps: Dict[int, Tuple[str, List[Map]]] = {}    # updated by ladder_service
 
         # Populated below in really_update_static_ish_data.
         self.featured_mods = dict()
@@ -279,10 +280,10 @@ class GameService(Service):
         await db_connection.execute(sqlalchemy.sql.text(
             "UPDATE `game_stats` SET `tada_available`= :available WHERE id = :game_id"), available=available, game_id=game_id)
 
-    def set_available_matchmaker_queues(self, queues: Dict[str,MatchmakerQueue]):
+    def set_available_matchmaker_queues(self, queues: Dict[str, MatchmakerQueue]):
         self._available_matchmaker_queues = queues
 
-    def get_available_matchmaker_queues(self) -> Dict[str,MatchmakerQueue]:
+    def get_available_matchmaker_queues(self) -> Dict[str, MatchmakerQueue]:
         return self._available_matchmaker_queues
 
     def set_available_ranked_maps(self, map_list: List[Map]):
@@ -290,6 +291,12 @@ class GameService(Service):
 
     def get_available_ranked_maps(self) -> List[Map]:
         return self._available_ranked_maps
+
+    def set_available_map_pool_maps(self, map_pool_maps: Dict[int, Tuple[str, List[Map]]]):
+        self._available_map_pool_maps = map_pool_maps
+
+    def get_available_map_pool_maps(self) -> Dict[int, Tuple[str, List[Map]]]:
+        return self._available_map_pool_maps
 
     @property
     def dirty_games(self):

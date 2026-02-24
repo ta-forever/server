@@ -1,3 +1,4 @@
+import asyncio
 import bisect
 import dataclasses
 import io
@@ -8,7 +9,6 @@ import aiofiles
 from trueskill import Rating
 
 from .player_service import PlayerService
-from .ladder_service import LadderService
 from .game_service import GameService
 from .db import FAFDatabase
 from .factions import Faction
@@ -32,11 +32,10 @@ from .stats.achievement_service import AchievementService
 @with_logger
 class GalacticWarService(Service):
 
-    def __init__(self, rating_service: RatingService, player_service: PlayerService, ladder_service: LadderService,
+    def __init__(self, rating_service: RatingService, player_service: PlayerService,
                  achievement_service: AchievementService, game_service: GameService, database: FAFDatabase):
         rating_service.add_game_rating_callback(self.on_game_rating)
         self.player_service = player_service
-        self.ladder_service = ladder_service
         self.achievement_service = achievement_service
         self.game_service = game_service
         self.db = database
@@ -205,10 +204,7 @@ class GalacticWarService(Service):
             if '/' in planet_name:
                 galaxy_name, planet_name = planet_name.split('/')
             else:
-                galaxy_name = None
-                for galaxy_name, state in self._state.items():
-                    if planet_name in state._planets_by_name.keys():
-                        break
+                galaxy_name = config.GALACTIC_WAR_DEFAULT_GALAXY
 
             galaxy_config = GwGalaxyConfig.from_dict_list(config.GALACTIC_WAR_GALAXIES).get(galaxy_name, None)
             if galaxy_config is None:
@@ -287,7 +283,7 @@ class GalacticWarService(Service):
 
         allowed_maps_by_mod = {
             mod_name: state.get_map_pool(mod_name,
-                                         self.ladder_service.queues,
+                                         self.game_service.get_available_matchmaker_queues(),
                                          self.game_service.get_available_ranked_maps())
             for mod_name in gw_config.mods.keys()
         }
@@ -308,7 +304,7 @@ class GalacticWarService(Service):
                 self._logger.debug(f"[_grant_avatars] avatar_ids={avatar_ids}")
                 continue
 
-            await self.ladder_service.grant_avatar(player_info.player_id, avatar_id, config.GALACTIC_WAR_RANK_AVATAR_AUTO_SELECT)
+            await self.achievement_service.grant_avatar(player_info.player_id, avatar_id, config.GALACTIC_WAR_RANK_AVATAR_AUTO_SELECT)
 
     async def _grant_achievements(self, achievement_ids: Dict[Faction, List[str]],
                                   game_info: EndedGameInfo, state: GalacticWarState):
@@ -344,7 +340,7 @@ class GalacticWarService(Service):
 
         allowed_maps_by_mod = {
             mod_name: state.get_map_pool(mod_name,
-                                         self.ladder_service.queues,
+                                         self.game_service.get_available_matchmaker_queues(),
                                          self.game_service.get_available_ranked_maps())
             for mod_name in galaxy_config.mods.keys()
         }
@@ -376,6 +372,14 @@ class GalacticWarService(Service):
             self._logger.info(f"[_load_state] galaxy={galaxy_config.technical_name}. Loading scenario: {new_scenario_path}")
             self._state[galaxy_config.technical_name] = await self._do_load_state(galaxy_config, new_scenario_path)
             self._logger.info(f"[_load_state] galaxy={galaxy_config.technical_name}. Initialising scenario")
+
+            for n in range(10):
+                allowed_maps = self.game_service.get_available_ranked_maps()
+                if len(allowed_maps) > 0:
+                    break
+                # give game_service time to find maps before we try to initialise_scenario
+                await asyncio.sleep(1)
+
             self._initialise_scenario(galaxy_config)
             await self._save_state(galaxy_config)
 

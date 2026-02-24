@@ -114,7 +114,7 @@ class ConfigurationStore:
                     {
                         "technical_name": "tacc",
                         "map_select_regexes": [".*"],
-                        "map_select_map_pool_id": -1
+                        "map_select_mmq_id": -1
                     }
                 ],
                 "rank_avatar_ids": {
@@ -124,6 +124,7 @@ class ConfigurationStore:
                 "rank_achievement_ids": {}
             },
         ]
+        self.GALACTIC_WAR_DEFAULT_GALAXY = "ota"    # for old clients that don't inform the galaxy name
         self.GALACTIC_WAR_SCENARIO_PATH = "/content/galactic_war/scenarios"
         self.GALACTIC_WAR_INITIAL_SCENARIO = "scenario_0.gml"
         self.GALACTIC_WAR_RELOAD_STATE = 0      # a change will trigger GalacticWarService to reload its state

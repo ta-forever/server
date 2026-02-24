@@ -46,7 +46,7 @@ class GalacticWarState(object):
 
         else: # GwMapSelectStrategy.MAP_POOL
             data["map_select_strategy"] = "MAP_POOL"
-            data["map_select_map_pool_id"] = {k: v.map_select_map_pool_id for k, v in galaxy_config.mods.items()}
+            data["map_select_mmq_id"] = {k: v.map_select_mmq_id for k, v in galaxy_config.mods.items()}
 
         data["factions"] = [k.name for k in galaxy_config.rank_avatar_ids.keys()]
 
@@ -481,7 +481,7 @@ class GalacticWarState(object):
 
     def get_map_pool(self,
                      mod_technical_name: str,
-                     matchmaker_queues: List[MatchmakerQueue],
+                     matchmaker_queues: Dict[str, MatchmakerQueue],
                      all_ranked_maps: List[Map]) -> Set[str]:
 
         galaxy_config = GwGalaxyConfig.from_dict_list(config.GALACTIC_WAR_GALAXIES).get(self._data["technical_name"], None)
@@ -489,27 +489,30 @@ class GalacticWarState(object):
             raise ValueError(f"Galaxy {self._data["technical_name"]} not found")
 
         if galaxy_config.map_select_strategy == GwMapSelectStrategy.MAP_POOL:
-            for queue in matchmaker_queues:
-                if queue.featured_mod == mod_technical_name and queue.team_size == 1:
-                    map_pool = queue.get_map_pool_for_rating(1500)
-                    return set([m.name for m in map_pool.maps.values()])
+            mmq_id = galaxy_config.mods[mod_technical_name].map_select_mmq_id
+            map_pool = [m.name for mmq in matchmaker_queues.values() if mmq.id == mmq_id
+                        for mp, _, _ in mmq.map_pools.values()
+                        for m in mp.maps.values()]
+            if len(map_pool) == 0:
+                self._logger.error(f"unable to find a map pool for mod={mod_technical_name}, mmq_id={mmq_id}")
+            return set(map_pool)
 
-        # else GwMapSelectStrategy.REGEX
-        all_map_names = set(m.name for m in all_ranked_maps)
-        regexes = []
-        mod_config = galaxy_config.mods[mod_technical_name]
-        for pattern in mod_config.map_select_regexes:
-            try:
-                regexes.append(re.compile(pattern))
-            except re.error as e:
-                self._logger.warning("[get_map_pool] Invalid regex for %s/%s: %s (%s)",
-                                     galaxy_config.technical_name, mod_config.technical_name, pattern, e)
+        else:  # GwMapSelectStrategy.REGEX
+            all_map_names = set(m.name for m in all_ranked_maps)
+            regexes = []
+            mod_config = galaxy_config.mods[mod_technical_name]
+            for pattern in mod_config.map_select_regexes:
+                try:
+                    regexes.append(re.compile(pattern))
+                except re.error as e:
+                    self._logger.warning("[get_map_pool] Invalid regex for %s/%s: %s (%s)",
+                                         galaxy_config.technical_name, mod_config.technical_name, pattern, e)
 
-        filtered_map_names = set()
-        for regex in regexes:
-            filtered_map_names.update(mn for mn in all_map_names if regex.search(mn))
+            filtered_map_names = set()
+            for regex in regexes:
+                filtered_map_names.update(mn for mn in all_map_names if regex.search(mn))
 
-        return filtered_map_names
+            return filtered_map_names
 
     def ensure_allowed_maps(self, allowed_map_names_by_mod: Dict[str, Set[str]]):
         self._logger.info(

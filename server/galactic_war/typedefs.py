@@ -16,14 +16,14 @@ class GwMapSelectStrategy(Enum):
 class GwModConfig:
     technical_name: str
     map_select_regexes: List[str]
-    map_select_map_pool_id: int
+    map_select_mmq_id: int
 
     @classmethod
     def from_dict(cls, d) -> "GwModConfig":
         return cls(
             technical_name=d["technical_name"],
             map_select_regexes=d.get("map_select_regexes", []),
-            map_select_map_pool_id=d.get("map_select_map_pool", None)
+            map_select_mmq_id=d.get("map_select_mmq_id", None)
         )
 
 

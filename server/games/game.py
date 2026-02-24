@@ -768,7 +768,7 @@ class Game():
         for player in self.players:
             if player.id not in latest_by_player:
                 fail_reasons.append(f"player={player.login} did not submit any launch codes")
-                self._logger.info("[_validate_launch_codes] Game %s was unranked because %s", self.id, fail_reasons[-1])
+                self._logger.info("[_validate_launch_codes] Game %s launch codes invalid because %s", self.id, fail_reasons[-1])
                 new_validity = ValidityState.OTHER_UNRANK
                 continue
 
@@ -791,7 +791,7 @@ class Game():
             allow_launch = response.get("allow_launch", True)
             if not allow_launch:
                 fail_reasons.append(f"player={player.login} {warning_message}")
-                self._logger.info("[_validate_launch_codes] Game %s was unranked because %s", self.id, fail_reasons[-1])
+                self._logger.info("[_validate_launch_codes] Game %s launch codes invalid because %s", self.id, fail_reasons[-1])
                 new_validity = ValidityState.BAD_MOD
 
         if self.validity is ValidityState.VALID and new_validity is not None:
