@@ -39,8 +39,8 @@ class GalacticWarService(Service):
         self.achievement_service = achievement_service
         self.game_service = game_service
         self.db = database
-        self._state = {}        # keyed by mod technical name
-        self._dirty = set()     # mod technical names that are dirty
+        self._state = {}        # keyed by galaxy technical name
+        self._dirty = set()     # galaxy technical names that are dirty
         self._update_state_cron = None
 
     async def initialize(self):
@@ -48,10 +48,20 @@ class GalacticWarService(Service):
         self.set_crontab()
         config.register_callback("GALACTIC_WAR_UPDATE_CRONTAB", self.set_crontab)
         config.register_callback("GALACTIC_WAR_GALAXIES", self.reload_state)
-        config.register_callback("GALACTIC_WAR_RELOAD_STATE", self.reload_state)
-        config.register_callback("GALACTIC_WAR_RESET", self.reset)
+        config.register_callback("GALACTIC_WAR_RELOAD_STATE", self.manual_reload)
+        config.register_callback("GALACTIC_WAR_RESET", self.manual_reset)
         config.register_callback("GALACTIC_WAR_MANUAL_CAPTURE", self.manual_capture)
         config.register_callback("GALACTIC_WAR_MANUAL_ATTACK", self.manual_attack)
+        config.register_callback("GALACTIC_WAR_RANDOMISE_MAPS", self.manual_randomise_maps)
+
+    async def manual_reload(self):
+        await self.reload_state(config.GALACTIC_WAR_RELOAD_RESET_TARGETS)
+
+    async def manual_reset(self):
+        await self.reset(config.GALACTIC_WAR_RELOAD_RESET_TARGETS)
+
+    async def manual_randomise_maps(self):
+        await self.randomise_maps(config.GALACTIC_WAR_RELOAD_RESET_TARGETS)
 
     def set_crontab(self):
         self._logger.info(f"[set_crontab] setting galactic war update crontab to {config.GALACTIC_WAR_UPDATE_CRONTAB}")
@@ -62,17 +72,45 @@ class GalacticWarService(Service):
         if len(config.GALACTIC_WAR_UPDATE_CRONTAB) > 0:
             self._update_state_cron = aiocron.crontab(config.GALACTIC_WAR_UPDATE_CRONTAB, func=self.scheduled_update_state)
 
-    async def reload_state(self):
-        self._logger.info("[reload_state] reloading state from file ...")
-        self._logger.info("   GALACTIC_WAR_GALAXIES:")
-        self._logger.info(config.GALACTIC_WAR_GALAXIES)
-        for galaxy_config in GwGalaxyConfig.from_dict_list(config.GALACTIC_WAR_GALAXIES).values():
+    async def reload_state(self, galaxy_technical_names=None):
+        galaxy_configs = GwGalaxyConfig.from_dict_list(config.GALACTIC_WAR_GALAXIES)
+        if not galaxy_technical_names:
+            galaxy_technical_names = galaxy_configs.keys()
+
+        for gtn in galaxy_technical_names:
+            self._logger.info(f"[reload_state] reloading {gtn}")
+            galaxy_config = galaxy_configs[gtn]
             await self._load_state(galaxy_config)
             self.set_dirty(galaxy_config.technical_name, True)
 
-    async def reset(self):
-        self._logger.info(f"[reset] resetting ...")
-        for galaxy_config in GwGalaxyConfig.from_dict_list(config.GALACTIC_WAR_GALAXIES).values():
+    async def randomise_maps(self, galaxy_technical_names=None):
+        galaxy_configs = GwGalaxyConfig.from_dict_list(config.GALACTIC_WAR_GALAXIES)
+        if not galaxy_technical_names:
+            galaxy_technical_names = galaxy_configs.keys()
+
+        for gtn in galaxy_technical_names:
+            self._logger.info(f"[randomise_maps] randomising {gtn}")
+            galaxy_config = galaxy_configs[gtn]
+            state = self._state[gtn]
+            allowed_maps_by_mod = {
+                mod_name: state.get_map_pool(mod_name,
+                                             self.game_service.get_available_matchmaker_queues(),
+                                             self.game_service.get_available_ranked_maps())
+                for mod_name in galaxy_config.mods.keys()
+            }
+            state.ensure_allowed_maps(allowed_maps_by_mod, randomise_maps=True)
+            await self._save_state(galaxy_config)
+            self.set_dirty(galaxy_config.technical_name, True)
+
+
+    async def reset(self, galaxy_technical_names=None):
+        galaxy_configs = GwGalaxyConfig.from_dict_list(config.GALACTIC_WAR_GALAXIES)
+        if not galaxy_technical_names:
+            galaxy_technical_names = galaxy_configs.keys()
+
+        for gtn in galaxy_technical_names:
+            self._logger.info(f"[reset] resetting {gtn}")
+            galaxy_config = galaxy_configs[gtn]
             try:
                 Path(galaxy_config.state_file).unlink()
             except FileNotFoundError:

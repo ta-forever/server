@@ -168,7 +168,7 @@ class ServerInstance(object):
             if dirty_galactic_war:
                 self.write_broadcast({
                     "command": "galactic_war_update",
-                    "mod_technical_name": [mod for mod in dirty_galactic_war]
+                    "galaxy_names": [mod for mod in dirty_galactic_war]
                 })
 
             if dirty_queues:

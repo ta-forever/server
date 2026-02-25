@@ -514,7 +514,7 @@ class GalacticWarState(object):
 
             return filtered_map_names
 
-    def ensure_allowed_maps(self, allowed_map_names_by_mod: Dict[str, Set[str]]):
+    def ensure_allowed_maps(self, allowed_map_names_by_mod: Dict[str, Set[str]], randomise_maps=False):
         self._logger.info(
             "[ensure_allowed_maps] len(allowed_map_names)=%d",
             len(allowed_map_names_by_mod)
@@ -546,7 +546,7 @@ class GalacticWarState(object):
                 )
                 continue
 
-            if planet.get_map() not in allowed_map_names:
+            if randomise_maps or planet.get_map() not in allowed_map_names:
                 new_map_name = next(shuffled_cycles_by_mod[mod])
 
                 self._logger.info(
@@ -570,6 +570,10 @@ class GalacticWarState(object):
 
         if map_name not in allowed_maps_by_mod[planet.get_mod()]:
             raise ValueError(f"Map '{map_name}' is not allowed for this planet")
+
+        already_planet = [p for p in self._planets_by_id.values() if p.get_map() == map_name]
+        if len(already_planet) > 0:
+            raise ValueError(f"Map '{map_name}' is already selected on {already_planet[0].get_name()}! Please try another")
 
         planet.set_map(map_name)
 

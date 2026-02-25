@@ -127,8 +127,12 @@ class ConfigurationStore:
         self.GALACTIC_WAR_DEFAULT_GALAXY = "ota"    # for old clients that don't inform the galaxy name
         self.GALACTIC_WAR_SCENARIO_PATH = "/content/galactic_war/scenarios"
         self.GALACTIC_WAR_INITIAL_SCENARIO = "scenario_0.gml"
+
+        self.GALACTIC_WAR_RELOAD_RESET_TARGETS = []   # galaxy technical names for below
         self.GALACTIC_WAR_RELOAD_STATE = 0      # a change will trigger GalacticWarService to reload its state
         self.GALACTIC_WAR_RESET = 0             # a change will trigger GalacticWarService to reset to GALACTIC_WAR_INITIAL_SCENARIO
+        self.GALACTIC_WAR_RANDOMISE_MAPS = 0    # a change will trigger GalacticWarService to randomise the maps on all planets
+
         self.GALACTIC_WAR_DOMINANCE_THRESHOLD = 3.0    # ratio between highest score to lowest score to consider a planet conquered
         self.GALACTIC_WAR_MAX_SCORE = 30.0                  # maximum amount per player by which faction-score for a planet may increase
         self.GALACTIC_WAR_STAKES_STRATEGY = "rank"          # "rank" or "rating"

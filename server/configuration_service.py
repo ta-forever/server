@@ -17,10 +17,13 @@ class ConfigurationService(Service):
         self._logger.info("Configuration service started.")
 
     async def _worker_loop(self) -> None:
-        while True:
-            self._logger.debug("Refreshing configuration variables")
-            self._store.refresh()
-            await asyncio.sleep(self._store.CONFIGURATION_REFRESH_TIME)
+        try:
+            while True:
+                self._logger.debug("Refreshing configuration variables")
+                self._store.refresh()
+                await asyncio.sleep(self._store.CONFIGURATION_REFRESH_TIME)
+        except Exception as e:
+            self._logger.exception(e)
 
     async def shutdown(self) -> None:
         if self._task is not None:
