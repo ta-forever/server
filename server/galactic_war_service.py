@@ -253,7 +253,7 @@ class GalacticWarService(Service):
             self._logger.info(f"[on_game_rating] game_id={game_info.game_id}, galaxy_name={galaxy_name}, planet={game_info.galactic_war_planet_name}")
             try:
                 state = self._state[galaxy_name]
-                state.validate_game(game_info)
+                state.validate_game(game_info, self.player_service)
                 self._logger.info(f"[on_game_rating]   validated OK")
 
                 old_scores = state._planets_by_name[game_info.galactic_war_planet_name].get_ro_scores()

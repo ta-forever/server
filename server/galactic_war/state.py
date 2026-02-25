@@ -14,7 +14,9 @@ from typing import List, Dict, Tuple, Set
 
 from .roman_planet_name import roman_planet_name
 from .typedefs import GwPlayerScore, GwGalaxyConfig, GwMapSelectStrategy
-from .. import config, FAFDatabase
+from ..config import config
+from ..db import FAFDatabase
+from ..player_service import PlayerService
 from ..decorators import with_logger
 from ..factions import Faction
 from ..games.game_results import GameOutcome
@@ -94,7 +96,7 @@ class GalacticWarState(object):
     def get_label(self):
         return self._data["label"]
 
-    def validate_game(self, game_info: EndedGameInfo):
+    def validate_game(self, game_info: EndedGameInfo, player_service: PlayerService):
         try:
             planet = self._planets_by_name[game_info.galactic_war_planet_name]
         except KeyError:
@@ -122,11 +124,17 @@ class GalacticWarState(object):
         if len(team_factions) != 2:
             raise InvalidGalacticWarGame("Galactic War must be played with opposing factions")
 
+        bad_faction_msgs = []
         for player_info in game_info.ended_game_player_summary:
             player_scores_by_faction = [(f, self.get_player_score(player_info.player_id, f)) for f in Faction]
-            best_faction, best_score = max(player_scores_by_faction, key=lambda item: item[1].cum_winning_scores)
-            if best_score.cum_winning_scores > 0. and best_faction != player_info.faction:
-                raise InvalidGalacticWarGame(f"Galactic War must be played for one side only. You previously played with {best_faction.name}")
+            best_faction, best_score = max(player_scores_by_faction, key=lambda item: (item[1].cum_winning_scores, item[1].wins + item[1].losses))
+            if (best_score.wins > 0 or best_score.losses > 0) and best_faction != player_info.faction:
+                player = player_service.get_player(player_info.player_id)
+                player_name = player.login if player else str(player_info.player_id)
+                bad_faction_msgs.append(f"{player_name} played for {player_info.faction.name.upper()} but previously enlisted with {best_faction.name.upper()}")
+        if len(bad_faction_msgs) > 0:
+            msg = '; '.join(bad_faction_msgs)
+            raise InvalidGalacticWarGame('; '.join(bad_faction_msgs))
 
         if game_info.rating_type is None or game_info.rating_type == RatingType.GLOBAL:
             raise InvalidGalacticWarGame("Galactic War must be played with ranked settings")
