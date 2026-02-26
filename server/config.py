@@ -174,6 +174,7 @@ class ConfigurationStore:
         self.UNRANK_ON_INVALID_LAUNCH_CODES = False
         self.RANKED_MAX_NUMBER_OF_AI = 0
         self.NOTIFY_USERS_ON_INVALID_LAUNCH_CODES = False
+        self.TEAMS_BUG_WORKAROUND = False   # on game going LIVE, identify stranded team member and reassign to a team
 
         self._defaults = {
             key: value for key, value in vars(self).items() if key.isupper()

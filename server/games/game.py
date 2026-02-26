@@ -825,6 +825,8 @@ class Game():
         """
         self._logger.debug(f"[on_live] gameid={self.id}, state={self.state}")
         if self.state is GameState.LAUNCHING:
+            if config.TEAMS_BUG_WORKAROUND:
+                self._teams_bug_workaround()
             self._players = self.players
             self._players_with_unsent_army_stats = list(self._players)
 
@@ -840,6 +842,39 @@ class Game():
 
             self._launch_fut.set_result(None)
             self._logger.info("Game launched")
+
+    def _teams_bug_workaround(self):
+        teams = self.get_team_sets()
+        teams.sort(key=lambda team: len(team))
+        team_sizes = [len(team) for team in teams]
+        num_players = sum(team_sizes)
+        if num_players >= 4 and num_players % 2 == 0 and len(teams) == 3 and team_sizes[0] == 1 and team_sizes[-1] == num_players // 2:
+            self._logger.debug(f"[teams_bug_workaround] gameid={self.id} team_sizes={team_sizes}")
+            incomplete_teams = [list(team) for team in teams if len(team) < num_players // 2]
+            if len(incomplete_teams) == 2:
+                target_team_id = FFA_TEAM
+                # prefer the ID from the larger incomplete team first
+                for incomplete_team in reversed(incomplete_teams):
+                    candidate = self.get_player_option(incomplete_team[0].id, "Team")
+                    if candidate != FFA_TEAM:
+                        target_team_id = candidate
+                        break
+                # if all incomplete teams are FFA, allocate a fresh team id
+                if target_team_id == FFA_TEAM:
+                    all_team_ids = {self.get_player_option(next(iter(team)).id, "Team") for team in teams}
+                    for n in range(FFA_TEAM + 1, 10):
+                        if n not in all_team_ids:
+                            target_team_id = n
+                            break
+                if target_team_id == FFA_TEAM:
+                    self._logger.warning(f"[teams_bug_workaround] gameid={self.id} unable to assign new team id")
+                    return
+                # reassign whichever incomplete teams don't already have the target id
+                for incomplete_team in incomplete_teams:
+                    for p in incomplete_team:
+                        if self.get_player_option(p.id, "Team") != target_team_id:
+                            self._logger.info(f"[teams_bug_workaround] gameid={self.id} playerid={p.id} assigning team to {target_team_id}")
+                            self.set_player_option(p.id, "Team", target_team_id)
 
     def find_suitable_rating_queue(self, strict_team_size: bool, strict_map_pool: bool, team_size: int = None):
         if team_size is None:
