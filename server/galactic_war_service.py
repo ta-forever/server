@@ -349,7 +349,7 @@ class GalacticWarService(Service):
             if winner_name is not None:
                 new_state.get_data()["last_galaxy_winner"] = winner_name
 
-            self._initialise_scenario(galaxy_config)
+            await self._initialise_scenario(galaxy_config)
             other_changes_made += 1
 
         return front_line_changes + other_changes_made
@@ -404,7 +404,7 @@ class GalacticWarService(Service):
             self.achievement_service.unlock(achievement_id, queue)
             await self.achievement_service.execute_batch_update(player_info.player_id, queue)
 
-    def _initialise_scenario(self, galaxy_config: GwGalaxyConfig):
+    async def _initialise_scenario(self, galaxy_config: GwGalaxyConfig):
         state = self._state[galaxy_config.technical_name]
         if len(state.get_capitals()) == 0:
             state.assign_two_capitals(galaxy_config)
@@ -416,7 +416,24 @@ class GalacticWarService(Service):
             state.distribute_planets_to_factions()
 
         state.separate_abutting_factions()
-        state.capture_uncontested_planets()
+
+        # Run the full stabilisation loop so topology quirks (e.g. adjacent
+        # uncontested planets that only become capturable after a neighbour is
+        # taken) are resolved before the state is saved and clients notified.
+        other_changes_made = 1
+        seen_snapshots = set()
+        while other_changes_made > 0:
+            snapshot = state.get_controller_snapshot()
+            if snapshot in seen_snapshots:
+                self._logger.warning(
+                    "[_initialise_scenario] %s: planet assignment is oscillating; "
+                    "stopping stabilisation loop to leave affected planets unchanged",
+                    galaxy_config.technical_name)
+                break
+            seen_snapshots.add(snapshot)
+            other_changes_made = state.capture_isolated_planets() + \
+                                 state.capture_uncontested_planets() + \
+                                 await state.update_front_lines(self.db)
 
         allowed_maps_by_mod = {
             mod_name: state.get_map_pool(mod_name,
@@ -460,7 +477,7 @@ class GalacticWarService(Service):
                 # give game_service time to find maps before we try to initialise_scenario
                 await asyncio.sleep(1)
 
-            self._initialise_scenario(galaxy_config)
+            await self._initialise_scenario(galaxy_config)
             await self._save_state(galaxy_config)
 
     async def _save_state(self, galaxy_config: GwGalaxyConfig):
