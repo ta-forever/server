@@ -1,301 +1,301 @@
-Abyssus
-Acies
-Aether
-Agnus
-Altum
-Ambitus
-Amnis
-Anguis
-Anima
-Annus
-Antiquitas
-Apex
-Aquila
-Arbor
-Arcana
-Arcus
-Arena
-Arma
-Arx
-Astra
-Astrum
-Ater
-Atrium
-Aura
-Aurora
-Aurum
-Auster
-Bellator
-Bellum
-Bestia
-Caedes
-Caelum
-Caligo
-Campus
-Candor
-Canis
-Caput
-Carcer
-Cardo
-Carmen
-Castrum
-Catena
-Caverna
-Celeritas
-Centurio
-Chaos
-Cinis
-Civitas
-Clades
-Clamor
-Clavis
-Collis
-Colossus
-Cometa
-Concordia
-Conditio
-Consilium
-Cor
-Corona
-Corpus
-Crepusculum
-Crux
-Cultus
-Cura
-Custos
-Daemon
-Damnum
-Decus
-Defensor
-Delubrum
-Desertum
-Desiderium
-Destinatio
-Deus
-Dies
-Discipulus
-Dominium
-Dominus
-Draco
-Dux
-Echo
-Eclipsis
-Elementum
-Ens
-Erinys
-Error
-Exitium
-Exilium
-Exordium
-Faber
-Facies
-Fatum
-Fax
-Fenestra
-Ferrum
-Fides
-Figura
-Flamma
-Fluctus
-Flumen
-Fortuna
-Fossa
-Fulmen
-Fumus
-Furor
-Glacies
-Gladius
-Gloria
-Gorgon
-Gravis
-Gurges
-Hades
-Hereditas
-Homo
-Honor
-Horror
-Hostis
-Hydra
-Ignis
-Imago
-Imperium
-Impetus
-Incendium
-Infernum
-Insidia
-Interitus
-Iter
-Janua
-Jugum
-Jus
-Labor
-Lacrima
-Lapis
-Latus
-Legatus
-Legio
-Leo
-Liber
-Libertas
-Limes
-Lingua
-Locus
-Lumen
-Luna
-Lux
-Machina
-Magister
-Magnitudo
-Malum
-Mandatum
-Mare
-Martyr
-Mater
-Memoria
-Mens
-Metus
-Miles
-Militia
-Mons
-Monstrum
-Mors
-Murus
-Natio
-Nauta
-Nebula
-Nexus
-Nihil
-Nobilitas
-Nodus
-Nox
-Nubes
-Numen
-Oblivio
-Occasus
-Occultus
-Oceanus
-Oculus
-Omen
-Onus
-Orbis
-Ordo
-Oriens
-Ortus
-Ossa
-Pactum
-Palus
-Paradoxum
-Parens
-Paries
-Patria
-Pax
-Periculum
-Perseverantia
-Persona
-Pestis
-Pietas
-Pilum
-Planeta
-Porta
-Potentia
-Praeda
-Praesidium
-Praetor
-Pretium
-Primus
-Princeps
-Proditor
-Proelium
-Profundum
-Promontorium
-Prophetia
-Proxima
-Pugna
-Pulvis
-Purgatorium
-Pyramis
-Quaesitor
-Quies
-Radix
-Raptor
-Regina
-Regnum
-Relictum
-Res
-Rex
-Ritus
-Robur
-Rosa
-Ruinum
-Ruptura
-Sacrarium
-Sanguis
-Saturnus
-Scelus
-Scutum
-Sedes
-Semita
-Senatus
-Serpens
-Servus
-Silentium
-Silva
-Signum
-Sol
-Solium
-Somnium
-Sors
-Spatium
-Speculum
-Sperare
-Spes
-Spiritus
-Statio
-Stella
-Strages
-Stratum
-Subitus
-Suffragium
-Summit
-Superbia
-Supremum
-Tabula
-Tempestas
-Tempus
-Tenebrae
-Terra
-Terror
-Testamentum
-Thronus
-Tigris
-Titan
-Tormentum
-Torrens
-Toxinum
-Tractus
-Trident
-Tribunus
-Tronus
-Umbra
-Universum
-Urbs
-Vallis
-Vapor
-Venator
-Venenum
-Ventus
-Veritas
-Vertex
-Vestigium
-Vetus
-Via
-Victor
-Victoria
-Vinculum
-Virtus
-Virus
-Vis
-Vita
-Vitium
-Vox
-Vulnus
+Abyssus f
+Acies f
+Aether m
+Agnus m
+Altum n
+Ambitus m
+Amnis m
+Anguis m
+Anima f
+Annus m
+Antiquitas f
+Apex m
+Aquila f
+Arbor f
+Arcana n
+Arcus m
+Arena f
+Arma n
+Arx f
+Astra n
+Astrum n
+Ater m
+Atrium n
+Aura f
+Aurora f
+Aurum n
+Auster m
+Bellator m
+Bellum n
+Bestia f
+Caedes f
+Caelum n
+Caligo f
+Campus m
+Candor m
+Canis m
+Caput n
+Carcer m
+Cardo m
+Carmen n
+Castrum n
+Catena f
+Caverna f
+Celeritas f
+Centurio m
+Chaos n
+Cinis m
+Civitas f
+Clades f
+Clamor m
+Clavis f
+Collis m
+Colossus m
+Cometa m
+Concordia f
+Conditio f
+Consilium n
+Cor n
+Corona f
+Corpus n
+Crepusculum n
+Crux f
+Cultus m
+Cura f
+Custos m
+Daemon m
+Damnum n
+Decus n
+Defensor m
+Delubrum n
+Desertum n
+Desiderium n
+Destinatio f
+Deus m
+Dies m
+Discipulus m
+Dominium n
+Dominus m
+Draco m
+Dux m
+Echo f
+Eclipsis f
+Elementum n
+Ens n
+Erinys f
+Error m
+Exitium n
+Exilium n
+Exordium n
+Faber m
+Facies f
+Fatum n
+Fax f
+Fenestra f
+Ferrum n
+Fides f
+Figura f
+Flamma f
+Fluctus m
+Flumen n
+Fortuna f
+Fossa f
+Fulmen n
+Fumus m
+Furor m
+Glacies f
+Gladius m
+Gloria f
+Gorgon f
+Gravis m
+Gurges m
+Hades m
+Hereditas f
+Homo m
+Honor m
+Horror m
+Hostis m
+Hydra f
+Ignis m
+Imago f
+Imperium n
+Impetus m
+Incendium n
+Infernum n
+Insidia f
+Interitus m
+Iter n
+Janua f
+Jugum n
+Jus n
+Labor m
+Lacrima f
+Lapis m
+Latus n
+Legatus m
+Legio f
+Leo m
+Liber m
+Libertas f
+Limes m
+Lingua f
+Locus m
+Lumen n
+Luna f
+Lux f
+Machina f
+Magister m
+Magnitudo f
+Malum n
+Mandatum n
+Mare n
+Martyr m
+Mater f
+Memoria f
+Mens f
+Metus m
+Miles m
+Militia f
+Mons m
+Monstrum n
+Mors f
+Murus m
+Natio f
+Nauta m
+Nebula f
+Nexus m
+Nihil n
+Nobilitas f
+Nodus m
+Nox f
+Nubes f
+Numen n
+Oblivio f
+Occasus m
+Occultus m
+Oceanus m
+Oculus m
+Omen n
+Onus n
+Orbis m
+Ordo m
+Oriens m
+Ortus m
+Ossa n
+Pactum n
+Palus f
+Paradoxum n
+Parens m
+Paries m
+Patria f
+Pax f
+Periculum n
+Perseverantia f
+Persona f
+Pestis f
+Pietas f
+Pilum n
+Planeta m
+Porta f
+Potentia f
+Praeda f
+Praesidium n
+Praetor m
+Pretium n
+Primus m
+Princeps m
+Proditor m
+Proelium n
+Profundum n
+Promontorium n
+Prophetia f
+Proxima f
+Pugna f
+Pulvis m
+Purgatorium n
+Pyramis f
+Quaesitor m
+Quies f
+Radix f
+Raptor m
+Regina f
+Regnum n
+Relictum n
+Res f
+Rex m
+Ritus m
+Robur n
+Rosa f
+Ruinum n
+Ruptura f
+Sacrarium n
+Sanguis m
+Saturnus m
+Scelus n
+Scutum n
+Sedes f
+Semita f
+Senatus m
+Serpens m
+Servus m
+Silentium n
+Silva f
+Signum n
+Sol m
+Solium n
+Somnium n
+Sors f
+Spatium n
+Speculum n
+Sperare n
+Spes f
+Spiritus m
+Statio f
+Stella f
+Strages f
+Stratum n
+Subitus m
+Suffragium n
+Summit m
+Superbia f
+Supremum n
+Tabula f
+Tempestas f
+Tempus n
+Tenebrae f
+Terra f
+Terror m
+Testamentum n
+Thronus m
+Tigris f
+Titan m
+Tormentum n
+Torrens m
+Toxinum n
+Tractus m
+Trident m
+Tribunus m
+Tronus m
+Umbra f
+Universum n
+Urbs f
+Vallis f
+Vapor m
+Venator m
+Venenum n
+Ventus m
+Veritas f
+Vertex m
+Vestigium n
+Vetus m
+Via f
+Victor m
+Victoria f
+Vinculum n
+Virtus f
+Virus n
+Vis f
+Vita f
+Vitium n
+Vox f
+Vulnus n

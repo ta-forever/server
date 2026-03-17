@@ -1,171 +1,171 @@
-Acer
-Acerbus
-Acrius
-Aeternus
-Aequus
-Aerius
-Afer
-Albus
-Altus
-Amarus
-Ancientior
-Antiquus
-Ardens
-Aridus
-Armatus
-Asper
-Ater
-Atratus
-Audax
-Aureus
-Avidus
-Barbarus
-Bellicus
-Belliger
-Benevolus
-Brevis
-Caecus
-Caelestis
-Caeruleus
-Calidus
-Candidus
-Carnifex
-Celer
-Cinerius
-Clarissimus
-Clarus
-Coelestis
-Colossalis
-Comatus
-Conditus
-Conqueror
-Crudelis
-Cruentus
-Cultus
-Curvus
-Daemoniacus
-Damnosus
-Decimus
-Divinus
-Dominus
-Durus
-Egregius
-Electricus
-Elementalis
-Eminens
-Enormis
-Eternus
-Exanimis
-Eximius
-Extremus
-Feralis
-Ferox
-Fervidus
-Finalis
-Firmus
-Flammeus
-Fortis
-Frigidus
-Fulgidus
-Furiosus
-Gelidus
-Giganteus
-Glacialis
-Gloriosus
-Grandis
-Gravis
-Horrendus
-Humanus
-Ignifer
-Ignitus
-Immensus
-Immortalis
-Impius
-Implacabilis
-Immanis
-Imperialis
-Inanis
-Incultus
-Infernalis
-Infinitus
-Ingens
-Iniquus
-Insanus
-Insignis
-Intrepidus
-Invisus
-Irascibilis
-Iratus
-Jovialis
-Justus
-Lethalis
-Liber
-Longus
-Lucidus
-Luminis
-Magnus
-Malignus
-Maledictus
-Martialis
-Mortalis
-Mutatus
-Mysticus
-Niger
-Nocturnus
-Noxius
-Obscurus
-Omnipotens
-Oppressus
-Perditus
-Perennis
-Perniciosus
-Primordialis
-Profundus
-Proximus
-Pulcher
-Purpureus
-Rapiens
-Rapidissimus
-Regalis
-Relictus
-Robustus
-Rubicundus
-Rugosus
-Rutilus
-Sacrus
-Saevius
-Sanguineus
-Sceleratus
-Secretus
-Serenus
-Severus
-Silentis
-Sinister
-Solaris
-Solidus
-Stellaris
-Strenuus
-Supremus
-Terribilis
-Titanicus
-Torridus
-Toxicus
-Tragicus
-Ultimus
-Umbrosus
-Universalis
-Urbanus
-Vastator
-Vastus
-Velox
-Veneficus
-Venenatus
-Venerabilis
-Verus
-Victorius
-Violentus
-Viridis
-Virilis
-Vividus
-Volcanicus
-Volucris
+Acer Acris Acre
+Acerbus Acerba Acerum
+Acrius Acrius Acrius
+Aeternus Aeterna Aeternum
+Aequus Aequa Aequum
+Aerius Aeria Aerium
+Afer Afra Afrum
+Albus Alba Album
+Altus Alta Altum
+Amarus Amara Amarum
+Ancientior Ancientior Ancientius
+Antiquus Antiqua Antiquum
+Ardens Ardens Ardens
+Aridus Arida Aridum
+Armatus Armata Armatum
+Asper Aspera Asperum
+Ater Atra Atrum
+Atratus Atrata Atratum
+Audax Audax Audax
+Aureus Aurea Aureum
+Avidus Avida Avidum
+Barbarus Barbara Barbarum
+Bellicus Bellica Bellicum
+Belliger Belligera Belligerum
+Benevolus Benevola Benevolum
+Brevis Brevis Breve
+Caecus Caeca Caecum
+Caelestis Caelestis Caeleste
+Caeruleus Caerulea Caeruleum
+Calidus Calida Calidum
+Candidus Candida Candidum
+Carnifex Carnifex Carnifex
+Celer Celeris Celere
+Cinerius Cineria Cinerium
+Clarissimus Clarissima Clarissimum
+Clarus Clara Clarum
+Coelestis Coelestis Coeleste
+Colossalis Colossalis Colossale
+Comatus Comata Comatum
+Conditus Condita Conditum
+Conqueror Conqueror Conqueror
+Crudelis Crudelis Crudele
+Cruentus Cruenta Cruentum
+Cultus Culta Cultum
+Curvus Curva Curvum
+Daemoniacus Daemoniaca Daemoniacum
+Damnosus Damnosa Damnosum
+Decimus Decima Decimum
+Divinus Divina Divinum
+Dominus Domina Dominum
+Durus Dura Durum
+Egregius Egregia Egregium
+Electricus Electrica Electricum
+Elementalis Elementalis Elementale
+Eminens Eminens Eminens
+Enormis Enormis Enorme
+Eternus Eterna Eternum
+Exanimis Exanimis Exanime
+Eximius Eximia Eximium
+Extremus Extrema Extremum
+Feralis Feralis Ferale
+Ferox Ferox Ferox
+Fervidus Fervida Fervidum
+Finalis Finalis Finale
+Firmus Firma Firmum
+Flammeus Flammea Flammeum
+Fortis Fortis Forte
+Frigidus Frigida Frigidum
+Fulgidus Fulgida Fulgidum
+Furiosus Furiosa Furiosum
+Gelidus Gelida Gelidum
+Giganteus Gigantea Giganteum
+Glacialis Glacialis Glaciale
+Gloriosus Gloriosa Gloriosum
+Grandis Grandis Grande
+Gravis Gravis Grave
+Horrendus Horrenda Horrendum
+Humanus Humana Humanum
+Ignifer Ignifera Igniferum
+Ignitus Ignita Ignitum
+Immensus Immensa Immensum
+Immortalis Immortalis Immortale
+Impius Impia Impium
+Implacabilis Implacabilis Implacabile
+Immanis Immanis Immane
+Imperialis Imperialis Imperiale
+Inanis Inanis Inane
+Incultus Inculta Incultum
+Infernalis Infernalis Infernale
+Infinitus Infinita Infinitum
+Ingens Ingens Ingens
+Iniquus Iniqua Iniquum
+Insanus Insana Insanum
+Insignis Insignis Insigne
+Intrepidus Intrepida Intrepidum
+Invisus Invisa Invisum
+Irascibilis Irascibilis Irascibile
+Iratus Irata Iratum
+Jovialis Jovialis Joviale
+Justus Justa Justum
+Lethalis Lethalis Lethale
+Liber Libera Liberum
+Longus Longa Longum
+Lucidus Lucida Lucidum
+Luminis Luminis Luminis
+Magnus Magna Magnum
+Malignus Maligna Malignum
+Maledictus Maledicta Maledictum
+Martialis Martialis Martiale
+Mortalis Mortalis Mortale
+Mutatus Mutata Mutatum
+Mysticus Mystica Mysticum
+Niger Nigra Nigrum
+Nocturnus Nocturna Nocturnum
+Noxius Noxia Noxium
+Obscurus Obscura Obscurum
+Omnipotens Omnipotens Omnipotens
+Oppressus Oppressa Oppressum
+Perditus Perdita Perditum
+Perennis Perennis Perenne
+Perniciosus Perniciosa Perniciosum
+Primordialis Primordialis Primordiale
+Profundus Profunda Profundum
+Proximus Proxima Proximum
+Pulcher Pulchra Pulchrum
+Purpureus Purpurea Purpureum
+Rapiens Rapiens Rapiens
+Rapidissimus Rapidissima Rapidissimum
+Regalis Regalis Regale
+Relictus Relicta Relictum
+Robustus Robusta Robustum
+Rubicundus Rubicunda Rubicundum
+Rugosus Rugosa Rugosum
+Rutilus Rutila Rutilum
+Sacrus Sacra Sacrum
+Saevius Saevia Saevium
+Sanguineus Sanguinea Sanguineum
+Sceleratus Scelerata Sceleratum
+Secretus Secreta Secretum
+Serenus Serena Serenum
+Severus Severa Severum
+Silentis Silentis Silentis
+Sinister Sinistra Sinistrum
+Solaris Solaris Solare
+Solidus Solida Solidum
+Stellaris Stellaris Stellare
+Strenuus Strenua Strenuum
+Supremus Suprema Supremum
+Terribilis Terribilis Terribile
+Titanicus Titanica Titanicum
+Torridus Torrida Torridum
+Toxicus Toxica Toxicum
+Tragicus Tragica Tragicum
+Ultimus Ultima Ultimum
+Umbrosus Umbrosa Umbrosum
+Universalis Universalis Universale
+Urbanus Urbana Urbanum
+Vastator Vastator Vastator
+Vastus Vasta Vastum
+Velox Velox Velox
+Veneficus Venefica Veneficum
+Venenatus Venenata Venenatum
+Venerabilis Venerabilis Venerabile
+Verus Vera Verum
+Victorius Victoria Victorium
+Violentus Violenta Violentum
+Viridis Viridis Viride
+Virilis Virilis Virile
+Vividus Vivida Vividum
+Volcanicus Volcanica Volcanicum
+Volucris Volucris Volucre

@@ -8,15 +8,21 @@ from server.rating_service.typedefs import PlayerID
 
 random.seed()
 
+# Each entry is (word, gender) where gender is 'm', 'f', or 'n'
 LATIN_NOUNS = []
 with open("latin_nouns.txt", "r") as fp:
     for line in fp:
-        LATIN_NOUNS += [line.strip().capitalize()]
+        parts = line.strip().split()
+        if len(parts) == 2:
+            LATIN_NOUNS.append((parts[0], parts[1]))
 
+# Each entry is (masc_form, fem_form, neut_form)
 LATIN_ADJECTIVES = []
 with open("latin_adjectives.txt", "r") as fp:
     for line in fp:
-        LATIN_ADJECTIVES += [line.strip().capitalize()]
+        parts = line.strip().split()
+        if len(parts) == 3:
+            LATIN_ADJECTIVES.append((parts[0], parts[1], parts[2]))
 
 
 def get_random_noun():
@@ -49,17 +55,18 @@ def _reset_random_adjs():
 
 def get_random_name():
     try:
-        noun = next(_random_noun_gen)
+        noun, gender = next(_random_noun_gen)
     except StopIteration:
         _reset_random_nouns()
-        noun = next(_random_noun_gen)
+        noun, gender = next(_random_noun_gen)
 
     try:
-        adj = next(_random_noun_gen)
+        adj_m, adj_f, adj_n = next(_random_adj_gen)
     except StopIteration:
-        _reset_random_nouns()
-        adj = next(_random_noun_gen)
+        _reset_random_adjs()
+        adj_m, adj_f, adj_n = next(_random_adj_gen)
 
+    adj = adj_f if gender == 'f' else adj_n if gender == 'n' else adj_m
     return f"{noun} {adj}"
 
 
