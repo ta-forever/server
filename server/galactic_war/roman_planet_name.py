@@ -5,8 +5,11 @@ def roman_planet_name(handle: str, existing_names=None, seed=None):
     if existing_names is None:
         existing_names = set()
 
-    if seed is not None:
-        random.seed(seed)
+    # Use a local Random instance so each call draws from fresh OS entropy
+    # (when seed=None) rather than the global module state.  The global state
+    # may be in the same position across server restarts, causing the same
+    # pattern to be picked repeatedly for the same player name.
+    _rng = random.Random(seed)
 
     # ----------------------------
     # Remove clan prefix
@@ -52,7 +55,7 @@ def roman_planet_name(handle: str, existing_names=None, seed=None):
         elif name.endswith("is"):
             return name[:-2], "3rd"
         else:
-            return name, random.choice(["2nd", "3rd"])
+            return name, _rng.choice(["2nd", "3rd"])
 
     stem, decl = latinize(base)
 
@@ -96,7 +99,7 @@ def roman_planet_name(handle: str, existing_names=None, seed=None):
         lambda: "Municipium " + adj_neut(),          # Neuter agreement
     ]
 
-    name = random.choice(patterns)()
+    name = _rng.choice(patterns)()
 
     # ----------------------------
     # Uniqueness resolution
