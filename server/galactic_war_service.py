@@ -12,7 +12,7 @@ from .player_service import PlayerService
 from .game_service import GameService
 from .db import FAFDatabase
 from .factions import Faction
-from .galactic_war.typedefs import GwGalaxyConfig
+from .galactic_war.typedefs import GwGalaxyConfig, GwPlayerScore
 from .games.game_results import GameOutcome
 from .rating_service import RatingService
 from .config import config
@@ -298,9 +298,19 @@ class GalacticWarService(Service):
 
         front_line_changes = await state.update_front_lines(self.db)
         other_changes_made = 1
+        seen_snapshots = set()
         while other_changes_made > 0:
+            snapshot = state.get_controller_snapshot()
+            if snapshot in seen_snapshots:
+                self._logger.warning(
+                    "[update_state] %s: planet assignment is oscillating; "
+                    "stopping stabilisation loop to leave affected planets unchanged",
+                    galaxy_config.technical_name)
+                break
+            seen_snapshots.add(snapshot)
             other_changes_made = state.capture_isolated_planets() + \
-                                 state.capture_uncontested_planets()
+                                 state.capture_uncontested_planets() + \
+                                 await state.update_front_lines(self.db)
 
         uncaptured_capitals: List[Planet] = state.get_capitals(standing=True, contested=True, captured=False)
         if len(uncaptured_capitals) < 2:
@@ -308,15 +318,34 @@ class GalacticWarService(Service):
             self._logger.info("[update_state] the galaxy is captured by {}. starting a new scenario".format(
                 winner_name or "no one"))
 
-            # Preserve top-level player stats across the galaxy reset.
-            # Per-planet belligerent scores live inside each node and are
-            # naturally discarded when the new scenario is loaded.
-            old_players = dict(state.get_data().get("players", {}))
+            # Update lifetime_players from current-galaxy players.
+            # Each players entry is pre-seeded from lifetime at first use, so it already
+            # represents the all-time total for that faction — copy, don't accumulate.
+            # Factions the player didn't touch this galaxy are unchanged in lifetime.
+            # The per-galaxy 'players' dict is NOT carried forward so that
+            # players are free to choose a different faction in the new galaxy.
+            old_players = state.get_data().get("players", {})
+            old_lifetime = state.get_data().get("lifetime_players", {})
+
+            if galaxy_config.carry_over_player_ranks:
+                new_lifetime = {pid: dict(faction_scores) for pid, faction_scores in old_lifetime.items()}
+                for pid, faction_scores in old_players.items():
+                    if pid not in new_lifetime:
+                        new_lifetime[pid] = {}
+                    for fname, score in faction_scores.items():
+                        new_lifetime[pid][fname] = GwPlayerScore(
+                            wins=score.wins,
+                            losses=score.losses,
+                            cum_winning_scores=score.cum_winning_scores,
+                            cum_losing_scores=score.cum_losing_scores,
+                        )
+            else:
+                new_lifetime = {}
 
             await self._load_state(galaxy_config, path=str(self._get_next_scenario(state.get_label())))
 
             new_state = self._state[galaxy_config.technical_name]
-            new_state.get_data()["players"] = old_players
+            new_state.get_data()["lifetime_players"] = new_lifetime
             if winner_name is not None:
                 new_state.get_data()["last_galaxy_winner"] = winner_name
 
@@ -344,7 +373,7 @@ class GalacticWarService(Service):
 
     async def _grant_avatars(self, avatar_ids: Dict[Faction, List[int]], game_info: EndedGameInfo, state: GalacticWarState):
         for player_info in game_info.ended_game_player_summary:
-            player_score = state.get_player_score(player_info.player_id, player_info.faction)
+            player_score = state.get_player_score_alltime(player_info.player_id, player_info.faction)
             metric = player_score.cum_winning_scores
             rank_tier = bisect.bisect_right(config.GALACTIC_WAR_RANK_THRESHOLDS, metric)
             try:
@@ -361,7 +390,7 @@ class GalacticWarService(Service):
                                   game_info: EndedGameInfo, state: GalacticWarState):
 
         for player_info in game_info.ended_game_player_summary:
-            player_score = state.get_player_score(player_info.player_id, player_info.faction)
+            player_score = state.get_player_score_alltime(player_info.player_id, player_info.faction)
             metric = player_score.cum_winning_scores
             rank_tier = bisect.bisect_right(config.GALACTIC_WAR_RANK_THRESHOLDS, metric)
             try:

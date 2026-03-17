@@ -1,4 +1,5 @@
 import bisect
+import dataclasses
 import math
 import random
 from itertools import cycle
@@ -24,7 +25,6 @@ from ..games.typedefs import EndedGameInfo, ValidityState, OutcomeLikelihoods, E
 from ..matchmaker import MatchmakerQueue
 from ..rating import RatingType
 from ..rating_service.typedefs import PlayerID, TeamID, RankedRating
-import scipy.stats
 
 from ..types import Map
 
@@ -58,13 +58,20 @@ class GalacticWarState(object):
         if not "players" in data.keys():
             data["players"] = {}
 
-        data["players"] = {
-            int(pid_string): {
-                faction_name: player_scores if isinstance(player_scores, GwPlayerScore) else GwPlayerScore.from_dict(player_scores)
-                for faction_name, player_scores in v.items()
+        def _parse_player_dict(raw):
+            return {
+                int(pid_string): {
+                    faction_name: player_scores if isinstance(player_scores, GwPlayerScore) else GwPlayerScore.from_dict(player_scores)
+                    for faction_name, player_scores in v.items()
+                }
+                for pid_string, v in raw.items()
             }
-            for pid_string, v in data["players"].items()
-        }
+
+        data["players"] = _parse_player_dict(data["players"])
+
+        if "lifetime_players" not in data:
+            data["lifetime_players"] = {}
+        data["lifetime_players"] = _parse_player_dict(data["lifetime_players"])
 
         self._data = data
 
@@ -199,6 +206,7 @@ class GalacticWarState(object):
             self._adjust_player(player_info.player_id, player_info.faction.name, belligerent_attribution_adjustment)
 
     def get_player_score(self, pid: int, faction: Faction) -> GwPlayerScore:
+        """Current-galaxy score only.  Used for faction determination and within-galaxy rank."""
         if not pid in self._data["players"]:
             return GwPlayerScore()
 
@@ -208,13 +216,26 @@ class GalacticWarState(object):
 
         return player_data[faction.name]
 
+    def get_player_score_alltime(self, pid: int, faction: Faction) -> GwPlayerScore:
+        """Lifetime score (all previous galaxies + current galaxy).  Used for leaderboard and grants.
+        Once a player has played for a faction in this galaxy, their 'players' entry is pre-seeded
+        from lifetime, so it already represents the all-time total — no addition needed.
+        For factions not yet touched this galaxy, fall back to lifetime_players directly."""
+        current = self._data["players"].get(pid, {}).get(faction.name)
+        if current is not None:
+            return current
+        return self._data["lifetime_players"].get(pid, {}).get(faction.name, GwPlayerScore())
+
     def _adjust_player(self, pid: int, faction_name: str, score_adj: float):
         if not pid in self._data["players"]:
             self._data["players"][pid] = {}
 
         player_data = self._data["players"][pid]
         if not faction_name in player_data:
-            player_data[faction_name] = GwPlayerScore()
+            # Pre-seed from lifetime so the player's history is preserved across galaxies
+            # while still allowing a free faction choice at the start of each new galaxy.
+            lifetime = self._data["lifetime_players"].get(pid, {}).get(faction_name)
+            player_data[faction_name] = dataclasses.replace(lifetime) if lifetime is not None else GwPlayerScore()
 
         player_scores = player_data[faction_name]
         if score_adj > 0.:
@@ -224,25 +245,6 @@ class GalacticWarState(object):
             player_scores.losses += 1
             player_scores.cum_losing_scores += score_adj
 
-    def _get_leaderboard(self) -> List[Tuple[int, GwPlayerScore]]:
-        return sorted(
-            (
-                (pid, max(scores.values(), key=lambda s: (
-                    s.cum_winning_scores,
-                    s.cum_losing_scores,
-                    s.wins,
-                    -s.losses
-                )))
-                for pid, scores in self._data["players"].items()
-            ),
-            key=lambda item: (
-                item[1].cum_winning_scores,
-                item[1].cum_losing_scores,
-                item[1].wins,
-                -item[1].losses,
-            ),
-            reverse=True
-        )
 
     def _calculate_stakes_from_rating(self,
                                       ended_game_player_summary: List[EndedGamePlayerSummary],
@@ -268,8 +270,12 @@ class GalacticWarState(object):
         def rank_tier_for_score(score: GwPlayerScore):
             return bisect.bisect_right(config.GALACTIC_WAR_RANK_THRESHOLDS, score.cum_winning_scores)
 
-        leaderboard = self._get_leaderboard()
-        rank_by_pid = {pid: rank_tier_for_score(score) for pid, score in leaderboard}
+        rank_by_pid = {
+            player_info.player_id: rank_tier_for_score(
+                self.get_player_score_alltime(player_info.player_id, player_info.faction)
+            )
+            for player_info in ended_game_player_summary
+        }
         NUM_RANK_TIERS = 1 + len(config.GALACTIC_WAR_RANK_THRESHOLDS)
 
         team_size = len(ended_game_player_summary) // 2
@@ -291,38 +297,6 @@ class GalacticWarState(object):
         min_adj, max_adj = config.GALACTIC_WAR_MIN_MAX_PLANET_ADJ
         planet_adj = min_adj + (max_adj - min_adj) * min_rank_in_game / max(1, (NUM_RANK_TIERS - 1))
         planet_adj = min(planet_adj, config.GALACTIC_WAR_MAX_SCORE)
-
-        return stakes, planet_adj
-
-    def _calculate_stakes_from_leaderboard_position(self, ended_game_player_summary: List[EndedGamePlayerSummary]) \
-            -> Tuple[Dict[PlayerID, float], float]:
-
-        team_ids = list({player_info.team_id for player_info in ended_game_player_summary})
-        assert(len(team_ids) == 2)
-
-        player_ids_by_team = {
-            tid: [player_info.player_id for player_info in ended_game_player_summary if player_info.team_id == tid]
-            for tid in team_ids
-        }
-
-        leaderboard = self._get_leaderboard()
-        rank_by_pid = {pid: n for n, (pid, score) in enumerate(leaderboard)}
-        NUM_RANKS = len(leaderboard)
-
-        team_size = len(ended_game_player_summary) // 2
-        max_stake_per_opponent = config.GALACTIC_WAR_MAX_SCORE / team_size
-        stakes = {player_info.player_id: 0. for player_info in ended_game_player_summary}
-        for pid1 in player_ids_by_team[team_ids[0]]:
-            rank1 = rank_by_pid.get(pid1, NUM_RANKS // 2)
-            for pid2 in player_ids_by_team[team_ids[1]]:
-                rank2 = rank_by_pid.get(pid2, NUM_RANKS // 2)
-                rank_difference = (rank2 - rank1) / NUM_RANKS if NUM_RANKS >= 10 else 0
-                stakes[pid1] += scipy.stats.norm.cdf(rank_difference / config.GALACTIC_WAR_STAKES_RANK_FACTOR) * max_stake_per_opponent
-                stakes[pid2] += scipy.stats.norm.cdf(-rank_difference / config.GALACTIC_WAR_STAKES_RANK_FACTOR) * max_stake_per_opponent
-
-        min_rank_in_game = min(rank_by_pid.values())
-        min_adj, max_adj = config.GALACTIC_WAR_MIN_MAX_PLANET_ADJ
-        planet_adj = min_adj + (max_adj - min_adj) * min_rank_in_game / max(1, (NUM_RANKS-1))
 
         return stakes, planet_adj
 
@@ -616,6 +590,20 @@ class GalacticWarState(object):
             if faction is not None:
                 planets_by_faction[faction] += [planet]
         return planets_by_faction
+
+    def get_controller_snapshot(self) -> frozenset:
+        """Return a hashable snapshot of every planet's current controller.
+
+        Used by the stabilisation loop in update_state to detect oscillation:
+        if the snapshot at the start of an iteration matches a snapshot seen in
+        a previous iteration, all three functions (capture_isolated_planets,
+        capture_uncontested_planets, update_front_lines) have already had a
+        chance to run and the state is cycling rather than converging.
+        """
+        return frozenset(
+            (pid, p.get_controlled_by().name if p.get_controlled_by() else None)
+            for pid, p in self._planets_by_id.items()
+        )
 
     def _make_sub_graph(self, planet_ids: List[int]):
         graph = networkx.Graph()

@@ -108,6 +108,9 @@ class ConfigurationStore:
             {
                 "technical_name": "ota",
                 "display_name": "OTA",
+                "arm_capital": "Empyrrean",
+                "core_capital": "Core Prime",
+                "carry_over_player_ranks": True,
                 "state_file": "/content/galactic_war/galactic_war.json",
                 "map_select_strategy": "REGEX",   # or "MAP_POOL"
                 "mods": [

@@ -42,6 +42,10 @@ class GwGalaxyConfig:
     # is absent or not found in the loaded scenario.
     arm_capital: str = None
     core_capital: str = None
+    # Whether players' accumulated scores carry over to the next galaxy.
+    # When False, lifetime_players is discarded on galaxy reset so every
+    # galaxy starts with a clean slate.  Defaults to True.
+    carry_over_player_ranks: bool = True
 
     @classmethod
     def from_dict(cls, d: Dict) -> "GwGalaxyConfig":
@@ -55,6 +59,7 @@ class GwGalaxyConfig:
             rank_achievement_ids={Faction.from_string(k): v for k, v in d["rank_achievement_ids"].items()},
             arm_capital=d.get("arm_capital", None),
             core_capital=d.get("core_capital", None),
+            carry_over_player_ranks=d.get("carry_over_player_ranks", True),
         )
 
     @classmethod
