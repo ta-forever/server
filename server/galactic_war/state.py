@@ -435,21 +435,45 @@ class GalacticWarState(object):
         return [planet for planet in self._planets_by_id.values()
                 if planet.get_controlled_by() is not None]
 
-    def assign_two_capitals(self):
-        pids = [pid for pid in self._planets_by_id.keys()]
-        G = self._make_sub_graph(pids)
-        all_pairs_shortest_path = networkx.all_pairs_shortest_path(G)
-        all_pairs_path_length = [(pid1, pid2, len(path12))
-                                 for pid1, paths1 in all_pairs_shortest_path
-                                 for pid2, path12 in paths1.items()]
-        all_pairs_path_length.sort(key=lambda x: x[2])
-        capital1_id, capital2_id, _ = all_pairs_path_length[-1]
+    def assign_two_capitals(self, galaxy_config=None):
+        # Try explicit named capitals from per-galaxy config first.
+        arm_planet = None
+        core_planet = None
+        if galaxy_config is not None:
+            arm_name = galaxy_config.arm_capital
+            core_name = galaxy_config.core_capital
+            if arm_name and core_name:
+                arm_planet = self._planets_by_name.get(arm_name)
+                core_planet = self._planets_by_name.get(core_name)
+                if arm_planet is None or core_planet is None:
+                    self._logger.warning(
+                        "[assign_two_capitals] named capitals not found in scenario "
+                        "(arm='%s' found=%s, core='%s' found=%s); falling back to distance search",
+                        arm_name, arm_planet is not None,
+                        core_name, core_planet is not None,
+                    )
+                    arm_planet = core_planet = None
 
+        if arm_planet is None or core_planet is None:
+            # Fall back to the pair of planets with the greatest graph distance.
+            pids = [pid for pid in self._planets_by_id.keys()]
+            G = self._make_sub_graph(pids)
+            all_pairs_shortest_path = networkx.all_pairs_shortest_path(G)
+            all_pairs_path_length = [(pid1, pid2, len(path12))
+                                     for pid1, paths1 in all_pairs_shortest_path
+                                     for pid2, path12 in paths1.items()]
+            all_pairs_path_length.sort(key=lambda x: x[2])
+            capital1_id, capital2_id, _ = all_pairs_path_length[-1]
+            arm_planet = self._planets_by_id[capital1_id]
+            core_planet = self._planets_by_id[capital2_id]
+
+        arm_id = arm_planet.get_id()
+        core_id = core_planet.get_id()
         for pid, planet in self._planets_by_id.items():
-            if pid == capital1_id:
+            if pid == arm_id:
                 planet.set_capital_of(Faction.arm)
                 planet.set_controlled_by(Faction.arm)
-            elif pid == capital2_id:
+            elif pid == core_id:
                 planet.set_capital_of(Faction.core)
                 planet.set_controlled_by(Faction.core)
             else:

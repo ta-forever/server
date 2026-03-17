@@ -36,6 +36,12 @@ class GwGalaxyConfig:
     mods: Dict[str, GwModConfig]
     rank_avatar_ids: Dict[Faction, List[int]]
     rank_achievement_ids: Dict[Faction, List[str]]
+    # Optional: explicit capital planet names.  If both are set and the named
+    # planets are found in the scenario, they take precedence over the
+    # greatest-distance search.  Falls back to distance search if either name
+    # is absent or not found in the loaded scenario.
+    arm_capital: str = None
+    core_capital: str = None
 
     @classmethod
     def from_dict(cls, d: Dict) -> "GwGalaxyConfig":
@@ -46,7 +52,9 @@ class GwGalaxyConfig:
             map_select_strategy=GwMapSelectStrategy(d["map_select_strategy"]),
             mods={c["technical_name"]:GwModConfig.from_dict(c) for c in d["mods"]},
             rank_avatar_ids={Faction.from_string(k): [int(_id) for _id in v] for k, v in d["rank_avatar_ids"].items()},
-            rank_achievement_ids={Faction.from_string(k): v for k, v in d["rank_achievement_ids"].items()}
+            rank_achievement_ids={Faction.from_string(k): v for k, v in d["rank_achievement_ids"].items()},
+            arm_capital=d.get("arm_capital", None),
+            core_capital=d.get("core_capital", None),
         )
 
     @classmethod
