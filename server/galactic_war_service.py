@@ -304,9 +304,22 @@ class GalacticWarService(Service):
 
         uncaptured_capitals: List[Planet] = state.get_capitals(standing=True, contested=True, captured=False)
         if len(uncaptured_capitals) < 2:
+            winner_name = uncaptured_capitals[0].get_capital_of().name if len(uncaptured_capitals) > 0 else None
             self._logger.info("[update_state] the galaxy is captured by {}. starting a new scenario".format(
-                uncaptured_capitals[0].get_capital_of().name if len(uncaptured_capitals) > 0 else "no one"))
+                winner_name or "no one"))
+
+            # Preserve top-level player stats across the galaxy reset.
+            # Per-planet belligerent scores live inside each node and are
+            # naturally discarded when the new scenario is loaded.
+            old_players = dict(state.get_data().get("players", {}))
+
             await self._load_state(galaxy_config, path=str(self._get_next_scenario(state.get_label())))
+
+            new_state = self._state[galaxy_config.technical_name]
+            new_state.get_data()["players"] = old_players
+            if winner_name is not None:
+                new_state.get_data()["last_galaxy_winner"] = winner_name
+
             self._initialise_scenario(galaxy_config)
             other_changes_made += 1
 
@@ -365,7 +378,7 @@ class GalacticWarService(Service):
     def _initialise_scenario(self, galaxy_config: GwGalaxyConfig):
         state = self._state[galaxy_config.technical_name]
         if len(state.get_capitals()) == 0:
-            state.assign_two_capitals()
+            state.assign_two_capitals(galaxy_config)
             state = GalacticWarState(state.get_data(), galaxy_config)
             self._state[galaxy_config.technical_name] = state
 
