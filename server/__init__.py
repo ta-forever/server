@@ -186,6 +186,15 @@ class ServerInstance(object):
                     lambda lobby_conn: lobby_conn.authenticated
                 )
 
+            left_players = player_service.left_players
+            player_service.clear_left()
+
+            if left_players:
+                self.write_broadcast(
+                    {"command": "player_left", "players": left_players},
+                    lambda lobby_conn: lobby_conn.authenticated
+                )
+
             # TODO: This spams squillions of messages: we should implement per-
             # connection message aggregation at the next abstraction layer down :P
             for (game, only_to_peers, pings_only) in dirty_games:

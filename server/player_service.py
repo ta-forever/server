@@ -39,6 +39,7 @@ class PlayerService(Service):
         # Static-ish data fields.
         self.uniqueid_exempt = {}
         self._dirty_players = set()
+        self._left_players: list = []
 
     async def initialize(self) -> None:
         await self.update_data()
@@ -79,6 +80,13 @@ class PlayerService(Service):
 
     def clear_dirty(self):
         self._dirty_players = set()
+
+    @property
+    def left_players(self) -> list:
+        return self._left_players
+
+    def clear_left(self):
+        self._left_players = []
 
     def set_player_state(self, player:Player, newState:PlayerState):
         if player.state != newState:
@@ -155,6 +163,7 @@ class PlayerService(Service):
 
     def remove_player(self, player: Player):
         if player.id in self._players:
+            self._left_players.append({"id": player.id, "login": player.login})
             del self._players[player.id]
             metrics.players_online.set(len(self._players))
 

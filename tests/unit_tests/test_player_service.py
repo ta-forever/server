@@ -139,3 +139,20 @@ async def test_broadcast_shutdown_error(player_factory, player_service):
     await player_service.shutdown()
 
     player.lobby_connection.send_warning.assert_called_once()
+
+
+async def test_on_connection_lost_populates_left_players(player_factory, player_service):
+    player = player_factory(player_id=1, login="Alice")
+    player_service[player.id] = player
+    conn = Mock(spec=LobbyConnection)
+    conn.player = player
+    player_service.on_connection_lost(conn)
+    assert player_service.get_player(1) is None
+    assert player_service.left_players == [{"id": 1, "login": "Alice"}]
+
+
+async def test_clear_left(player_factory, player_service):
+    player = player_factory(player_id=1, login="Alice")
+    player_service._left_players = [{"id": 1, "login": "Alice"}]
+    player_service.clear_left()
+    assert player_service.left_players == []
