@@ -190,19 +190,32 @@ class GalacticWarState(object):
             GameOutcome.DEFEAT: 0.0
         }[player_info.outcome] for player_info in game_info.ended_game_player_summary}
 
+        # pre-compute per-player planet score adjustments so we can derive winner credit
+        planet_adjustments = {}
+        for player_info in game_info.ended_game_player_summary:
+            pid = player_info.player_id
+            adj = returned_stakes[pid] - stakes[pid]
+            if adj < 0. and PLANET_ADJ is not None:
+                adj = -PLANET_ADJ
+            planet_adjustments[pid] = adj
+
+        # winners get credit equal to the total planet score lost by losers, split across the winning team
+        total_planet_loss = sum(abs(adj) for adj in planet_adjustments.values() if adj < 0.)
+        winner_count = sum(1 for pi in game_info.ended_game_player_summary if planet_adjustments[pi.player_id] >= 0.)
+        winner_planet_credit = total_planet_loss / winner_count if winner_count > 0 else 0.
+
         # execute adjustments to score
         for player_info in game_info.ended_game_player_summary:
             pid = player_info.player_id
             belligerent_attribution_adjustment = winners_gains[pid] + returned_stakes[pid] - stakes[pid]
-            planet_adjustment = returned_stakes[pid] - stakes[pid]
-            if planet_adjustment < 0. and PLANET_ADJ is not None:
-                planet_adjustment = -PLANET_ADJ
+            planet_adjustment = planet_adjustments[pid]
+            planet_belligerent_adj = winner_planet_credit if planet_adjustment >= 0. else -abs(planet_adjustment)
 
-            self._logger.info("[update_scores] player %d of %s. stake=%.1f, returned=%.1f, winnings=%.1f, planet_adj=%.1f, belligerent_adj=%.1f",
-                              pid, player_info.faction.name, stakes[pid], returned_stakes[pid], winners_gains[pid], planet_adjustment, belligerent_attribution_adjustment)
+            self._logger.info("[update_scores] player %d of %s. stake=%.1f, returned=%.1f, winnings=%.1f, planet_adj=%.1f, planet_belligerent_adj=%.1f, belligerent_adj=%.1f",
+                              pid, player_info.faction.name, stakes[pid], returned_stakes[pid], winners_gains[pid], planet_adjustment, planet_belligerent_adj, belligerent_attribution_adjustment)
 
             planet.set_score(player_info.faction, planet.get_score(player_info.faction) + planet_adjustment)
-            planet.adjust_belligerent(player_info.player_id, player_info.faction, belligerent_attribution_adjustment)
+            planet.adjust_belligerent(player_info.player_id, player_info.faction, planet_belligerent_adj)
             self._adjust_player(player_info.player_id, player_info.faction.name, belligerent_attribution_adjustment)
 
     def get_player_score(self, pid: int, faction: Faction) -> GwPlayerScore:
@@ -225,6 +238,57 @@ class GalacticWarState(object):
         if current is not None:
             return current
         return self._data["lifetime_players"].get(pid, {}).get(faction.name, GwPlayerScore())
+
+    def _effective_threshold(self, planet: Planet, galaxy_config: GwGalaxyConfig, periods_offset: int = 0) -> float:
+        """Return the dominance threshold that applies to *planet*.
+
+        periods_offset=1 gives the threshold that will apply at the NEXT update
+        (after contested_periods has been incremented), which is what the
+        capture-preview flag should use.
+        """
+        decay_period = galaxy_config.dominance_decay_period
+        decay_thresholds = galaxy_config.dominance_decay_thresholds
+        if decay_period and decay_thresholds:
+            periods = planet.get_contested_periods() + periods_offset
+            step = min(periods // decay_period, len(decay_thresholds) - 1)
+            return decay_thresholds[step]
+        return config.GALACTIC_WAR_DOMINANCE_THRESHOLD
+
+    def increment_contested_periods(self):
+        """Increment the contested-period counter for every currently contested planet.
+        Must be called exactly once per scheduled update period, before the
+        stabilisation loop runs."""
+        for planet in self._planets_by_id.values():
+            if planet.get_controlled_by() is None:
+                self._data_by_planet_id(planet.get_id())["contested_periods"] = \
+                    planet.get_contested_periods() + 1
+
+    def _data_by_planet_id(self, planet_id: int) -> dict:
+        """Return the raw data dict for the planet with the given id."""
+        return next(n for n in self._data["node"] if n["id"] == planet_id)
+
+    def update_capture_preview(self, galaxy_config: GwGalaxyConfig):
+        """Write client-facing preview fields into each planet's data dict.
+
+        For contested planets:
+          - contested_periods  : current count (informational)
+          - effective_threshold: threshold that will apply at the NEXT update
+          - about_to_be_captured: True if a faction already dominates at that threshold
+
+        Controlled planets have these fields removed so the payload stays clean.
+        Legacy clients that do not know these fields will continue to use the
+        global dominance_threshold for their own warning logic.
+        """
+        for planet in self._planets_by_id.values():
+            data = self._data_by_planet_id(planet.get_id())
+            if planet.get_controlled_by() is None:
+                next_threshold = self._effective_threshold(planet, galaxy_config, periods_offset=1)
+                data["effective_threshold"] = next_threshold
+                data["about_to_be_captured"] = planet.get_dominant_faction(next_threshold) is not None
+            else:
+                data.pop("effective_threshold", None)
+                data.pop("about_to_be_captured", None)
+                data.pop("contested_periods", None)
 
     def _adjust_player(self, pid: int, faction_name: str, score_adj: float):
         if not pid in self._data["players"]:
@@ -307,16 +371,16 @@ class GalacticWarState(object):
             row = result.fetchone()
             return row[0] if row else None
 
-    async def update_front_lines(self, database: FAFDatabase, planet=None):
+    async def update_front_lines(self, database: FAFDatabase, galaxy_config: GwGalaxyConfig, planet=None):
         changes_made = 0
         if planet is None:
             # do planets with higher scores first so if there's a conflict, the higher-scored planet gets precedence
             contested_planets = [p for pid, p in self._planets_by_id.items() if p.get_controlled_by() is None]
             contested_planets.sort(key=lambda p: max(p.get_ro_scores().values()), reverse=True)
-            return sum([await self.update_front_lines(database, planet=p) for p in contested_planets])
+            return sum([await self.update_front_lines(database, galaxy_config, planet=p) for p in contested_planets])
 
         else:
-            dominant_faction = planet.get_dominant_faction()
+            dominant_faction = planet.get_dominant_faction(self._effective_threshold(planet, galaxy_config))
             if dominant_faction is not None:
                 self._logger.info(f"[update_front_lines] capturing {planet.get_name()} for {dominant_faction.name} because is dominating")
                 planet.set_controlled_by(dominant_faction)
@@ -333,7 +397,7 @@ class GalacticWarState(object):
                         self._neighbours_by_name[new_planet_name] = self._neighbours_by_name.pop(old_planet_name)
 
                 for p in self._neighbours_by_name[planet.get_name()]:
-                    f = p.get_dominant_faction()
+                    f = p.get_dominant_faction(self._effective_threshold(p, galaxy_config))
                     c = p.get_controlled_by()
                     if (f is not None and f != dominant_faction):
                         self._logger.info(f"[update_front_lines] contesting {p.get_name()}({f.name} dominant) because neighbours with {planet.get_name()}({dominant_faction.name} captured)")

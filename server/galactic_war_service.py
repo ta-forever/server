@@ -269,6 +269,8 @@ class GalacticWarService(Service):
 
                 if self._update_state_cron is None:
                     await self.update_state(galaxy_config)
+                else:
+                    state.update_capture_preview(galaxy_config)
 
                 await self._save_state(galaxy_config)
                 self.set_dirty(galaxy_name, True)
@@ -285,18 +287,18 @@ class GalacticWarService(Service):
 
     async def scheduled_update_state(self):
         for galaxy_config in GwGalaxyConfig.from_dict_list(config.GALACTIC_WAR_GALAXIES).values():
-            changes_made = await self.update_state(galaxy_config)
-            if changes_made > 0:
-                await self._save_state(galaxy_config)
-                self.set_dirty(galaxy_config.technical_name, True)
+            await self.update_state(galaxy_config)
+            await self._save_state(galaxy_config)
+            self.set_dirty(galaxy_config.technical_name, True)
 
     async def update_state(self, galaxy_config: GwGalaxyConfig):
         self._logger.info(f"[update_state] updating {galaxy_config.technical_name} ...")
         state = self._state[galaxy_config.technical_name]
 
         state._data["dominance_threshold"] = config.GALACTIC_WAR_DOMINANCE_THRESHOLD
+        state.increment_contested_periods()
 
-        front_line_changes = await state.update_front_lines(self.db)
+        front_line_changes = await state.update_front_lines(self.db, galaxy_config)
         other_changes_made = 1
         seen_snapshots = set()
         while other_changes_made > 0:
@@ -310,7 +312,7 @@ class GalacticWarService(Service):
             seen_snapshots.add(snapshot)
             other_changes_made = state.capture_isolated_planets() + \
                                  state.capture_uncontested_planets() + \
-                                 await state.update_front_lines(self.db)
+                                 await state.update_front_lines(self.db, galaxy_config)
 
         uncaptured_capitals: List[Planet] = state.get_capitals(standing=True, contested=True, captured=False)
         if len(uncaptured_capitals) < 2:
@@ -352,6 +354,7 @@ class GalacticWarService(Service):
             await self._initialise_scenario(galaxy_config)
             other_changes_made += 1
 
+        self._state[galaxy_config.technical_name].update_capture_preview(galaxy_config)
         return front_line_changes + other_changes_made
 
     async def on_command_set_map(self, player_id: int, galaxy_technical_name: str, planet_name: str, map_name: str):
@@ -433,7 +436,7 @@ class GalacticWarService(Service):
             seen_snapshots.add(snapshot)
             other_changes_made = state.capture_isolated_planets() + \
                                  state.capture_uncontested_planets() + \
-                                 await state.update_front_lines(self.db)
+                                 await state.update_front_lines(self.db, galaxy_config)
 
         allowed_maps_by_mod = {
             mod_name: state.get_map_pool(mod_name,
@@ -463,6 +466,7 @@ class GalacticWarService(Service):
         if state_path.exists():
             self._logger.info(f"[_load_state] galaxy={galaxy_config.technical_name}. Loading existing state:{state_path}")
             self._state[galaxy_config.technical_name] = await self._do_load_state(galaxy_config, state_path)
+            self._state[galaxy_config.technical_name].update_capture_preview(galaxy_config)
 
         else:
             new_scenario_path = Path(config.GALACTIC_WAR_SCENARIO_PATH) / config.GALACTIC_WAR_INITIAL_SCENARIO

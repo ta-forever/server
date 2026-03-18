@@ -166,6 +166,12 @@ class Planet(object):
         except KeyError:
             return None
 
+    def get_contested_periods(self) -> int:
+        return self._data.get("contested_periods", 0)
+
+    def reset_contested_periods(self):
+        self._data["contested_periods"] = 0
+
     def set_controlled_by(self, faction: Union[Faction, None]):
         if faction is None:
             if "controlled_by" in self._data:
@@ -173,6 +179,7 @@ class Planet(object):
                 self._data["belligerents"].clear()
         else:
             self._data["controlled_by"] = faction.capitalized
+            self.reset_contested_periods()
 
     def get_score(self, faction: Faction) -> float:
         try:
@@ -194,12 +201,14 @@ class Planet(object):
         for f in self.get_ro_scores().keys():
             self.set_score(f, self.get_size())
 
-    def get_dominant_faction(self) -> Union[Faction, None]:
+    def get_dominant_faction(self, threshold: float = None) -> Union[Faction, None]:
+        if threshold is None:
+            threshold = config.GALACTIC_WAR_DOMINANCE_THRESHOLD
         scores = self.get_ro_scores()
         min_score = min(scores.values())
         max_faction = max(scores, key=scores.get)
         max_score = scores[max_faction]
-        if max_score > config.GALACTIC_WAR_DOMINANCE_THRESHOLD * min_score:
+        if max_score > threshold * min_score:
             try:
                 return Faction.from_value(max_faction)
             except KeyError:

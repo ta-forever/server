@@ -111,6 +111,8 @@ class ConfigurationStore:
                 "arm_capital": "Empyrrean",
                 "core_capital": "Core Prime",
                 "carry_over_player_ranks": True,
+                "dominance_decay_period": 7,
+                "dominance_decay_thresholds": [3, 2, 1.5, 1.25, 1.01],
                 "state_file": "/content/galactic_war/galactic_war.json",
                 "map_select_strategy": "REGEX",   # or "MAP_POOL"
                 "mods": [

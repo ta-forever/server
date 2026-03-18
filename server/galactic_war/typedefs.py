@@ -46,6 +46,14 @@ class GwGalaxyConfig:
     # When False, lifetime_players is discarded on galaxy reset so every
     # galaxy starts with a clean slate.  Defaults to True.
     carry_over_player_ranks: bool = True
+    # Optional time-decay for the dominance threshold.
+    # dominance_decay_period: N update periods between each threshold step.
+    # dominance_decay_thresholds: thresholds applied at 0, N, 2N, 3N … periods
+    #   contested.  The last entry is held indefinitely.
+    # If absent, the global config.GALACTIC_WAR_DOMINANCE_THRESHOLD is used
+    # for all planets with no decay.
+    dominance_decay_period: int = None
+    dominance_decay_thresholds: list = None
 
     @classmethod
     def from_dict(cls, d: Dict) -> "GwGalaxyConfig":
@@ -60,6 +68,8 @@ class GwGalaxyConfig:
             arm_capital=d.get("arm_capital", None),
             core_capital=d.get("core_capital", None),
             carry_over_player_ranks=d.get("carry_over_player_ranks", True),
+            dominance_decay_period=d.get("dominance_decay_period", None),
+            dominance_decay_thresholds=d.get("dominance_decay_thresholds", None),
         )
 
     @classmethod
