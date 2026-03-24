@@ -40,6 +40,10 @@ class CoturnHMAC:
             )
             auth_token = base64.b64encode(secret.digest()).decode()
 
+            # RFC 7065: IPv6 addresses in TURN/STUN URIs must be enclosed in brackets
+            if ":" in coturn_host and not coturn_host.startswith("["):
+                coturn_host = f"[{coturn_host}]"
+
             servers.append({
                 "urls": [
                     f"turn:{coturn_host}?transport=tcp",
