@@ -344,9 +344,12 @@ class GalacticWarService(Service):
             else:
                 new_lifetime = {}
 
+            old_iteration = state.get_iteration()
+
             await self._load_state(galaxy_config, path=str(self._get_next_scenario(state.get_label())))
 
             new_state = self._state[galaxy_config.technical_name]
+            new_state.get_data()["iteration"] = old_iteration + 1
             new_state.get_data()["lifetime_players"] = new_lifetime
             if winner_name is not None:
                 new_state.get_data()["last_galaxy_winner"] = winner_name

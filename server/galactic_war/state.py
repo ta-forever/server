@@ -73,6 +73,9 @@ class GalacticWarState(object):
             data["lifetime_players"] = {}
         data["lifetime_players"] = _parse_player_dict(data["lifetime_players"])
 
+        if "iteration" not in data:
+            data["iteration"] = 1
+
         self._data = data
 
         mod_names = [cfg.technical_name for cfg in galaxy_config.mods.values()]
@@ -102,6 +105,9 @@ class GalacticWarState(object):
 
     def get_label(self):
         return self._data["label"]
+
+    def get_iteration(self) -> int:
+        return self._data.get("iteration", 1)
 
     def validate_game(self, game_info: EndedGameInfo, player_service: PlayerService):
         try:
@@ -392,6 +398,7 @@ class GalacticWarState(object):
                         old_planet_name = planet.get_name()
                         new_planet_name = roman_planet_name(heroic_player_name, self._planets_by_name.keys())
                         self._logger.info(f"[update_front_lines] renaming from {old_planet_name} to {new_planet_name} to honour {heroic_player_name}")
+                        planet.add_previous_name(old_planet_name)
                         planet.set_name(new_planet_name)
                         self._planets_by_name[new_planet_name] = self._planets_by_name.pop(old_planet_name)
                         self._neighbours_by_name[new_planet_name] = self._neighbours_by_name.pop(old_planet_name)

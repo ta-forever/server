@@ -130,6 +130,15 @@ class Planet(object):
     def set_name(self, new_name):
         self._data["label"] = new_name
 
+    def get_previous_names(self) -> List[str]:
+        return self._data.get("previous_names", [])
+
+    def add_previous_name(self, name: str):
+        if "previous_names" not in self._data:
+            self._data["previous_names"] = []
+        if name not in self._data["previous_names"]:
+            self._data["previous_names"].append(name)
+
     def get_map(self) -> str:
         return self._data["map"]
 
