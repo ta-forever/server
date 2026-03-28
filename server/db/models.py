@@ -354,3 +354,18 @@ user_group_assignment = Table(
     Column("create_time",   TIMESTAMP,  nullable=False),
     Column("update_time",   TIMESTAMP,  nullable=False)
 )
+
+gw_game_stats = Table(
+    "gw_game_stats", metadata,
+    Column("game_id",       Integer, ForeignKey("game_stats.id"), primary_key=True),
+    Column("galaxy",        String(64), nullable=False),
+    Column("iteration",     Integer, nullable=False),
+    Column("planet_id",     Integer, nullable=False),
+)
+
+gw_game_player_stats = Table(
+    "gw_game_player_stats", metadata,
+    Column("game_player_stats_id", Integer, ForeignKey("game_player_stats.id"), primary_key=True),
+    Column("gw_faction",    String(16), nullable=False),
+    Column("gw_rank",       Integer, nullable=False),
+)

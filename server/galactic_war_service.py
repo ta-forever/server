@@ -10,7 +10,10 @@ from trueskill import Rating
 
 from .player_service import PlayerService
 from .game_service import GameService
+from sqlalchemy import select
+
 from .db import FAFDatabase
+from .db.models import game_player_stats, gw_game_stats, gw_game_player_stats
 from .factions import Faction
 from .galactic_war.typedefs import GwGalaxyConfig, GwPlayerScore
 from .games.game_results import GameOutcome
@@ -158,6 +161,7 @@ class GalacticWarService(Service):
                 config.GALACTIC_WAR_MANUAL_ATTACK[k]
                 for k in ["galaxy", "planet", "pid1", "faction1", "rank1", "pid2", "faction2", "rank2", "pwin"]
             ]
+            game_id = int(config.GALACTIC_WAR_MANUAL_ATTACK.get("game_id", 0))
             pid1, pid2 = int(pid1), int(pid2)
             fac1, fac2 = Faction.from_string(fac1), Faction.from_string(fac2)
             rank1, rank2 = int(rank1), int(rank2)
@@ -176,7 +180,7 @@ class GalacticWarService(Service):
             game_outcome_2 = GameOutcome.DEFEAT
 
             game_info = EndedGameInfo(
-                game_id=0,
+                game_id=game_id,
                 rating_type='ranked',
                 map_id=0,
                 map_name=planet.get_map(),
@@ -260,6 +264,8 @@ class GalacticWarService(Service):
                 state.update_scores(game_info, old_ratings, new_ratings, team_outcome_likelihoods)
                 new_scores = state._planets_by_name[game_info.galactic_war_planet_name].get_ro_scores()
                 self._logger.info(f"[on_game_rating]    old_scores={old_scores}, new_scores={new_scores}")
+
+                await self._persist_gw_stats(galaxy_name, state, game_info)
 
                 if config.GALACTIC_WAR_RANK_THRESHOLDS:
                     if galaxy_config.rank_avatar_ids:
@@ -409,6 +415,58 @@ class GalacticWarService(Service):
             queue = []
             self.achievement_service.unlock(achievement_id, queue)
             await self.achievement_service.execute_batch_update(player_info.player_id, queue)
+
+    async def _persist_gw_stats(self, galaxy_name: str, state: GalacticWarState, game_info: EndedGameInfo):
+        if game_info.game_id <= 0:
+            return
+
+        try:
+            planet = state._planets_by_name.get(game_info.galactic_war_planet_name)
+            if planet is None:
+                self._logger.warning(f"[_persist_gw_stats] planet not found: {game_info.galactic_war_planet_name}")
+                return
+
+            planet_id = planet.get_id()
+            iteration = state.get_iteration()
+
+            async with self.db.acquire() as conn:
+                await conn.execute(gw_game_stats.insert().values(
+                    game_id=game_info.game_id,
+                    galaxy=galaxy_name,
+                    iteration=iteration,
+                    planet_id=planet_id,
+                ))
+
+                for player_info in game_info.ended_game_player_summary:
+                    # Look up game_player_stats id
+                    result = await conn.execute(
+                        select(game_player_stats.c.id).where(
+                            (game_player_stats.c.gameId == game_info.game_id) &
+                            (game_player_stats.c.playerId == player_info.player_id)
+                        )
+                    )
+                    row = result.fetchone()
+                    if row is None:
+                        self._logger.warning(
+                            f"[_persist_gw_stats] game_player_stats not found for game_id={game_info.game_id}, player_id={player_info.player_id}")
+                        continue
+
+                    gps_id = row[0]
+
+                    # Compute rank tier
+                    player_score = state.get_player_score_alltime(player_info.player_id, player_info.faction)
+                    rank_tier = bisect.bisect_right(config.GALACTIC_WAR_RANK_THRESHOLDS, player_score.cum_winning_scores)
+
+                    await conn.execute(gw_game_player_stats.insert().values(
+                        game_player_stats_id=gps_id,
+                        gw_faction=player_info.faction.name if hasattr(player_info.faction, 'name') else str(player_info.faction),
+                        gw_rank=rank_tier,
+                    ))
+
+            self._logger.info(f"[_persist_gw_stats] persisted GW stats for game_id={game_info.game_id}")
+
+        except Exception:
+            self._logger.exception("[_persist_gw_stats] failed to persist GW stats for game_id=%s", game_info.game_id)
 
     async def _initialise_scenario(self, galaxy_config: GwGalaxyConfig):
         state = self._state[galaxy_config.technical_name]
