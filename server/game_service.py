@@ -151,26 +151,30 @@ class GameService(Service):
             # Delete original file
             os.remove(file_path)
 
+            tada_upload = False
+            replay_info = None
             async with self._db.acquire() as conn:
-                # see if we want to auto upload to TADA
-                replay_info = await self.get_replay_info(conn, game_id)
-
-                tada_upload = (not replay_info.tada_available) and \
-                              (not replay_info.replay_hidden) and \
-                              (replay_info.leaderboard_id in config.TADA_AUTO_UPLOAD_LEADERBOARD_IDS)
-
-                # Update DB
+                # Always mark the replay as available since the .tad file exists
                 await conn.execute(sqlalchemy.sql.text(
-                    """
-                    UPDATE `game_stats`
-                    SET
-                        `replay_available` = 1,
-                        `tada_available` = :tada_available
-                    WHERE `id` = :game_id
-                    """
-                ), tada_available=tada_upload, game_id=game_id)
+                    "UPDATE `game_stats` SET `replay_available` = 1 WHERE `id` = :game_id"
+                ), game_id=game_id)
 
-            if tada_upload:
+                # See if we want to auto upload to TADA
+                try:
+                    replay_info = await self.get_replay_info(conn, game_id)
+
+                    tada_upload = (not replay_info.tada_available) and \
+                                  (not replay_info.replay_hidden) and \
+                                  (replay_info.leaderboard_id in config.TADA_AUTO_UPLOAD_LEADERBOARD_IDS)
+
+                    if tada_upload:
+                        await conn.execute(sqlalchemy.sql.text(
+                            "UPDATE `game_stats` SET `tada_available` = 1 WHERE `id` = :game_id"
+                        ), game_id=game_id)
+                except Exception:
+                    self._logger.warning("[archive_new_replays] Could not get replay info for game_id=%s, skipping TADA upload", game_id)
+
+            if tada_upload and replay_info is not None:
                 await self._tada_service.upload(game_id, replay_info.replay_meta, archive_path, 2)
 
     async def process_replay_metadata(self):
@@ -263,7 +267,7 @@ class GameService(Service):
             FROM `game_stats` gs
             JOIN `game_featuredMods` gfm on gfm.id = gs.gameMod
             JOIN `game_player_stats` gps on gps.gameId = gs.id
-            JOIN `leaderboard_rating_journal` lrj on lrj.game_player_stats_id = gps.id
+            LEFT JOIN `leaderboard_rating_journal` lrj on lrj.game_player_stats_id = gps.id
             WHERE gs.id = :game_id
             limit 1
             """), game_id=game_id)
